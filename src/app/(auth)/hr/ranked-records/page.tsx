@@ -1,8 +1,9 @@
 'use client';
 import React from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Table, Button } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { Download, Trophy, Medal, Award, TrendingUp, User, Mail, Briefcase } from 'lucide-react';
 
 export default function RankedRecordsPage() {
   const { showToast } = useToast();
@@ -69,56 +70,228 @@ export default function RankedRecordsPage() {
   ];
 
   const extractedColumns = [
-    { header: '#', accessor: 'no' },
-    { header: 'Name', accessor: 'name' },
-    { header: 'Contact Info', accessor: 'contactInfo' },
-    { header: 'Skills', accessor: 'skills' },
-    { header: 'Education', accessor: 'education' },
-    { header: 'Experience', accessor: 'experience' },
+    { header: '#', accessor: 'no' as const },
+    {
+      header: 'Name',
+      accessor: 'name' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <span className="font-medium text-gray-900">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Contact Info',
+      accessor: 'contactInfo' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Skills',
+      accessor: 'skills' as const,
+      render: (value: string) => (
+        <Badge variant="info">{value}</Badge>
+      )
+    },
+    { header: 'Education', accessor: 'education' as const },
+    {
+      header: 'Experience',
+      accessor: 'experience' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
   ];
 
+  const getRankIcon = (ranking: number) => {
+    switch (ranking) {
+      case 1:
+        return <Trophy className="w-5 h-5 text-yellow-500" />;
+      case 2:
+        return <Medal className="w-5 h-5 text-gray-400" />;
+      case 3:
+        return <Award className="w-5 h-5 text-orange-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const getRankBadgeVariant = (ranking: number): 'success' | 'info' | 'warning' | 'default' => {
+    switch (ranking) {
+      case 1:
+        return 'success';
+      case 2:
+        return 'info';
+      case 3:
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
   const rankedColumns = [
-    { header: 'Ranking', accessor: 'ranking' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Contact Info', accessor: 'contactInfo' },
-    { header: 'Applied Position', accessor: 'appliedPosition' },
+    {
+      header: 'Rank',
+      accessor: 'ranking' as const,
+      render: (value: number) => (
+        <div className="flex items-center gap-2">
+          {getRankIcon(value)}
+          <Badge variant={getRankBadgeVariant(value)}>
+            {value === 1 ? '1st' : value === 2 ? '2nd' : value === 3 ? '3rd' : `${value}th`}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      header: 'Name',
+      accessor: 'name' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <span className="font-medium text-gray-900">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Email',
+      accessor: 'email' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Applied Position',
+      accessor: 'appliedPosition' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
     {
       header: 'PDS Match Score',
-      accessor: 'matchScore',
+      accessor: 'matchScore' as const,
       render: (value: string) => (
-        <span className="font-bold text-[#22A555]">{value}</span>
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-[#22A555]" />
+          <span className="font-bold text-[#22A555] text-lg">{value}</span>
+        </div>
       )
     },
   ];
 
   return (
-    <AdminLayout role="HR" userName="HR Admin">
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Analyzer and Ranking</h1>
-          <Button variant="success" onClick={() => showToast('Generate report feature coming soon', 'info')}>
-            📥 Generate Report
-          </Button>
-        </div>
+    <AdminLayout role="HR" userName="HR Admin" pageTitle="Extracted & Ranked PDS Records" pageDescription="AI-powered applicant ranking and analysis">
+      <Container size="xl">
+        <div className="space-y-8">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Applicants</p>
+                  <p className="text-3xl font-bold text-gray-900">{extractedData.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
 
-        <div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            Extracted Resume Data Table
-          </h2>
-          <Card>
-            <Table columns={extractedColumns} data={extractedData} />
-          </Card>
-        </div>
+            <Card variant="flat" className="bg-gradient-to-br from-yellow-50 to-yellow-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Top Ranked</p>
+                  <p className="text-3xl font-bold text-gray-900">{rankedCandidates.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center">
+                  <Trophy className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
 
-        <div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            Ranked Candidates
-          </h2>
-          <Card>
-            <Table columns={rankedColumns} data={rankedCandidates} />
-          </Card>
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Avg. Match Score</p>
+                  <p className="text-3xl font-bold text-gray-900">93.4%</p>
+                </div>
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Active Positions</p>
+                  <p className="text-3xl font-bold text-gray-900">1</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                  <Briefcase className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex items-center justify-end">
+            <Button variant="success" icon={Download} onClick={() => showToast('Generate report feature coming soon', 'info')}>
+              Generate Report
+            </Button>
+          </div>
+
+          {/* Extracted Resume Data */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Extracted Resume Data</h2>
+              <Badge variant="info">{extractedData.length} records</Badge>
+            </div>
+            <Card>
+              <EnhancedTable
+                columns={extractedColumns}
+                data={extractedData}
+                searchable
+                paginated
+                pageSize={10}
+                searchPlaceholder="Search by name, skills, or experience..."
+              />
+            </Card>
+          </div>
+
+          {/* Ranked Candidates */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">AI-Ranked Candidates</h2>
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                <Badge variant="success">{rankedCandidates.length} candidates</Badge>
+              </div>
+            </div>
+            <Card variant="elevated">
+              <EnhancedTable
+                columns={rankedColumns}
+                data={rankedCandidates}
+                searchable
+                searchPlaceholder="Search by name, email, or position..."
+              />
+            </Card>
+          </div>
         </div>
-      </div>
+      </Container>
     </AdminLayout>
   );
 }

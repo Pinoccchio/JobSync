@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: 'HR' as 'HR' | 'PESO' | 'APPLICANT',
+    role: 'ADMIN' as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT',
     rememberMe: false,
   });
 
@@ -36,6 +36,9 @@ export default function LoginPage() {
 
       // Redirect based on selected role
       switch (formData.role) {
+        case 'ADMIN':
+          router.push('/admin/dashboard');
+          break;
         case 'HR':
           router.push('/hr/dashboard');
           break;
@@ -113,10 +116,11 @@ export default function LoginPage() {
                 </label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'HR' | 'PESO' | 'APPLICANT' })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' })}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#22A555] transition-colors bg-white"
                   disabled={isLoading}
                 >
+                  <option value="ADMIN">System Admin</option>
                   <option value="HR">HR Admin</option>
                   <option value="PESO">PESO Admin</option>
                   <option value="APPLICANT">Applicant</option>

@@ -9,10 +9,10 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  role: 'HR' | 'PESO' | 'APPLICANT' | null;
+  role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, role: 'HR' | 'PESO' | 'APPLICANT') => Promise<void>;
+  login: (email: string, password: string, role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT') => Promise<void>;
   logout: () => void;
 }
 
@@ -20,7 +20,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<'HR' | 'PESO' | 'APPLICANT' | null>(null);
+  const [role, setRole] = useState<'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -30,12 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (storedUser && storedRole) {
       setUser(JSON.parse(storedUser));
-      setRole(storedRole as 'HR' | 'PESO' | 'APPLICANT');
+      setRole(storedRole as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, selectedRole: 'HR' | 'PESO' | 'APPLICANT') => {
+  const login = async (email: string, password: string, selectedRole: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT') => {
     // Mock login - replace with actual API call
     const mockUser: User = {
       id: '1',

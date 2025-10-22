@@ -1,45 +1,69 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
+import {
+  Home,
+  Briefcase,
+  ClipboardList,
+  FileText,
+  Settings,
+  Megaphone,
+  GraduationCap,
+  BarChart3,
+  Users,
+  Activity
+} from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
-  role: 'HR' | 'PESO' | 'Applicant';
+  role: 'Admin' | 'HR' | 'PESO' | 'Applicant';
   userName?: string;
+  pageTitle?: string;
+  pageDescription?: string;
 }
 
+const ADMIN_MENU_ITEMS = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
+  { label: 'User Management', href: '/admin/user-management', icon: Users },
+  { label: 'Activity Logs', href: '/admin/activity-logs', icon: Activity },
+];
+
 const HR_MENU_ITEMS = [
-  { label: 'Dashboard', href: '/hr/dashboard', icon: '🏠' },
-  { label: 'Extracted and Ranked PDS Record', href: '/hr/ranked-records', icon: '⚙️' },
-  { label: 'Scanned PDS Records Management', href: '/hr/scanned-records', icon: '📄' },
-  { label: 'Job Management', href: '/hr/job-management', icon: '💼' },
-  { label: 'Announcements', href: '/hr/announcements', icon: '📢' },
+  { label: 'Dashboard', href: '/hr/dashboard', icon: Home },
+  { label: 'Extracted and Ranked PDS Record', href: '/hr/ranked-records', icon: BarChart3 },
+  { label: 'Scanned PDS Records Management', href: '/hr/scanned-records', icon: FileText },
+  { label: 'Job Management', href: '/hr/job-management', icon: Briefcase },
+  { label: 'Announcements', href: '/hr/announcements', icon: Megaphone },
 ];
 
 const PESO_MENU_ITEMS = [
-  { label: 'Dashboard', href: '/peso/dashboard', icon: '🏠' },
-  { label: 'Training Applications', href: '/peso/applications', icon: '📋' },
-  { label: 'Training Programs', href: '/peso/programs', icon: '🎓' },
+  { label: 'Dashboard', href: '/peso/dashboard', icon: Home },
+  { label: 'Training Applications', href: '/peso/applications', icon: ClipboardList },
+  { label: 'Training Programs', href: '/peso/programs', icon: GraduationCap },
 ];
 
 const APPLICANT_MENU_ITEMS = [
-  { label: 'Dashboard', href: '/applicant/dashboard', icon: '🏠' },
-  { label: 'Jobs', href: '/applicant/jobs', icon: '💼' },
-  { label: 'Trainings', href: '/applicant/trainings', icon: '🎓' },
-  { label: 'My Applications', href: '/applicant/applications', icon: '📋' },
+  { label: 'Dashboard', href: '/applicant/dashboard', icon: Home },
+  { label: 'Jobs', href: '/applicant/jobs', icon: Briefcase },
+  { label: 'Trainings', href: '/applicant/trainings', icon: GraduationCap },
+  { label: 'My Applications', href: '/applicant/applications', icon: ClipboardList },
 ];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   children,
   role,
-  userName = 'Admin'
+  userName = 'Admin',
+  pageTitle,
+  pageDescription
 }) => {
   const menuItems =
+    role === 'Admin' ? ADMIN_MENU_ITEMS :
     role === 'HR' ? HR_MENU_ITEMS :
     role === 'PESO' ? PESO_MENU_ITEMS :
     APPLICANT_MENU_ITEMS;
 
   const userRole =
+    role === 'Admin' ? 'System Admin' :
     role === 'HR' ? 'HR Admin' :
     role === 'PESO' ? 'PESO Admin' :
     'Applicant';
@@ -49,7 +73,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <Sidebar menuItems={menuItems} role={role} />
 
       <div className="flex-1 ml-64 flex flex-col">
-        <TopNav userRole={userRole} userName={userName} showSearch={true} />
+        <TopNav
+          userRole={userRole}
+          userName={userName}
+          pageTitle={pageTitle}
+          pageDescription={pageDescription}
+        />
 
         <main className="flex-1 overflow-y-auto p-8">
           {children}

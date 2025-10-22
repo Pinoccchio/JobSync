@@ -1,8 +1,9 @@
 'use client';
 import React from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Table, Button } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock } from 'lucide-react';
 
 export default function PESOApplicationsPage() {
   const { showToast } = useToast();
@@ -40,38 +41,92 @@ export default function PESOApplicationsPage() {
   ];
 
   const columns = [
-    { header: 'Full Name', accessor: 'name' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Phone', accessor: 'phone' },
-    { header: 'Address', accessor: 'address' },
-    { header: 'Education', accessor: 'education' },
-    { header: 'Applied Training', accessor: 'training' },
-    { header: 'Status', accessor: 'status',
+    {
+      header: 'Full Name',
+      accessor: 'name' as const,
       render: (value: string) => (
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          value === 'Approved' ? 'bg-green-100 text-green-800' :
-          value === 'Rejected' ? 'bg-red-100 text-red-800' :
-          'bg-yellow-100 text-yellow-800'
-        }`}>
-          {value}
-        </span>
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <span className="font-medium text-gray-900">{value}</span>
+        </div>
       )
     },
     {
+      header: 'Email',
+      accessor: 'email' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Phone',
+      accessor: 'phone' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Phone className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Address',
+      accessor: 'address' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Education',
+      accessor: 'education' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <GraduationCap className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Applied Training',
+      accessor: 'training' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Status',
+      accessor: 'status' as const,
+      render: (value: string) => {
+        const variant = value === 'Approved' ? 'success' : value === 'Rejected' ? 'danger' : 'warning';
+        const icon = value === 'Approved' ? CheckCircle : value === 'Rejected' ? XCircle : Clock;
+        return <Badge variant={variant} icon={icon}>{value}</Badge>;
+      }
+    },
+    {
       header: 'Actions',
-      accessor: 'actions',
+      accessor: 'actions' as const,
       render: () => (
         <div className="flex gap-2">
           <Button
-            variant="teal"
+            variant="secondary"
             size="sm"
+            icon={Eye}
             onClick={() => showToast('View details feature coming soon', 'info')}
           >
-            View Details
+            View
           </Button>
           <Button
-            variant="warning"
+            variant="success"
             size="sm"
+            icon={CheckCircle}
             onClick={() => showToast('Approve feature coming soon', 'info')}
           >
             Approve
@@ -79,6 +134,7 @@ export default function PESOApplicationsPage() {
           <Button
             variant="danger"
             size="sm"
+            icon={XCircle}
             onClick={() => showToast('Reject feature coming soon', 'info')}
           >
             Reject
@@ -89,14 +145,79 @@ export default function PESOApplicationsPage() {
   ];
 
   return (
-    <AdminLayout role="PESO" userName="PESO Admin">
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">Training Applications</h1>
+    <AdminLayout role="PESO" userName="PESO Admin" pageTitle="Training Applications" pageDescription="Manage and review training program applications">
+      <Container size="xl">
+        <div className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Applications</p>
+                  <p className="text-3xl font-bold text-gray-900">{applications.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
 
-        <Card title="TRAINING APPLICATION LIST">
-          <Table columns={columns} data={applications} />
-        </Card>
-      </div>
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applications.filter(a => a.status === 'Pending').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Approved</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applications.filter(a => a.status === 'Approved').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Rejected</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applications.filter(a => a.status === 'Rejected').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Applications Table */}
+          <Card title="TRAINING APPLICATION LIST" headerColor="bg-[#D4F4DD]">
+            <EnhancedTable
+              columns={columns}
+              data={applications}
+              searchable
+              paginated
+              pageSize={10}
+              searchPlaceholder="Search by name, email, training, or status..."
+            />
+          </Card>
+        </div>
+      </Container>
     </AdminLayout>
   );
 }

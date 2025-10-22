@@ -1,12 +1,12 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Table, Button, Input } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { Eye, CheckCircle, XCircle, FileText } from 'lucide-react';
 
 export default function ScannedRecordsPage() {
   const { showToast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
 
   const applicants = [
     {
@@ -36,34 +36,55 @@ export default function ScannedRecordsPage() {
   ];
 
   const columns = [
-    { header: 'No.', accessor: 'no' },
-    { header: 'Applicant Name', accessor: 'name' },
-    { header: 'File Name', accessor: 'fileName' },
+    { header: 'No.', accessor: 'no' as const },
+    { header: 'Applicant Name', accessor: 'name' as const },
+    {
+      header: 'File Name',
+      accessor: 'fileName' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Status',
+      accessor: 'status' as const,
+      render: (value: string) => (
+        <Badge variant="warning" icon={CheckCircle}>
+          {value.charAt(0).toUpperCase() + value.slice(1)}
+        </Badge>
+      )
+    },
     {
       header: 'Actions',
-      accessor: 'actions',
+      accessor: 'actions' as const,
       render: (_: any, row: any) => (
         <div className="flex gap-2">
           <Button
-            variant="teal"
+            variant="secondary"
             size="sm"
+            icon={Eye}
             onClick={() => showToast('View feature coming soon', 'info')}
           >
-            VIEW
+            View
           </Button>
           <Button
-            variant="warning"
+            variant="success"
             size="sm"
+            icon={CheckCircle}
             onClick={() => showToast('Approve feature coming soon', 'info')}
           >
-            approve
+            Approve
           </Button>
           <Button
             variant="danger"
             size="sm"
+            icon={XCircle}
             onClick={() => showToast('Disapprove feature coming soon', 'info')}
           >
-            disapprove
+            Disapprove
           </Button>
         </div>
       )
@@ -71,30 +92,63 @@ export default function ScannedRecordsPage() {
   ];
 
   return (
-    <AdminLayout role="HR" userName="HR Admin">
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">Scanned Resume Records</h1>
+    <AdminLayout role="HR" userName="HR Admin" pageTitle="Scanned PDS Records" pageDescription="Manage uploaded Personal Data Sheets">
+      <Container size="xl">
+        <div className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total PDS Uploaded</p>
+                  <p className="text-3xl font-bold text-gray-900">{applicants.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
 
-        <div className="flex gap-4">
-          <Input
-            type="text"
-            placeholder="Search for..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-md"
-          />
-          <Button
-            variant="success"
-            onClick={() => showToast('Search feature coming soon', 'info')}
-          >
-            🔍 Search
-          </Button>
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending Review</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applicants.filter(a => a.status === 'pending').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Approved Today</p>
+                  <p className="text-3xl font-bold text-gray-900">0</p>
+                </div>
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* PDS Records Table */}
+          <Card title="LIST OF PDS UPLOADED BY APPLICANTS" headerColor="bg-[#D4F4DD]">
+            <EnhancedTable
+              columns={columns}
+              data={applicants}
+              searchable
+              paginated
+              pageSize={10}
+              searchPlaceholder="Search applicants by name or file..."
+            />
+          </Card>
         </div>
-
-        <Card title="LIST OF PDS UPLOADED BY APPLICANTS" headerColor="bg-[#D4F4DD]">
-          <Table columns={columns} data={applicants} />
-        </Card>
-      </div>
+      </Container>
     </AdminLayout>
   );
 }

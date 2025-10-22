@@ -1,8 +1,9 @@
 'use client';
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Button, Input, Textarea } from '@/components/ui';
+import { Card, Button, Input, Textarea, FileUpload, Container, Badge } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone } from 'lucide-react';
 
 export default function AnnouncementsPage() {
   const { showToast } = useToast();
@@ -16,15 +17,31 @@ export default function AnnouncementsPage() {
     {
       id: 1,
       title: 'We are looking for IT Technician!',
+      description: 'Join our team as an IT Technician. Great opportunity for skilled professionals.',
       image: '/sample-job.jpg',
-      date: '2025-01-15'
+      date: '2025-01-15',
+      category: 'Job Opening'
+    },
+    {
+      id: 2,
+      title: 'Training Program Registration Open',
+      description: 'New web development training program starting next month.',
+      image: '/sample-training.jpg',
+      date: '2025-01-12',
+      category: 'Training'
+    },
+    {
+      id: 3,
+      title: 'HR Office Relocation Notice',
+      description: 'The HR office will be temporarily relocated during renovations.',
+      image: '/sample-notice.jpg',
+      date: '2025-01-10',
+      category: 'Notice'
     }
   ]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFormData({ ...formData, file: e.target.files[0] });
-    }
+  const handleFileSelect = (file: File) => {
+    setFormData({ ...formData, file });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -32,97 +49,143 @@ export default function AnnouncementsPage() {
     showToast('Post announcement feature coming soon', 'info');
   };
 
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'Job Opening': return 'bg-blue-100 text-blue-800';
+      case 'Training': return 'bg-purple-100 text-purple-800';
+      case 'Notice': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
-    <AdminLayout role="HR" userName="HR Admin">
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Announcements</h1>
-          <p className="text-gray-600 mt-2">
-            Annouments posting for available jobs/ vacant positions
-          </p>
-        </div>
-
-        <Card>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* File Upload Section */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Image
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label
-                    htmlFor="file-upload"
-                    className="cursor-pointer inline-block px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                  >
-                    Choose File
-                  </label>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {formData.file ? formData.file.name : 'No file chosen'}
-                  </p>
-                </div>
+    <AdminLayout role="HR" userName="HR Admin" pageTitle="Announcements" pageDescription="Post job announcements and notices">
+      <Container size="xl">
+        {/* Create Announcement Card */}
+        <Card variant="elevated" className="mb-8">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                <Megaphone className="w-6 h-6 text-white" />
               </div>
-
-              {/* Form Fields */}
-              <div className="space-y-4">
-                <Input
-                  label="*Title"
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Enter announcement title"
-                  required
-                />
-
-                <Textarea
-                  label="*Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter announcement description"
-                  rows={6}
-                  required
-                />
-
-                <Button type="submit" variant="success" size="lg" className="w-full">
-                  Post
-                </Button>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Create Announcement</h2>
+                <p className="text-sm text-gray-600">Share important updates and job openings</p>
               </div>
             </div>
-          </form>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* File Upload Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4" />
+                    Upload Image
+                  </label>
+                  <FileUpload
+                    onFileSelect={handleFileSelect}
+                    accept="image/*"
+                  />
+                  {formData.file && (
+                    <p className="text-sm text-[#22A555] mt-2 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      {formData.file.name}
+                    </p>
+                  )}
+                </div>
+
+                {/* Form Fields */}
+                <div className="space-y-4">
+                  <Input
+                    label="Title"
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="Enter announcement title"
+                    required
+                  />
+
+                  <Textarea
+                    label="Description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Enter announcement description"
+                    rows={5}
+                    required
+                  />
+
+                  <Button type="submit" variant="success" size="lg" icon={Send} className="w-full">
+                    Post Announcement
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </div>
         </Card>
 
         {/* Posted Content */}
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Posted Content</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {postedContent.map((item) => (
-              <Card key={item.id}>
-                <div className="space-y-4">
-                  <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-500">Image Placeholder</span>
-                  </div>
-                  <h3 className="font-semibold text-lg">{item.title}</h3>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => showToast('Delete announcement feature coming soon', 'info')}
-                  >
-                    🗑️ DELETE
-                  </Button>
-                </div>
-              </Card>
-            ))}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Posted Announcements</h2>
+            <Badge variant="info">{postedContent.length} active</Badge>
           </div>
+
+          {postedContent.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {postedContent.map((item) => (
+                <Card key={item.id} variant="interactive" noPadding className="group">
+                  {/* Image Section */}
+                  <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300 overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-16 h-16 text-gray-400" />
+                    </div>
+                    {/* Category Badge */}
+                    <div className="absolute top-4 right-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(item.category)}`}>
+                        {item.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content Section */}
+                  <div className="p-5 space-y-3">
+                    <h3 className="font-semibold text-lg text-gray-900 group-hover:text-[#22A555] transition-colors line-clamp-2">
+                      {item.title}
+                    </h3>
+
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {item.description}
+                    </p>
+
+                    {/* Date */}
+                    <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={Trash2}
+                      className="w-full mt-3"
+                      onClick={() => showToast('Delete announcement feature coming soon', 'info')}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-16">
+              <Megaphone className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No announcements yet</h3>
+              <p className="text-gray-600 mb-4">Create your first announcement to get started</p>
+            </Card>
+          )}
         </div>
-      </div>
+      </Container>
     </AdminLayout>
   );
 }

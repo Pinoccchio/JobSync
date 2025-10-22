@@ -1,9 +1,12 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import { Menu, X } from 'lucide-react';
 
 export function Header() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <nav className="container mx-auto px-6 py-4">
@@ -19,7 +22,7 @@ export function Header() {
             </div>
           </Link>
 
-          {/* Navigation Links */}
+          {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
               Features
@@ -35,15 +38,69 @@ export function Header() {
             </Link>
           </div>
 
-          {/* CTA Button */}
-          <div className="flex items-center">
+          {/* Desktop CTA Button */}
+          <div className="hidden md:flex items-center">
             <Link href="/register">
               <Button variant="success" size="lg" className="px-8">
                 Get Started
               </Button>
             </Link>
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 text-gray-700 hover:text-[#22A555] hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
+          </button>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden mt-4 pt-4 border-t border-gray-200 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <a
+              href="#features"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              How It Works
+            </a>
+            <a
+              href="#about"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              About
+            </a>
+            <Link
+              href="/login"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Admin Portal
+            </Link>
+            <div className="pt-2">
+              <Link href="/register" className="block" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="success" size="lg" className="w-full">
+                  Get Started
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
     </header>
   );

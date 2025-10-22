@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Button, Card } from '@/components/ui';
 import Image from 'next/image';
+import { Briefcase, GraduationCap, Sparkles, Target, BarChart3, Zap, Bell, FileText, MapPin, Phone, Clock } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -35,7 +36,7 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 hover:bg-white/20 transition-all">
                   <div className="w-14 h-14 bg-white/20 rounded-lg inline-flex items-center justify-center mb-4">
-                    <span className="text-3xl leading-none">💼</span>
+                    <Briefcase className="w-7 h-7 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-2">Municipal Hall Jobs</h3>
                   <p className="text-white/80 text-sm">
@@ -45,7 +46,7 @@ export default function Home() {
 
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 hover:bg-white/20 transition-all">
                   <div className="w-14 h-14 bg-white/20 rounded-lg inline-flex items-center justify-center mb-4">
-                    <span className="text-3xl leading-none">🎓</span>
+                    <GraduationCap className="w-7 h-7 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-2">PESO Training</h3>
                   <p className="text-white/80 text-sm">
@@ -55,7 +56,7 @@ export default function Home() {
 
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 hover:bg-white/20 transition-all">
                   <div className="w-14 h-14 bg-white/20 rounded-lg inline-flex items-center justify-center mb-4">
-                    <span className="text-3xl leading-none">🤖</span>
+                    <Sparkles className="w-7 h-7 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-2">AI-Powered Matching</h3>
                   <p className="text-white/80 text-sm">
@@ -104,7 +105,7 @@ export default function Home() {
             <Card className="text-center hover:shadow-xl transition-shadow">
               <div className="p-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <span className="text-4xl">🎯</span>
+                  <Target className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Gemini AI-Powered Matching</h3>
                 <p className="text-gray-600">
@@ -117,7 +118,7 @@ export default function Home() {
             <Card className="text-center hover:shadow-xl transition-shadow">
               <div className="p-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#20C997] to-[#1AB386] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <span className="text-4xl">📊</span>
+                  <BarChart3 className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Intelligent Ranking</h3>
                 <p className="text-gray-600">
@@ -130,7 +131,7 @@ export default function Home() {
             <Card className="text-center hover:shadow-xl transition-shadow">
               <div className="p-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#FDB912] to-[#E5A810] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <span className="text-4xl">⚡</span>
+                  <Zap className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Instant Processing</h3>
                 <p className="text-gray-600">
@@ -143,7 +144,7 @@ export default function Home() {
             <Card className="text-center hover:shadow-xl transition-shadow">
               <div className="p-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#DC3545] to-[#C82333] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <span className="text-4xl">🔔</span>
+                  <Bell className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Real-time Updates</h3>
                 <p className="text-gray-600">
@@ -156,7 +157,7 @@ export default function Home() {
             <Card className="text-center hover:shadow-xl transition-shadow">
               <div className="p-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#6C757D] to-[#495057] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <span className="text-4xl">📄</span>
+                  <FileText className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">PDS Management</h3>
                 <p className="text-gray-600">
@@ -169,7 +170,7 @@ export default function Home() {
             <Card className="text-center hover:shadow-xl transition-shadow">
               <div className="p-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#22A555] to-[#20C997] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <span className="text-4xl">🎓</span>
+                  <GraduationCap className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Training Programs</h3>
                 <p className="text-gray-600">
@@ -284,7 +285,7 @@ export default function Home() {
             {/* Location */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 text-center hover:bg-white/20 transition-all">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-4xl">📍</span>
+                <MapPin className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-xl font-bold mb-3">Visit Us</h3>
               <p className="text-white/90 text-sm leading-relaxed">
@@ -297,7 +298,7 @@ export default function Home() {
             {/* Contact */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 text-center hover:bg-white/20 transition-all">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-4xl">📞</span>
+                <Phone className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-xl font-bold mb-3">Contact</h3>
               <p className="text-white/90 text-sm leading-relaxed">
@@ -310,7 +311,7 @@ export default function Home() {
             {/* Hours */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 text-center hover:bg-white/20 transition-all">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-4xl">🕐</span>
+                <Clock className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-xl font-bold mb-3">Office Hours</h3>
               <p className="text-white/90 text-sm leading-relaxed">
