@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { generateContent, parseGeminiJSON, RANKING_PROMPTS } from '@/lib/gemini';
 
 /**
@@ -43,7 +43,7 @@ interface ScoreResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClient();
+    const supabase = createClient();
     const body: RankingRequest = await request.json();
 
     // TODO: Implement full ranking system
