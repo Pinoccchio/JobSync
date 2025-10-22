@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, Container, Badge } from '@/components/ui';
 import { Users, Shield, Building2, UserCheck, Activity, Clock, UserPlus, Loader2 } from 'lucide-react';
@@ -22,7 +22,7 @@ interface ActivityLog {
 }
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     hrAccounts: 0,
@@ -32,12 +32,36 @@ export default function AdminDashboard() {
   const [recentActivities, setRecentActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Track component mount state to prevent state updates after unmount
+  const isMounted = useRef(true);
+  const hasFetched = useRef(false);
+
   useEffect(() => {
-    fetchDashboardData();
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async () => {
+    if (authLoading || !isAuthenticated) {
+      console.log('⏳ Waiting for authentication...');
+      return;
+    }
+
+    // Prevent duplicate fetches on strict mode double render
+    if (hasFetched.current) {
+      console.log('⏭️ Already fetched, skipping...');
+      return;
+    }
+
+    console.log('📊 Fetching dashboard data...');
+    hasFetched.current = true;
+
+    // Only update loading state if component is still mounted
+    if (isMounted.current) {
+      setLoading(true);
+    }
     try {
       // Fetch total users count
       const { count: totalUsers } = await supabase
@@ -71,20 +95,37 @@ export default function AdminDashboard() {
         .order('timestamp', { ascending: false })
         .limit(5);
 
-      setStats({
-        totalUsers: totalUsers || 0,
-        hrAccounts: hrAccounts || 0,
-        pesoAccounts: pesoAccounts || 0,
-        applicants: applicants || 0,
-      });
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        setStats({
+          totalUsers: totalUsers || 0,
+          hrAccounts: hrAccounts || 0,
+          pesoAccounts: pesoAccounts || 0,
+          applicants: applicants || 0,
+        });
 
-      setRecentActivities(activities || []);
+        setRecentActivities(activities || []);
+        console.log('✅ Dashboard data loaded:', {
+          totalUsers: totalUsers || 0,
+          hrAccounts: hrAccounts || 0,
+          pesoAccounts: pesoAccounts || 0,
+          applicants: applicants || 0,
+          activities: activities?.length || 0
+        });
+      }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
     } finally {
-      setLoading(false);
+      // Only update loading state if component is still mounted
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [authLoading, isAuthenticated]); // Already correct - no unstable dependencies
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const getEventIcon = (event: string) => {
     if (event.includes('registration') || event.includes('signup') || event.includes('created')) return UserPlus;

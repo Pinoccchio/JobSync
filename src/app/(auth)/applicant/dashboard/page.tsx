@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button, Card, Container } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
@@ -24,7 +24,7 @@ interface Announcement {
 }
 
 export default function ApplicantDashboard() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     activeJobs: 0,
@@ -34,12 +34,36 @@ export default function ApplicantDashboard() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Track component mount state to prevent state updates after unmount
+  const isMounted = useRef(true);
+  const hasFetched = useRef(false);
+
   useEffect(() => {
-    fetchDashboardData();
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async () => {
+    if (authLoading || !isAuthenticated) {
+      console.log('⏳ Waiting for authentication...');
+      return;
+    }
+
+    // Prevent duplicate fetches on strict mode double render
+    if (hasFetched.current) {
+      console.log('⏭️ Already fetched, skipping...');
+      return;
+    }
+
+    console.log('📊 Fetching applicant dashboard data...');
+    hasFetched.current = true;
+
+    // Only update loading state if component is still mounted
+    if (isMounted.current) {
+      setLoading(true);
+    }
     try {
       // Fetch active jobs count
       const { count: activeJobs } = await supabase
@@ -70,20 +94,33 @@ export default function ApplicantDashboard() {
         console.error('Error fetching announcements:', error);
       }
 
-      setStats({
-        activeJobs: activeJobs || 0,
-        trainingPrograms: trainingPrograms || 0,
-        totalApplications: totalApplications || 0,
-      });
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        setStats({
+          activeJobs: activeJobs || 0,
+          trainingPrograms: trainingPrograms || 0,
+          totalApplications: totalApplications || 0,
+        });
 
-      setAnnouncements(announcementsData || []);
+        setAnnouncements(announcementsData || []);
+      }
     } catch (error) {
-      console.error('Error fetching applicant dashboard data:', error);
-      showToast('Failed to load dashboard data', 'error');
+      console.error('❌ Error fetching applicant dashboard data:', error);
+      // Use showToast directly without including it in dependencies to avoid infinite loop
+      if (isMounted.current) {
+        showToast('Failed to load dashboard data', 'error');
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if component is still mounted
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [authLoading, isAuthenticated]); // Fixed: removed user?.id and showToast from dependencies
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {

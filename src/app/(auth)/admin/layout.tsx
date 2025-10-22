@@ -34,7 +34,9 @@ export default function AdminLayout({
         router.push(dashboardMap[role] || '/applicant/dashboard');
       }
     }
-  }, [isAuthenticated, isLoading, role, router]);
+    // Fix: Remove router from dependencies - it's an unstable reference
+    // that causes infinite re-renders when included in useEffect deps
+  }, [isAuthenticated, isLoading, role]);
 
   // Show loading spinner while checking auth
   if (isLoading) {

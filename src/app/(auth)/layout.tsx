@@ -20,7 +20,9 @@ export default function AuthLayout({
     if (!isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, isLoading, router, pathname]);
+    // Fix: Remove router and pathname from dependencies
+    // They are unstable references that cause infinite re-renders
+  }, [isAuthenticated, isLoading]);
 
   // Show loading state while checking authentication
   if (isLoading) {

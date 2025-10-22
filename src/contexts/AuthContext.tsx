@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase, loginUser, getCurrentSession, signOut as authSignOut } from '@/lib/supabase/auth';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -32,50 +32,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Ref to track if auth listener has been initialized
+  // This prevents double initialization in React 19 Strict Mode
+  const listenerInitialized = useRef(false);
+  const fetchingProfile = useRef(false);
+
   useEffect(() => {
-    /**
-     * Initialize authentication on mount
-     * Checks for existing session using auth.ts getCurrentSession()
-     */
-    const initializeAuth = async () => {
-      try {
-        console.log('🔄 Initializing authentication...');
+    // Skip if already initialized (React 19 Strict Mode protection)
+    if (listenerInitialized.current) {
+      console.log('⏭️ Auth listener already initialized, skipping...');
+      return;
+    }
 
-        // Use auth.ts getCurrentSession() function
-        const result = await getCurrentSession();
-
-        if (result.success && result.data) {
-          // Session exists and is valid
-          const mappedUser: User = {
-            id: result.data.profile.id,
-            email: result.data.profile.email,
-            fullName: result.data.profile.fullName,
-          };
-
-          setUser(mappedUser);
-          setRole(result.data.profile.role);
-          console.log('✨ User authenticated:', {
-            email: mappedUser.email,
-            role: result.data.profile.role
-          });
-        } else {
-          console.log('ℹ️ No active session:', result.error);
-        }
-      } catch (error) {
-        console.error('❌ Error initializing auth:', error);
-      } finally {
-        setIsLoading(false);
-        console.log('✅ Auth initialization complete');
-      }
-    };
-
-    initializeAuth();
+    console.log('🔄 Setting up auth state listener...');
+    listenerInitialized.current = true;
 
     /**
      * Listen for auth state changes (login, logout, token refresh)
-     * When Supabase auth state changes, update our local state
+     * This fires immediately with the current session state on subscription
+     * No need for separate initialization
      */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Prevent duplicate profile fetches
+      if (fetchingProfile.current) {
+        console.log('⏭️ Already fetching profile, skipping...');
+        return;
+      }
+
       console.log('🔔 Auth state changed:', {
         event,
         userId: session?.user?.id,
@@ -83,27 +66,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (session?.user) {
-        // Use getCurrentSession to get profile data
-        const result = await getCurrentSession();
+        fetchingProfile.current = true;
+        try {
+          // Fetch user profile directly from database
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .eq('status', 'active')
+            .single();
 
-        if (result.success && result.data) {
-          const mappedUser: User = {
-            id: result.data.profile.id,
-            email: result.data.profile.email,
-            fullName: result.data.profile.fullName,
-          };
+          if (profileError || !profile) {
+            console.warn('⚠️ Profile not found or inactive:', profileError?.message);
+            setUser(null);
+            setRole(null);
+          } else {
+            const mappedUser: User = {
+              id: profile.id,
+              email: profile.email || session.user.email || '',
+              fullName: profile.full_name,
+            };
 
-          setUser(mappedUser);
-          setRole(result.data.profile.role);
-          console.log('✨ User state updated:', {
-            email: mappedUser.email,
-            role: result.data.profile.role
-          });
-        } else {
-          // Profile not found or inactive, clear auth state
-          console.warn('⚠️ Profile validation failed:', result.error);
+            setUser(mappedUser);
+            setRole(profile.role as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
+            console.log('✨ User state updated:', {
+              email: mappedUser.email,
+              role: profile.role
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error fetching profile:', error);
           setUser(null);
           setRole(null);
+        } finally {
+          fetchingProfile.current = false;
         }
       } else {
         console.log('ℹ️ No session, clearing user state');
@@ -115,7 +111,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      console.log('🧹 Cleaning up auth listener...');
       subscription.unsubscribe();
+      // Don't reset listenerInitialized - let it persist across strict mode cycles
+      // This prevents duplicate listeners when React remounts during strict mode testing
     };
   }, []);
 

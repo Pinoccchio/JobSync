@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { DashboardTile, Card, Button, Container } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,7 @@ interface DashboardStats {
 }
 
 export default function HRDashboard() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalScanned: 0,
@@ -29,12 +29,36 @@ export default function HRDashboard() {
   });
   const [loading, setLoading] = useState(true);
 
+  // Track component mount state to prevent state updates after unmount
+  const isMounted = useRef(true);
+  const hasFetched = useRef(false);
+
   useEffect(() => {
-    fetchDashboardStats();
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
-  const fetchDashboardStats = async () => {
-    setLoading(true);
+  const fetchDashboardStats = useCallback(async () => {
+    if (authLoading || !isAuthenticated) {
+      console.log('⏳ Waiting for authentication...');
+      return;
+    }
+
+    // Prevent duplicate fetches on strict mode double render
+    if (hasFetched.current) {
+      console.log('⏭️ Already fetched, skipping...');
+      return;
+    }
+
+    console.log('📊 Fetching HR dashboard stats...');
+    hasFetched.current = true;
+
+    // Only update loading state if component is still mounted
+    if (isMounted.current) {
+      setLoading(true);
+    }
     try {
       // Fetch total applications (PDS scanned)
       const { count: totalScanned } = await supabase
@@ -79,21 +103,34 @@ export default function HRDashboard() {
         !job.applications || job.applications.length === 0
       ).length || 0;
 
-      setStats({
-        totalScanned: totalScanned || 0,
-        pendingReview: pendingReview || 0,
-        noMatches: noMatches,
-        approved: approved || 0,
-        rejected: rejected || 0,
-        activeJobs: activeJobs || 0,
-      });
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        setStats({
+          totalScanned: totalScanned || 0,
+          pendingReview: pendingReview || 0,
+          noMatches: noMatches,
+          approved: approved || 0,
+          rejected: rejected || 0,
+          activeJobs: activeJobs || 0,
+        });
+      }
     } catch (error) {
-      console.error('Error fetching HR dashboard stats:', error);
-      showToast('Failed to load dashboard statistics', 'error');
+      console.error('❌ Error fetching HR dashboard stats:', error);
+      // Use showToast directly without including it in dependencies to avoid infinite loop
+      if (isMounted.current) {
+        showToast('Failed to load dashboard statistics', 'error');
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if component is still mounted
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [authLoading, isAuthenticated]); // Fixed: removed showToast from dependencies
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, [fetchDashboardStats]);
 
   const tiles = [
     {

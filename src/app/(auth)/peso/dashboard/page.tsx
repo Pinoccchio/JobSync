@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, Container, Badge } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +25,7 @@ interface RecentApplication {
 }
 
 export default function PESODashboard() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalApplications: 0,
@@ -35,12 +35,36 @@ export default function PESODashboard() {
   const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Track component mount state to prevent state updates after unmount
+  const isMounted = useRef(true);
+  const hasFetched = useRef(false);
+
   useEffect(() => {
-    fetchDashboardData();
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async () => {
+    if (authLoading || !isAuthenticated) {
+      console.log('⏳ Waiting for authentication...');
+      return;
+    }
+
+    // Prevent duplicate fetches on strict mode double render
+    if (hasFetched.current) {
+      console.log('⏭️ Already fetched, skipping...');
+      return;
+    }
+
+    console.log('📊 Fetching PESO dashboard data...');
+    hasFetched.current = true;
+
+    // Only update loading state if component is still mounted
+    if (isMounted.current) {
+      setLoading(true);
+    }
     try {
       // Fetch total training applications
       const { count: totalApplications } = await supabase
@@ -79,20 +103,33 @@ export default function PESODashboard() {
         console.error('Error fetching recent applications:', error);
       }
 
-      setStats({
-        totalApplications: totalApplications || 0,
-        pendingApplications: pendingApplications || 0,
-        activePrograms: activePrograms || 0,
-      });
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        setStats({
+          totalApplications: totalApplications || 0,
+          pendingApplications: pendingApplications || 0,
+          activePrograms: activePrograms || 0,
+        });
 
-      setRecentApplications(applications || []);
+        setRecentApplications(applications || []);
+      }
     } catch (error) {
-      console.error('Error fetching PESO dashboard data:', error);
-      showToast('Failed to load dashboard data', 'error');
+      console.error('❌ Error fetching PESO dashboard data:', error);
+      // Use showToast directly without including it in dependencies to avoid infinite loop
+      if (isMounted.current) {
+        showToast('Failed to load dashboard data', 'error');
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if component is still mounted
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [authLoading, isAuthenticated]); // Fixed: removed showToast from dependencies
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const tiles = [
     {
