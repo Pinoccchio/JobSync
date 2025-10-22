@@ -43,7 +43,7 @@ interface ScoreResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const body: RankingRequest = await request.json();
 
     // TODO: Implement full ranking system

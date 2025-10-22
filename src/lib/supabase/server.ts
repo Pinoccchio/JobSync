@@ -5,8 +5,8 @@ import { cookies } from 'next/headers';
  * Server-side Supabase client for Server Components and Route Handlers
  * Handles authentication cookies properly for SSR
  */
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

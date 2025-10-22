@@ -27,7 +27,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const bucket = formData.get('bucket') as string; // 'pds-files' or 'id-images'
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // TODO: Generate signed URL for private file access
     // const { data, error } = await supabase.storage
