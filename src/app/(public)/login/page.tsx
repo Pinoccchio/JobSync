@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button, Input } from '@/components/ui';
@@ -9,48 +9,108 @@ import { useToast } from '@/contexts/ToastContext';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, role, isAuthenticated, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: 'ADMIN' as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT',
     rememberMe: false,
   });
 
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+  });
+
+  // Auto-redirect after successful login when role is set
+  useEffect(() => {
+    if (shouldRedirect && isAuthenticated && role && !authLoading) {
+      console.log('🔄 Auto-redirecting based on role:', role);
+
+      const dashboardMap: Record<string, string> = {
+        ADMIN: '/admin/dashboard',
+        HR: '/hr/dashboard',
+        PESO: '/peso/dashboard',
+        APPLICANT: '/applicant/dashboard',
+      };
+
+      const dashboardPath = dashboardMap[role] || '/applicant/dashboard';
+      console.log('➡️ Redirecting to:', dashboardPath);
+
+      // Small delay to ensure state is set before redirect
+      setTimeout(() => {
+        router.push(dashboardPath);
+      }, 100);
+    }
+
+    // If redirect is triggered but something fails, reset loading after timeout
+    if (shouldRedirect && !authLoading) {
+      const timeoutId = setTimeout(() => {
+        if (!role) {
+          console.error('❌ Redirect timeout - role not set');
+          setIsLoading(false);
+          showToast('Login succeeded but redirect failed. Please try again.', 'error');
+        }
+      }, 3000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [shouldRedirect, isAuthenticated, role, authLoading, router, showToast]);
+
+  // Validation functions
+  const validateEmail = (email: string) => {
+    if (!email) return 'Email is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address';
+    return '';
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) return 'Password is required';
+    return '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    console.log('🔐 Login form submitted');
+
+    // Validate all fields
+    const newErrors = {
+      email: validateEmail(formData.email),
+      password: validatePassword(formData.password),
+    };
+
+    setErrors(newErrors);
+
+    // If any errors exist, stop submission
+    if (Object.values(newErrors).some(error => error !== '')) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Demo validation
-      if (!formData.email || !formData.password) {
-        showToast('Please fill in all fields', 'error');
-        setIsLoading(false);
-        return;
-      }
+      console.log('✅ Validation passed, calling login...');
 
-      await login(formData.email, formData.password, formData.role);
+      // Login with Supabase - role will be fetched from database
+      await login(formData.email, formData.password);
+
+      console.log('✅ Login completed successfully');
+
       showToast('Login successful!', 'success');
 
-      // Redirect based on selected role
-      switch (formData.role) {
-        case 'ADMIN':
-          router.push('/admin/dashboard');
-          break;
-        case 'HR':
-          router.push('/hr/dashboard');
-          break;
-        case 'PESO':
-          router.push('/peso/dashboard');
-          break;
-        case 'APPLICANT':
-          router.push('/applicant/dashboard');
-          break;
-      }
-    } catch (error) {
-      showToast('Invalid credentials', 'error');
+      // Trigger redirect via useEffect
+      // useEffect will watch for role to be set and redirect accordingly
+      setShouldRedirect(true);
+
+      // Keep loading state active until redirect completes
+      // setIsLoading will be false after redirect in useEffect
+    } catch (error: any) {
+      console.error('❌ Login form error:', error);
+      console.error('❌ Error message:', error.message);
+      showToast(error.message || 'Invalid credentials', 'error');
       setIsLoading(false);
     }
   };
@@ -109,24 +169,6 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Role Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Login As
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#22A555] transition-colors bg-white"
-                  disabled={isLoading}
-                >
-                  <option value="ADMIN">System Admin</option>
-                  <option value="HR">HR Admin</option>
-                  <option value="PESO">PESO Admin</option>
-                  <option value="APPLICANT">Applicant</option>
-                </select>
-              </div>
-
               {/* Email Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -136,7 +178,12 @@ export default function LoginPage() {
                   type="email"
                   placeholder="your.email@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (errors.email) setErrors({ ...errors, email: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, email: validateEmail(e.target.value) })}
+                  error={errors.email}
                   required
                   disabled={isLoading}
                 />
@@ -151,7 +198,12 @@ export default function LoginPage() {
                   type="password"
                   placeholder="Enter your password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors({ ...errors, password: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, password: validatePassword(e.target.value) })}
+                  error={errors.password}
                   required
                   disabled={isLoading}
                 />
@@ -203,13 +255,6 @@ export default function LoginPage() {
                 </p>
               </div>
             </form>
-
-            {/* Demo Info */}
-            <div className="mt-6 p-4 bg-[#D4F4DD] rounded-xl">
-              <p className="text-xs text-gray-600 text-center">
-                <span className="font-semibold">Demo Mode:</span> You can login with any email and password
-              </p>
-            </div>
           </div>
         </div>
       </div>

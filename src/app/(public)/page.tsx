@@ -1,9 +1,48 @@
+'use client';
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
 import Image from 'next/image';
-import { Briefcase, GraduationCap, Sparkles, Target, BarChart3, Zap, Bell, FileText, MapPin, Phone, Clock } from 'lucide-react';
+import { Briefcase, GraduationCap, Sparkles, Target, BarChart3, Zap, Bell, FileText, MapPin, Phone, Clock, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
+  const { isAuthenticated, role, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && role) {
+      // Redirect authenticated users to their role-specific dashboard
+      console.log('🏠 Landing page: User authenticated, redirecting to dashboard');
+      const dashboardMap: Record<string, string> = {
+        ADMIN: '/admin/dashboard',
+        HR: '/hr/dashboard',
+        PESO: '/peso/dashboard',
+        APPLICANT: '/applicant/dashboard',
+      };
+      const redirectPath = dashboardMap[role] || '/applicant/dashboard';
+      router.push(redirectPath);
+    }
+  }, [isAuthenticated, role, isLoading, router]);
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-[#22A555] mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render landing page content if authenticated (will redirect)
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <>
       {/* Hero Section */}

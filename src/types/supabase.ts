@@ -8,30 +8,37 @@ import { Database } from './database.types';
  */
 
 // Table row types (for SELECT queries)
-export type User = Database['public']['Tables']['users']['Row'];
+export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Job = Database['public']['Tables']['jobs']['Row'];
 export type Application = Database['public']['Tables']['applications']['Row'];
 export type ApplicantProfile = Database['public']['Tables']['applicant_profiles']['Row'];
 export type TrainingProgram = Database['public']['Tables']['training_programs']['Row'];
 export type TrainingApplication = Database['public']['Tables']['training_applications']['Row'];
 export type ActivityLog = Database['public']['Tables']['activity_logs']['Row'];
+export type Announcement = Database['public']['Tables']['announcements']['Row'];
+export type Notification = Database['public']['Tables']['notifications']['Row'];
+export type AuditTrail = Database['public']['Tables']['audit_trail']['Row'];
 
 // Insert types (for INSERT queries)
-export type UserInsert = Database['public']['Tables']['users']['Insert'];
+export type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 export type JobInsert = Database['public']['Tables']['jobs']['Insert'];
 export type ApplicationInsert = Database['public']['Tables']['applications']['Insert'];
 export type ApplicantProfileInsert = Database['public']['Tables']['applicant_profiles']['Insert'];
 export type TrainingProgramInsert = Database['public']['Tables']['training_programs']['Insert'];
 export type TrainingApplicationInsert = Database['public']['Tables']['training_applications']['Insert'];
 export type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert'];
+export type AnnouncementInsert = Database['public']['Tables']['announcements']['Insert'];
+export type NotificationInsert = Database['public']['Tables']['notifications']['Insert'];
 
 // Update types (for UPDATE queries)
-export type UserUpdate = Database['public']['Tables']['users']['Update'];
+export type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
 export type JobUpdate = Database['public']['Tables']['jobs']['Update'];
 export type ApplicationUpdate = Database['public']['Tables']['applications']['Update'];
 export type ApplicantProfileUpdate = Database['public']['Tables']['applicant_profiles']['Update'];
 export type TrainingProgramUpdate = Database['public']['Tables']['training_programs']['Update'];
 export type TrainingApplicationUpdate = Database['public']['Tables']['training_applications']['Update'];
+export type AnnouncementUpdate = Database['public']['Tables']['announcements']['Update'];
+export type NotificationUpdate = Database['public']['Tables']['notifications']['Update'];
 
 // Enum types
 export type UserRole = Database['public']['Enums']['user_role'];
@@ -57,7 +64,8 @@ export interface RankingScores {
   education_score: number;
   experience_score: number;
   skills_score: number;
-  final_score: number;
+  eligibility_score: number;
+  match_score: number;
 }
 
 export interface RankingDetails {
@@ -71,6 +79,18 @@ export interface FullRankingResult {
   education: RankingDetails;
   experience: RankingDetails;
   skills: RankingDetails;
+  eligibility: RankingDetails;
   final: RankingDetails;
   ranked_at: string;
+}
+
+// Extended types with profile relations
+export interface ApplicationWithProfile extends Application {
+  applicant: Profile;
+  applicant_profile?: ApplicantProfile;
+  job?: Job;
+}
+
+export interface NotificationWithUser extends Notification {
+  user: Profile;
 }

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Button, Input } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
+import { signupUser } from '@/lib/supabase/auth';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,46 +16,134 @@ export default function RegisterPage() {
     fullName: '',
     password: '',
     confirmPassword: '',
+    role: 'APPLICANT' as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT',
     agreeToTerms: false,
   });
 
+  const [errors, setErrors] = useState({
+    email: '',
+    fullName: '',
+    password: '',
+    confirmPassword: '',
+    terms: '',
+  });
+
+  // Validation functions
+  const validateEmail = (email: string) => {
+    if (!email) return 'Email is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address';
+    return '';
+  };
+
+  const validateFullName = (name: string) => {
+    if (!name) return 'Full name is required';
+    if (name.length < 2) return 'Name must be at least 2 characters';
+    return '';
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) return 'Password is required';
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    return '';
+  };
+
+  const validateConfirmPassword = (password: string, confirmPassword: string) => {
+    if (!confirmPassword) return 'Please confirm your password';
+    if (password !== confirmPassword) return 'Passwords do not match';
+    return '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate all fields
+    const newErrors = {
+      fullName: validateFullName(formData.fullName),
+      email: validateEmail(formData.email),
+      password: validatePassword(formData.password),
+      confirmPassword: validateConfirmPassword(formData.password, formData.confirmPassword),
+      terms: formData.agreeToTerms ? '' : 'You must agree to the terms and conditions',
+    };
+
+    setErrors(newErrors);
+
+    // If any errors exist, stop submission
+    if (Object.values(newErrors).some(error => error !== '')) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Validation
-      if (!formData.email || !formData.fullName || !formData.password) {
-        showToast('Please fill in all fields', 'error');
-        setIsLoading(false);
-        return;
+      console.log('📝 Creating user account...');
+      console.log('📋 Registration details:', {
+        email: formData.email,
+        fullName: formData.fullName,
+        role: formData.role
+      });
+
+      // Use auth.ts signupUser function
+      const result = await signupUser({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        role: formData.role,
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Registration failed');
       }
 
-      if (formData.password !== formData.confirmPassword) {
-        showToast('Passwords do not match', 'error');
-        setIsLoading(false);
-        return;
+      console.log('✅ User created successfully:', {
+        userId: result.data.userId,
+        profileId: result.data.profileId,
+        emailConfirmationSent: result.data.emailConfirmationSent
+      });
+
+      // Check if email confirmation is required
+      if (!result.data.emailConfirmationSent) {
+        // User is logged in immediately (email confirmation disabled)
+        console.log('✅ User logged in immediately (no email confirmation required)');
+
+        // Redirect based on selected role
+        const dashboardMap: Record<string, string> = {
+          ADMIN: '/admin/dashboard',
+          HR: '/hr/dashboard',
+          PESO: '/peso/dashboard',
+          APPLICANT: '/applicant/dashboard',
+        };
+
+        const redirectPath = dashboardMap[formData.role] || '/applicant/dashboard';
+        console.log(`➡️ Redirecting to ${redirectPath} for role: ${formData.role}`);
+
+        showToast(`Account created successfully as ${formData.role}! Redirecting...`, 'success');
+        router.push(redirectPath);
+      } else {
+        // Email confirmation required
+        console.log('📧 Email confirmation required');
+        console.log('➡️ Redirecting to /login');
+        showToast(
+          'Account created! Please check your email to verify your account.',
+          'success'
+        );
+        router.push('/login');
+      }
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        name: error.name
+      });
+
+      // Handle specific server error messages (keep toast for these)
+      if (error.message?.includes('User already registered')) {
+        console.warn('⚠️ User already exists');
+        showToast('This email is already registered. Please login instead.', 'error');
+      } else {
+        // Show server errors in toast
+        showToast(error.message || 'Registration failed. Please try again.', 'error');
       }
 
-      if (formData.password.length < 8) {
-        showToast('Password must be at least 8 characters', 'error');
-        setIsLoading(false);
-        return;
-      }
-
-      if (!formData.agreeToTerms) {
-        showToast('Please agree to the terms and conditions', 'error');
-        setIsLoading(false);
-        return;
-      }
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      showToast('Account created successfully!', 'success');
-      router.push('/login');
-    } catch (error) {
-      showToast('Registration failed. Please try again.', 'error');
       setIsLoading(false);
     }
   };
@@ -142,7 +231,12 @@ export default function RegisterPage() {
                   type="text"
                   placeholder="Juan Dela Cruz"
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, fullName: e.target.value });
+                    if (errors.fullName) setErrors({ ...errors, fullName: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, fullName: validateFullName(e.target.value) })}
+                  error={errors.fullName}
                   required
                   disabled={isLoading}
                 />
@@ -157,10 +251,37 @@ export default function RegisterPage() {
                   type="email"
                   placeholder="your.email@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (errors.email) setErrors({ ...errors, email: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, email: validateEmail(e.target.value) })}
+                  error={errors.email}
                   required
                   disabled={isLoading}
                 />
+              </div>
+
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Register As
+                </label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' })}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#22A555] transition-colors bg-white text-gray-900"
+                  disabled={isLoading}
+                  required
+                >
+                  <option value="APPLICANT">Applicant (Job Seeker)</option>
+                  <option value="HR">HR Admin (Municipal Hall)</option>
+                  <option value="PESO">PESO Admin (Training Programs)</option>
+                  <option value="ADMIN">System Administrator</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select your role. Admins have full access to the system.
+                </p>
               </div>
 
               {/* Password Input */}
@@ -172,7 +293,12 @@ export default function RegisterPage() {
                   type="password"
                   placeholder="Minimum 8 characters"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors({ ...errors, password: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, password: validatePassword(e.target.value) })}
+                  error={errors.password}
                   required
                   disabled={isLoading}
                 />
@@ -187,32 +313,45 @@ export default function RegisterPage() {
                   type="password"
                   placeholder="Re-enter your password"
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, confirmPassword: e.target.value });
+                    if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, confirmPassword: validateConfirmPassword(formData.password, e.target.value) })}
+                  error={errors.confirmPassword}
                   required
                   disabled={isLoading}
                 />
               </div>
 
               {/* Terms Agreement */}
-              <div className="flex items-start">
-                <input
-                  type="checkbox"
-                  id="agreeToTerms"
-                  checked={formData.agreeToTerms}
-                  onChange={(e) => setFormData({ ...formData, agreeToTerms: e.target.checked })}
-                  className="w-4 h-4 mt-1 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
-                  disabled={isLoading}
-                />
-                <label htmlFor="agreeToTerms" className="ml-2 text-sm text-gray-600">
-                  I agree to the{' '}
-                  <Link href="/terms" className="text-[#22A555] hover:text-[#1A7F3E] font-medium">
-                    Terms and Conditions
-                  </Link>{' '}
-                  and{' '}
-                  <Link href="/privacy" className="text-[#22A555] hover:text-[#1A7F3E] font-medium">
-                    Privacy Policy
-                  </Link>
-                </label>
+              <div>
+                <div className="flex items-start">
+                  <input
+                    type="checkbox"
+                    id="agreeToTerms"
+                    checked={formData.agreeToTerms}
+                    onChange={(e) => {
+                      setFormData({ ...formData, agreeToTerms: e.target.checked });
+                      if (errors.terms) setErrors({ ...errors, terms: '' });
+                    }}
+                    className="w-4 h-4 mt-1 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
+                    disabled={isLoading}
+                  />
+                  <label htmlFor="agreeToTerms" className="ml-2 text-sm text-gray-600">
+                    I agree to the{' '}
+                    <Link href="/terms" className="text-[#22A555] hover:text-[#1A7F3E] font-medium">
+                      Terms and Conditions
+                    </Link>{' '}
+                    and{' '}
+                    <Link href="/privacy" className="text-[#22A555] hover:text-[#1A7F3E] font-medium">
+                      Privacy Policy
+                    </Link>
+                  </label>
+                </div>
+                {errors.terms && (
+                  <p className="mt-1 text-sm text-red-500">{errors.terms}</p>
+                )}
               </div>
 
               {/* Register Button */}

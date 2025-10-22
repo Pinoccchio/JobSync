@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Bell, Settings, LogOut, CheckCircle, XCircle, Clock, ChevronDown } from 'lucide-react';
 
 interface Notification {
@@ -27,6 +28,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 }) => {
   const router = useRouter();
   const { showToast } = useToast();
+  const { logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -182,7 +184,16 @@ export const TopNav: React.FC<TopNavProps> = ({
                     <span className="text-sm">Settings</span>
                   </button>
                   <button
-                    onClick={() => router.push('/login')}
+                    onClick={async () => {
+                      try {
+                        setShowUserMenu(false);
+                        await logout();
+                        showToast('Logged out successfully', 'success');
+                        router.push('/login');
+                      } catch (error: any) {
+                        showToast(error.message || 'Logout failed', 'error');
+                      }
+                    }}
                     className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-600 flex items-center gap-3 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />

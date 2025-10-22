@@ -1,20 +1,27 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { supabase, loginUser, getCurrentSession, signOut as authSignOut } from '@/lib/supabase/auth';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
+/**
+ * User interface for the application
+ */
 interface User {
   id: string;
   email: string;
   fullName: string;
 }
 
+/**
+ * Auth context interface
+ * Provides authentication state and methods to all components
+ */
 interface AuthContextType {
   user: User | null;
   role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT') => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -26,57 +33,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing Supabase session
+    /**
+     * Initialize authentication on mount
+     * Checks for existing session using auth.ts getCurrentSession()
+     */
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔄 Initializing authentication...');
 
-        if (session?.user) {
-          // Map Supabase user to our User interface
+        // Use auth.ts getCurrentSession() function
+        const result = await getCurrentSession();
+
+        if (result.success && result.data) {
+          // Session exists and is valid
           const mappedUser: User = {
-            id: session.user.id,
-            email: session.user.email || '',
-            fullName: session.user.user_metadata?.full_name || session.user.email || 'User',
+            id: result.data.profile.id,
+            email: result.data.profile.email,
+            fullName: result.data.profile.fullName,
           };
 
           setUser(mappedUser);
-
-          // Get role from user metadata or localStorage as fallback
-          // TODO: Once database is set up, fetch role from users table
-          const userRole = session.user.user_metadata?.role || localStorage.getItem('jobsync_role');
-          if (userRole) {
-            setRole(userRole as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
-          }
+          setRole(result.data.profile.role);
+          console.log('✨ User authenticated:', {
+            email: mappedUser.email,
+            role: result.data.profile.role
+          });
+        } else {
+          console.log('ℹ️ No active session:', result.error);
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('❌ Error initializing auth:', error);
       } finally {
         setIsLoading(false);
+        console.log('✅ Auth initialization complete');
       }
     };
 
     initializeAuth();
 
-    // Listen for auth state changes (login, logout, token refresh)
+    /**
+     * Listen for auth state changes (login, logout, token refresh)
+     * When Supabase auth state changes, update our local state
+     */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔔 Auth state changed:', {
+        event,
+        userId: session?.user?.id,
+        email: session?.user?.email
+      });
+
       if (session?.user) {
-        const mappedUser: User = {
-          id: session.user.id,
-          email: session.user.email || '',
-          fullName: session.user.user_metadata?.full_name || session.user.email || 'User',
-        };
+        // Use getCurrentSession to get profile data
+        const result = await getCurrentSession();
 
-        setUser(mappedUser);
+        if (result.success && result.data) {
+          const mappedUser: User = {
+            id: result.data.profile.id,
+            email: result.data.profile.email,
+            fullName: result.data.profile.fullName,
+          };
 
-        // Update role from metadata
-        const userRole = session.user.user_metadata?.role || localStorage.getItem('jobsync_role');
-        if (userRole) {
-          setRole(userRole as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
+          setUser(mappedUser);
+          setRole(result.data.profile.role);
+          console.log('✨ User state updated:', {
+            email: mappedUser.email,
+            role: result.data.profile.role
+          });
+        } else {
+          // Profile not found or inactive, clear auth state
+          console.warn('⚠️ Profile validation failed:', result.error);
+          setUser(null);
+          setRole(null);
         }
       } else {
+        console.log('ℹ️ No session, clearing user state');
         setUser(null);
         setRole(null);
-        localStorage.removeItem('jobsync_role');
       }
 
       setIsLoading(false);
@@ -87,46 +119,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string, selectedRole: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT') => {
+  /**
+   * Login function - uses auth.ts loginUser()
+   * Handles authentication and profile fetching
+   */
+  const login = async (email: string, password: string) => {
     try {
-      // Authenticate with Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Use auth.ts loginUser function
+      const result = await loginUser({ email, password });
 
-      if (error) throw error;
-
-      if (data.user) {
-        // Map Supabase user to our User interface
-        const mappedUser: User = {
-          id: data.user.id,
-          email: data.user.email || '',
-          fullName: data.user.user_metadata?.full_name || data.user.email || 'User',
-        };
-
-        setUser(mappedUser);
-        setRole(selectedRole);
-
-        // Store role in localStorage as temporary solution
-        // TODO: Once database schema is ready, fetch role from users table
-        localStorage.setItem('jobsync_role', selectedRole);
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Login failed');
       }
+
+      // Set user and role in context state
+      const mappedUser: User = {
+        id: result.data.profile.id,
+        email: result.data.profile.email,
+        fullName: result.data.profile.fullName,
+      };
+
+      setUser(mappedUser);
+      setRole(result.data.profile.role);
+
+      console.log('✨ Login successful in context:', {
+        email: mappedUser.email,
+        role: result.data.profile.role,
+        fullName: mappedUser.fullName
+      });
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error in context:', error);
       throw new Error(error.message || 'Failed to login');
     }
   };
 
+  /**
+   * Logout function - uses auth.ts signOut()
+   * Clears session and local state
+   */
   const logout = async () => {
     try {
-      await supabase.auth.signOut();
+      // Use auth.ts signOut function
+      const result = await authSignOut();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Logout failed');
+      }
+
+      // Clear local state
       setUser(null);
       setRole(null);
-      localStorage.removeItem('jobsync_role');
-    } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
+
+      console.log('✅ Logout successful in context');
+    } catch (error: any) {
+      console.error('❌ Logout error in context:', error);
+      throw new Error(error.message || 'Logout failed');
     }
   };
 

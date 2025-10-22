@@ -1,43 +1,143 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Card, Container } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
-import { Briefcase, Download, Calendar, Users, GraduationCap, Megaphone } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
+import { Briefcase, Download, Calendar, Users, GraduationCap, Megaphone, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase/auth';
+
+interface DashboardStats {
+  activeJobs: number;
+  trainingPrograms: number;
+  totalApplications: number;
+}
+
+interface Announcement {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  image_url: string | null;
+  published_at: string;
+}
 
 export default function ApplicantDashboard() {
-  const announcements = [
-    {
-      icon: Briefcase,
-      iconColor: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-      title: 'Hiring! Hiring! Hiring!',
-      description: 'We are seeking a skilled and reliable IT Technician to join our team at the Municipal Hall.',
-      date: 'Posted 2 days ago',
-      category: 'Job Opening'
-    },
-    {
-      icon: GraduationCap,
-      iconColor: 'text-purple-600',
-      bgColor: 'bg-purple-100',
-      title: 'Web Development Training',
-      description: 'Learn modern web development technologies and frameworks in our comprehensive 3-month program.',
-      date: 'Posted 5 days ago',
-      category: 'Training Program'
-    },
-    {
-      icon: Users,
-      iconColor: 'text-teal-600',
-      bgColor: 'bg-teal-100',
-      title: 'Administrative Aide Position',
-      description: 'Join the Municipal Hall team as an Administrative Aide. Multiple positions available.',
-      date: 'Posted 1 week ago',
-      category: 'Job Opening'
-    },
-  ];
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [stats, setStats] = useState<DashboardStats>({
+    activeJobs: 0,
+    trainingPrograms: 0,
+    totalApplications: 0,
+  });
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Fetch active jobs count
+      const { count: activeJobs } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      // Fetch active training programs count
+      const { count: trainingPrograms } = await supabase
+        .from('training_programs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      // Fetch total applications count
+      const { count: totalApplications } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true });
+
+      // Fetch recent announcements (last 3)
+      const { data: announcementsData, error } = await supabase
+        .from('announcements')
+        .select('id, title, description, category, image_url, published_at')
+        .eq('status', 'active')
+        .order('published_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error('Error fetching announcements:', error);
+      }
+
+      setStats({
+        activeJobs: activeJobs || 0,
+        trainingPrograms: trainingPrograms || 0,
+        totalApplications: totalApplications || 0,
+      });
+
+      setAnnouncements(announcementsData || []);
+    } catch (error) {
+      console.error('Error fetching applicant dashboard data:', error);
+      showToast('Failed to load dashboard data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'job_opening':
+        return Briefcase;
+      case 'training':
+        return GraduationCap;
+      case 'notice':
+        return Megaphone;
+      default:
+        return Users;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'job_opening':
+        return { bg: 'bg-blue-100', text: 'text-blue-600' };
+      case 'training':
+        return { bg: 'bg-purple-100', text: 'text-purple-600' };
+      case 'notice':
+        return { bg: 'bg-teal-100', text: 'text-teal-600' };
+      default:
+        return { bg: 'bg-gray-100', text: 'text-gray-600' };
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Posted today';
+    if (diffDays === 1) return 'Posted 1 day ago';
+    if (diffDays < 7) return `Posted ${diffDays} days ago`;
+    if (diffDays < 14) return 'Posted 1 week ago';
+    if (diffDays < 30) return `Posted ${Math.floor(diffDays / 7)} weeks ago`;
+    return `Posted ${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+  };
+
+  const formatCategory = (category: string) => {
+    return category.split('_').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
 
   return (
-    <AdminLayout role="Applicant" userName="User" pageTitle="Dashboard" pageDescription="Welcome back! Here's your overview">
+    <AdminLayout
+      role="Applicant"
+      userName={user?.fullName || 'Applicant'}
+      pageTitle="Dashboard"
+      pageDescription="Welcome back! Here's your overview"
+    >
       <Container size="xl">
         {/* Hero Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
@@ -91,7 +191,9 @@ export default function ApplicantDashboard() {
                 <Briefcase className="w-6 h-6 text-[#22A555]" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-gray-900">12</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" /> : stats.activeJobs}
+                </p>
                 <p className="text-sm text-gray-600">Active Job Postings</p>
               </div>
             </div>
@@ -103,7 +205,9 @@ export default function ApplicantDashboard() {
                 <GraduationCap className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-gray-900">4</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" /> : stats.trainingPrograms}
+                </p>
                 <p className="text-sm text-gray-600">Training Programs</p>
               </div>
             </div>
@@ -115,7 +219,9 @@ export default function ApplicantDashboard() {
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-gray-900">150+</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" /> : `${stats.totalApplications}+`}
+                </p>
                 <p className="text-sm text-gray-600">Applications Processed</p>
               </div>
             </div>
@@ -134,42 +240,55 @@ export default function ApplicantDashboard() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {announcements.map((announcement, index) => {
-              const Icon = announcement.icon;
-              return (
-                <Card key={index} variant="interactive" noPadding className="group">
-                  <div className="p-6 space-y-4">
-                    {/* Icon and Category */}
-                    <div className="flex items-start justify-between">
-                      <div className={`w-14 h-14 ${announcement.bgColor} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                        <Icon className={`w-7 h-7 ${announcement.iconColor}`} />
+          {loading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+            </div>
+          ) : announcements.length === 0 ? (
+            <Card variant="flat" className="text-center py-12">
+              <Megaphone className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No announcements yet</p>
+              <p className="text-sm text-gray-400 mt-2">Check back later for updates</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {announcements.map((announcement) => {
+                const Icon = getCategoryIcon(announcement.category);
+                const colors = getCategoryColor(announcement.category);
+                return (
+                  <Card key={announcement.id} variant="interactive" noPadding className="group">
+                    <div className="p-6 space-y-4">
+                      {/* Icon and Category */}
+                      <div className="flex items-start justify-between">
+                        <div className={`w-14 h-14 ${colors.bg} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <Icon className={`w-7 h-7 ${colors.text}`} />
+                        </div>
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          {formatCategory(announcement.category)}
+                        </span>
                       </div>
-                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {announcement.category}
-                      </span>
-                    </div>
 
-                    {/* Content */}
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2 text-gray-900 group-hover:text-[#22A555] transition-colors">
-                        {announcement.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
-                        {announcement.description}
-                      </p>
-                    </div>
+                      {/* Content */}
+                      <div>
+                        <h3 className="font-semibold text-lg mb-2 text-gray-900 group-hover:text-[#22A555] transition-colors">
+                          {announcement.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                          {announcement.description}
+                        </p>
+                      </div>
 
-                    {/* Date */}
-                    <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{announcement.date}</span>
+                      {/* Date */}
+                      <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{formatDate(announcement.published_at)}</span>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       </Container>
     </AdminLayout>

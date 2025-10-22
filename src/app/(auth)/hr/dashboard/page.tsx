@@ -1,29 +1,156 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { DashboardTile, Card, Button, Container } from '@/components/ui';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle } from 'lucide-react';
+import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase/auth';
+
+interface DashboardStats {
+  totalScanned: number;
+  pendingReview: number;
+  noMatches: number;
+  approved: number;
+  rejected: number;
+  activeJobs: number;
+}
 
 export default function HRDashboard() {
+  const { user } = useAuth();
   const { showToast } = useToast();
-  // Mock data with icons and colors
+  const [stats, setStats] = useState<DashboardStats>({
+    totalScanned: 0,
+    pendingReview: 0,
+    noMatches: 0,
+    approved: 0,
+    rejected: 0,
+    activeJobs: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+    try {
+      // Fetch total applications (PDS scanned)
+      const { count: totalScanned } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true });
+
+      // Fetch pending applications
+      const { count: pendingReview } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      // Fetch approved applications
+      const { count: approved } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved');
+
+      // Fetch rejected applications
+      const { count: rejected } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'denied');
+
+      // Fetch active job postings
+      const { count: activeJobs } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      // For "no matches", we'd need more complex logic
+      // For now, using jobs with no applications or low match scores
+      const { data: jobsWithApps } = await supabase
+        .from('jobs')
+        .select(`
+          id,
+          applications!applications_job_id_fkey(count)
+        `)
+        .eq('status', 'active');
+
+      const noMatches = jobsWithApps?.filter(job =>
+        !job.applications || job.applications.length === 0
+      ).length || 0;
+
+      setStats({
+        totalScanned: totalScanned || 0,
+        pendingReview: pendingReview || 0,
+        noMatches: noMatches,
+        approved: approved || 0,
+        rejected: rejected || 0,
+        activeJobs: activeJobs || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching HR dashboard stats:', error);
+      showToast('Failed to load dashboard statistics', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const tiles = [
-    { title: 'Total PDS Scanned', value: '40', icon: FileText, color: 'from-blue-500 to-blue-600' },
-    { title: 'Number of PDS Pending Review', value: '25', icon: Clock, color: 'from-orange-500 to-orange-600' },
-    { title: 'Jobs with No Qualified Matches', value: '100', icon: AlertCircle, color: 'from-red-500 to-red-600' },
-    { title: 'Total Approved Applications', value: '15', icon: CheckCircle2, color: 'from-green-500 to-green-600' },
-    { title: 'Total Rejected Applications', value: '8', icon: XCircle, color: 'from-gray-500 to-gray-600' },
-    { title: 'Active Job Postings', value: '12', icon: Briefcase, color: 'from-purple-500 to-purple-600' },
+    {
+      title: 'Total PDS Scanned',
+      value: loading ? '...' : stats.totalScanned.toString(),
+      icon: FileText,
+      color: 'from-blue-500 to-blue-600'
+    },
+    {
+      title: 'Number of PDS Pending Review',
+      value: loading ? '...' : stats.pendingReview.toString(),
+      icon: Clock,
+      color: 'from-orange-500 to-orange-600'
+    },
+    {
+      title: 'Jobs with No Qualified Matches',
+      value: loading ? '...' : stats.noMatches.toString(),
+      icon: AlertCircle,
+      color: 'from-red-500 to-red-600'
+    },
+    {
+      title: 'Total Approved Applications',
+      value: loading ? '...' : stats.approved.toString(),
+      icon: CheckCircle2,
+      color: 'from-green-500 to-green-600'
+    },
+    {
+      title: 'Total Rejected Applications',
+      value: loading ? '...' : stats.rejected.toString(),
+      icon: XCircle,
+      color: 'from-gray-500 to-gray-600'
+    },
+    {
+      title: 'Active Job Postings',
+      value: loading ? '...' : stats.activeJobs.toString(),
+      icon: Briefcase,
+      color: 'from-purple-500 to-purple-600'
+    },
   ];
 
   return (
-    <AdminLayout role="HR" userName="Micah Echavarre" pageTitle="Dashboard" pageDescription="Overview of hiring statistics and metrics">
+    <AdminLayout
+      role="HR"
+      userName={user?.fullName || 'HR User'}
+      pageTitle="Dashboard"
+      pageDescription="Overview of hiring statistics and metrics"
+    >
       <Container size="xl">
         <div className="space-y-8">
           {/* Generate Report Button */}
           <div className="flex items-center justify-end">
-            <Button variant="success" icon={Download} onClick={() => showToast('Generate report feature coming soon', 'info')}>
+            <Button
+              variant="success"
+              icon={Download}
+              onClick={() => showToast('Generate report feature coming soon', 'info')}
+              disabled={loading}
+            >
               Generate Report
             </Button>
           </div>
@@ -37,7 +164,13 @@ export default function HRDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600 mb-2">{tile.title}</p>
-                      <p className="text-4xl font-bold text-gray-900">{tile.value}</p>
+                      <p className="text-4xl font-bold text-gray-900">
+                        {loading ? (
+                          <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                        ) : (
+                          tile.value
+                        )}
+                      </p>
                     </div>
                     <div className={`w-16 h-16 bg-gradient-to-br ${tile.color} rounded-xl flex items-center justify-center shadow-lg`}>
                       <Icon className="w-8 h-8 text-white" />
@@ -53,75 +186,28 @@ export default function HRDashboard() {
             {/* Monthly Applicants Chart */}
             <Card title="MONTHLY APPLICANTS" headerColor="bg-[#D4F4DD]" variant="elevated">
               <div className="h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-lg p-4">
-                <svg viewBox="0 0 400 200" className="w-full h-full">
-                  {/* Simple line chart illustration */}
-                  <polyline
-                    points="20,180 60,120 100,80 140,100 180,90 220,110 260,70 300,90 340,60 380,50"
-                    fill="none"
-                    stroke="#22A555"
-                    strokeWidth="3"
-                  />
-                  <line x1="20" y1="180" x2="380" y2="180" stroke="#ccc" strokeWidth="2"/>
-                  <line x1="20" y1="20" x2="20" y2="180" stroke="#ccc" strokeWidth="2"/>
-                  <text x="200" y="195" textAnchor="middle" fill="#666" fontSize="12">Months</text>
-                  <text x="10" y="15" fill="#666" fontSize="12">6,000</text>
-                  <text x="10" y="95" fill="#666" fontSize="12">4,000</text>
-                  <text x="10" y="175" fill="#666" fontSize="12">0</text>
-                </svg>
+                {loading ? (
+                  <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+                ) : (
+                  <div className="text-center text-gray-500">
+                    <p className="text-sm">Chart visualization coming soon</p>
+                    <p className="text-xs mt-2">Will display monthly application trends</p>
+                  </div>
+                )}
               </div>
             </Card>
 
             {/* Job Matched Chart */}
             <Card title="JOB MATCHED" headerColor="bg-[#D4F4DD]" variant="elevated">
               <div className="h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-lg p-4">
-                <div className="relative">
-                  {/* Simple donut chart illustration */}
-                  <svg width="200" height="200" viewBox="0 0 200 200">
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="80"
-                      fill="none"
-                      stroke="#3B82F6"
-                      strokeWidth="30"
-                      strokeDasharray="150 502"
-                    />
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="80"
-                      fill="none"
-                      stroke="#20C997"
-                      strokeWidth="30"
-                      strokeDasharray="120 502"
-                      strokeDashoffset="-150"
-                    />
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="80"
-                      fill="none"
-                      stroke="#8B5CF6"
-                      strokeWidth="30"
-                      strokeDasharray="80 502"
-                      strokeDashoffset="-270"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-8 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-500 rounded shadow-sm"></div>
-                    <span className="text-sm font-medium text-gray-700">IT Assistant Tech</span>
+                {loading ? (
+                  <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+                ) : (
+                  <div className="text-center text-gray-500">
+                    <p className="text-sm">Chart visualization coming soon</p>
+                    <p className="text-xs mt-2">Will display application distribution by job</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-[#20C997] rounded shadow-sm"></div>
-                    <span className="text-sm font-medium text-gray-700">HR Officer</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-purple-500 rounded shadow-sm"></div>
-                    <span className="text-sm font-medium text-gray-700">Accountant</span>
-                  </div>
-                </div>
+                )}
               </div>
             </Card>
           </div>
