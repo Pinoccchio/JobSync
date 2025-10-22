@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Facebook, Twitter, Mail, Sparkles, ExternalLink } from 'lucide-react';
 
 export function Footer() {
@@ -10,9 +11,13 @@ export function Footer() {
           {/* About */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded flex items-center justify-center">
-                <span className="text-white font-bold text-sm">JS</span>
-              </div>
+              <Image
+                src="/logo-no-bg.png"
+                alt="Municipality of Asuncion"
+                width={32}
+                height={32}
+                className="rounded"
+              />
               <h3 className="font-bold text-lg">JobSync</h3>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed mb-4">

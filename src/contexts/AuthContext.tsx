@@ -1,5 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
   id: string;
@@ -13,7 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string, role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT') => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,38 +26,108 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const storedUser = localStorage.getItem('jobsync_user');
-    const storedRole = localStorage.getItem('jobsync_role');
+    // Check for existing Supabase session
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-    if (storedUser && storedRole) {
-      setUser(JSON.parse(storedUser));
-      setRole(storedRole as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
-    }
-    setIsLoading(false);
+        if (session?.user) {
+          // Map Supabase user to our User interface
+          const mappedUser: User = {
+            id: session.user.id,
+            email: session.user.email || '',
+            fullName: session.user.user_metadata?.full_name || session.user.email || 'User',
+          };
+
+          setUser(mappedUser);
+
+          // Get role from user metadata or localStorage as fallback
+          // TODO: Once database is set up, fetch role from users table
+          const userRole = session.user.user_metadata?.role || localStorage.getItem('jobsync_role');
+          if (userRole) {
+            setRole(userRole as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth state changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const mappedUser: User = {
+          id: session.user.id,
+          email: session.user.email || '',
+          fullName: session.user.user_metadata?.full_name || session.user.email || 'User',
+        };
+
+        setUser(mappedUser);
+
+        // Update role from metadata
+        const userRole = session.user.user_metadata?.role || localStorage.getItem('jobsync_role');
+        if (userRole) {
+          setRole(userRole as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
+        }
+      } else {
+        setUser(null);
+        setRole(null);
+        localStorage.removeItem('jobsync_role');
+      }
+
+      setIsLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string, selectedRole: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT') => {
-    // Mock login - replace with actual API call
-    const mockUser: User = {
-      id: '1',
-      email,
-      fullName: 'Demo User'
-    };
+    try {
+      // Authenticate with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setUser(mockUser);
-    setRole(selectedRole);
+      if (error) throw error;
 
-    // Store in localStorage
-    localStorage.setItem('jobsync_user', JSON.stringify(mockUser));
-    localStorage.setItem('jobsync_role', selectedRole);
+      if (data.user) {
+        // Map Supabase user to our User interface
+        const mappedUser: User = {
+          id: data.user.id,
+          email: data.user.email || '',
+          fullName: data.user.user_metadata?.full_name || data.user.email || 'User',
+        };
+
+        setUser(mappedUser);
+        setRole(selectedRole);
+
+        // Store role in localStorage as temporary solution
+        // TODO: Once database schema is ready, fetch role from users table
+        localStorage.setItem('jobsync_role', selectedRole);
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw new Error(error.message || 'Failed to login');
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    setRole(null);
-    localStorage.removeItem('jobsync_user');
-    localStorage.removeItem('jobsync_role');
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setRole(null);
+      localStorage.removeItem('jobsync_role');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   return (

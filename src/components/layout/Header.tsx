@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui';
 import { Menu, X } from 'lucide-react';
 
@@ -13,9 +14,13 @@ export function Header() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-white font-bold text-xl">JS</span>
-            </div>
+            <Image
+              src="/logo-no-bg.png"
+              alt="Municipality of Asuncion"
+              width={40}
+              height={40}
+              className="rounded-lg"
+            />
             <div>
               <div className="font-bold text-2xl text-gray-900">JobSync</div>
               <div className="text-xs text-gray-600">Municipality of Asuncion</div>

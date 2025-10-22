@@ -84,11 +84,11 @@ export default function LoginPage() {
           {/* Left Section - Logo & Info */}
           <div className="flex flex-col items-center justify-center text-center">
             <Image
-              src="/logo.jpg"
+              src="/logo-no-bg.png"
               alt="Municipality of Asuncion Logo"
               width={280}
               height={280}
-              className="rounded-full shadow-xl mb-6"
+              className="rounded-full mb-6"
             />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">JobSync</h1>
             <p className="text-gray-600 text-sm">
