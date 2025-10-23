@@ -1,10 +1,11 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Container, Badge, RefreshButton } from '@/components/ui';
+import { Card, Container, Badge, RefreshButton, EventIcon, EventBadge } from '@/components/ui';
 import { Users, Shield, Building2, UserCheck, Activity, Clock, UserPlus, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { getEventConfig, formatEventType } from '@/lib/activityEventConfig';
 
 interface DashboardStats {
   totalUsers: number;
@@ -147,18 +148,6 @@ export default function AdminDashboard() {
     }
   }, [authLoading, isAuthenticated, fetchDashboardData]); // All dependencies to prevent race condition
 
-  const getEventIcon = (event: string) => {
-    if (event.includes('registration') || event.includes('signup') || event.includes('created')) return UserPlus;
-    if (event.includes('login')) return Activity;
-    return Clock;
-  };
-
-  const getEventColor = (event: string) => {
-    if (event.includes('registration') || event.includes('signup') || event.includes('created')) return 'from-green-500 to-green-600';
-    if (event.includes('login')) return 'from-blue-500 to-blue-600';
-    return 'from-gray-500 to-gray-600';
-  };
-
   const getRoleBadgeVariant = (role: string): 'success' | 'info' | 'warning' | 'default' => {
     switch (role) {
       case 'HR': return 'success';
@@ -271,21 +260,28 @@ export default function AdminDashboard() {
             ) : (
               <div className="space-y-3">
                 {recentActivities.map((activity) => {
-                  const EventIcon = getEventIcon(activity.event_type);
-                  const eventColor = getEventColor(activity.event_type);
+                  const config = getEventConfig(activity.event_type);
 
                   return (
-                    <div key={activity.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg border border-gray-100 transition-colors">
+                    <div
+                      key={activity.id}
+                      className={`
+                        flex items-center justify-between p-4 rounded-lg border-l-4 transition-all duration-200
+                        ${config.rowColor}
+                        hover:shadow-md cursor-pointer
+                      `}
+                      style={{ borderLeftColor: config.gradientColor?.split(' ')[0].replace('from-', '') }}
+                    >
                       <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 bg-gradient-to-br ${eventColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                          <EventIcon className="w-6 h-6 text-white" />
-                        </div>
+                        <EventIcon eventType={activity.event_type} size="md" />
                         <div>
-                          <p className="font-semibold text-gray-900">{formatEventType(activity.event_type)}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-gray-600">{activity.user_email || 'Unknown User'}</span>
+                          <div className="flex items-center gap-2 mb-1">
+                            <EventBadge eventType={activity.event_type} size="sm" showIcon={false} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">{activity.user_email || 'System'}</span>
                             {activity.user_role && (
-                              <Badge variant={getRoleBadgeVariant(activity.user_role)} className="text-xs">
+                              <Badge variant={getRoleBadgeVariant(activity.user_role)} size="sm">
                                 {activity.user_role}
                               </Badge>
                             )}
@@ -294,7 +290,7 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <Clock className="w-4 h-4" />
-                        <span>{formatTimeAgo(activity.timestamp)}</span>
+                        <span className="font-medium">{formatTimeAgo(activity.timestamp)}</span>
                       </div>
                     </div>
                   );

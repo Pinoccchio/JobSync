@@ -32,33 +32,29 @@ export function useTableRealtime(
 ) {
   const { isAuthenticated } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const subscriptionInitialized = useRef(false);
 
-  // Use refs to store unstable dependencies and prevent infinite re-subscriptions
+  // Use ref to store the callback to prevent unnecessary re-subscriptions
   const onEventRef = useRef(onEvent);
-  const eventsRef = useRef(events);
 
-  // Update refs when values change
+  // Update callback ref when it changes
   useEffect(() => {
     onEventRef.current = onEvent;
-    eventsRef.current = events;
-  }, [onEvent, events]);
+  }, [onEvent]);
 
   useEffect(() => {
-    // Only subscribe if authenticated, enabled, and not already subscribed
-    if (!isAuthenticated || !enabled || subscriptionInitialized.current) {
+    // Skip if not authenticated or disabled
+    if (!isAuthenticated || !enabled) {
       return;
     }
 
-    console.log(`🔄 Setting up real-time subscription for ${tableName}`, { events: eventsRef.current, filter });
-    subscriptionInitialized.current = true;
+    console.log(`🔄 Setting up real-time subscription for ${tableName}`, { events, filter });
 
     // Generate unique channel name
     const channelName = `${tableName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     let channel = supabase.channel(channelName);
 
-    // Subscribe to each event type using stable refs
-    eventsRef.current.forEach(event => {
+    // Subscribe to each event type
+    events.forEach(event => {
       channel = channel.on(
         'postgres_changes',
         {
@@ -77,11 +73,14 @@ export function useTableRealtime(
       );
     });
 
-    // Subscribe and store reference
+    // Subscribe and handle status
     channel.subscribe((status, err) => {
-      console.log(`${tableName} subscription status: ${status}`);
-      if (err) {
-        console.error(`${tableName} subscription error:`, err);
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ ${tableName} subscription ACTIVE`);
+      } else if (status === 'CLOSED') {
+        console.log(`❌ ${tableName} subscription CLOSED`);
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error(`⚠️ ${tableName} subscription ERROR:`, err);
       }
     });
 
@@ -94,9 +93,8 @@ export function useTableRealtime(
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      subscriptionInitialized.current = false;
     };
-  }, [tableName, isAuthenticated, enabled, filter]); // Removed unstable dependencies
+  }, [tableName, isAuthenticated, enabled, filter, events]); // Include all dependencies
 
   return { channel: channelRef.current };
 }

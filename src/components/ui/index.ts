@@ -12,3 +12,7 @@ export { ApplicationModal } from './ApplicationModal';
 export { Badge } from './Badge';
 export { Container } from './Container';
 export { RefreshButton } from './RefreshButton';
+export { EventBadge } from './EventBadge';
+export { StatusIndicator } from './StatusIndicator';
+export { EventIcon } from './EventIcon';
+export { EventFilter, EventFilterGroup } from './EventFilter';

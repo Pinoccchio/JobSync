@@ -23,6 +23,7 @@ interface EnhancedTableProps {
   onExport?: () => void;
   exportLabel?: string;
   getRowClassName?: (row: any) => string;
+  getRowColor?: (row: any) => string; // NEW: For event severity-based row coloring
 }
 
 export const EnhancedTable: React.FC<EnhancedTableProps> = ({
@@ -35,7 +36,8 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
   pageSize = 10,
   onExport,
   exportLabel = 'Export',
-  getRowClassName
+  getRowClassName,
+  getRowColor
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState<{
@@ -165,11 +167,13 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
             {paginatedData.length > 0 ? (
               paginatedData.map((row, rowIndex) => {
                 const customClassName = getRowClassName ? getRowClassName(row) : '';
+                const rowColor = getRowColor ? getRowColor(row) : '';
                 return (
                   <tr
                     key={rowIndex}
                     className={cn(
-                      "border-b border-gray-200 hover:bg-gray-50 transition-colors",
+                      "border-b border-gray-200 transition-all duration-150",
+                      rowColor || "hover:bg-gray-50",
                       customClassName
                     )}
                   >

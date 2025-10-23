@@ -1,18 +1,43 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Container, Badge, RefreshButton } from '@/components/ui';
+import {
+  Card, EnhancedTable, Container, RefreshButton, EventBadge, EventIcon,
+  StatusIndicator, EventFilterGroup
+} from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { supabase } from '@/lib/supabase/auth';
-import { Activity, LogIn, LogOut, UserPlus, Trash2, UserX, Calendar, User, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import {
+  getEventConfig, type EventCategory, type EventSeverity,
+  formatEventType, getCategoryIcon
+} from '@/lib/activityEventConfig';
+import { Activity, Clock, User, AlertTriangle, CheckCircle2, AlertCircle, Filter } from 'lucide-react';
+
+interface ActivityLog {
+  id: string;
+  event_type: string;
+  event_category: EventCategory;
+  user_email: string | null;
+  user_role: string | null;
+  details: string;
+  status: 'success' | 'failed';
+  metadata: any;
+  timestamp: string;
+}
 
 export default function ActivityLogsPage() {
   const { showToast } = useToast();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [filteredActivities, setFilteredActivities] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Filter states
+  const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(new Set());
+  const [activeStatus, setActiveStatus] = useState<'all' | 'success' | 'failed'>('all');
+  const [activeSeverity, setActiveSeverity] = useState<Set<EventSeverity>>(new Set());
 
   // Fetch activity logs function
   const fetchActivityLogs = useCallback(async () => {
@@ -29,26 +54,7 @@ export default function ActivityLogsPage() {
         throw error;
       }
 
-      // Transform data to match the table format
-      const transformedData = (data || []).map((log: any) => ({
-        id: log.id,
-        timestamp: new Date(log.timestamp).toLocaleString('en-US', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        }),
-        eventType: log.event_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-        user: log.user_email || 'System',
-        role: log.user_role || 'System',
-        details: log.details || `${log.event_type} event`,
-        status: log.status === 'success' ? 'Success' : 'Failed'
-      }));
-
-      setActivities(transformedData);
+      setActivities((data || []) as ActivityLog[]);
       showToast('Activity logs refreshed', 'success');
     } catch (error: any) {
       console.error('Failed to fetch activity logs:', error);
@@ -56,214 +62,353 @@ export default function ActivityLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]); // Added showToast to dependencies
+  }, [showToast]);
 
-  // Fetch activity logs when authentication is ready - fixed race condition
+  // Apply filters
+  useEffect(() => {
+    let filtered = [...activities];
+
+    // Filter by category
+    if (activeCategories.size > 0) {
+      filtered = filtered.filter(log => activeCategories.has(log.event_category));
+    }
+
+    // Filter by status
+    if (activeStatus !== 'all') {
+      filtered = filtered.filter(log => log.status === activeStatus);
+    }
+
+    // Filter by severity
+    if (activeSeverity.size > 0) {
+      filtered = filtered.filter(log => {
+        const config = getEventConfig(log.event_type);
+        return activeSeverity.has(config.severity);
+      });
+    }
+
+    setFilteredActivities(filtered);
+  }, [activities, activeCategories, activeStatus, activeSeverity]);
+
+  // Fetch activity logs when authentication is ready
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       fetchActivityLogs();
     }
-  }, [authLoading, isAuthenticated, fetchActivityLogs]); // All dependencies to prevent race condition
+  }, [authLoading, isAuthenticated, fetchActivityLogs]);
 
   // Real-time subscription for activity logs
   useTableRealtime('activity_logs', ['INSERT'], null, () => {
     showToast('New activity logged', 'info');
-    fetchActivityLogs(); // Refresh data when new log is inserted
+    fetchActivityLogs();
   });
 
-  const getEventIcon = (eventType: string) => {
-    switch (eventType) {
-      case 'Login': return LogIn;
-      case 'Logout': return LogOut;
-      case 'Account Created':
-      case 'User Registration': return UserPlus;
-      case 'Account Deleted': return Trash2;
-      case 'Account Deactivated': return UserX;
-      case 'Login Failed': return AlertCircle;
-      default: return Activity;
+  // Category filter data
+  const categoryStats = React.useMemo(() => {
+    const stats: Record<EventCategory, number> = {
+      auth: 0,
+      user_management: 0,
+      application: 0,
+      job: 0,
+      training: 0,
+      system: 0,
+    };
+
+    activities.forEach(log => {
+      stats[log.event_category]++;
+    });
+
+    return stats;
+  }, [activities]);
+
+  const categoryFilters = [
+    { category: 'auth' as EventCategory, label: 'Auth', count: categoryStats.auth, active: activeCategories.has('auth') },
+    { category: 'user_management' as EventCategory, label: 'User Management', count: categoryStats.user_management, active: activeCategories.has('user_management') },
+    { category: 'job' as EventCategory, label: 'Jobs', count: categoryStats.job, active: activeCategories.has('job') },
+    { category: 'application' as EventCategory, label: 'Applications', count: categoryStats.application, active: activeCategories.has('application') },
+    { category: 'training' as EventCategory, label: 'Training', count: categoryStats.training, active: activeCategories.has('training') },
+    { category: 'system' as EventCategory, label: 'System', count: categoryStats.system, active: activeCategories.has('system') },
+  ];
+
+  const handleCategoryToggle = (category: EventCategory) => {
+    const newCategories = new Set(activeCategories);
+    if (newCategories.has(category)) {
+      newCategories.delete(category);
+    } else {
+      newCategories.add(category);
     }
+    setActiveCategories(newCategories);
   };
 
-  const getEventBadgeVariant = (eventType: string): 'success' | 'info' | 'warning' | 'danger' | 'default' => {
-    switch (eventType) {
-      case 'Login':
-      case 'User Registration':
-      case 'Account Created': return 'success';
-      case 'Logout': return 'info';
-      case 'Account Deactivated': return 'warning';
-      case 'Account Deleted':
-      case 'Login Failed': return 'danger';
-      default: return 'default';
-    }
+  const clearFilters = () => {
+    setActiveCategories(new Set());
+    setActiveStatus('all');
+    setActiveSeverity(new Set());
   };
 
-  const getRoleBadgeVariant = (role: string): 'success' | 'info' | 'warning' | 'default' => {
-    switch (role) {
-      case 'HR':
-      case 'Admin': return 'success';
-      case 'PESO': return 'info';
-      case 'Applicant': return 'warning';
-      default: return 'default';
-    }
-  };
-
+  // Table columns
   const columns = [
     {
-      header: 'Timestamp',
-      accessor: 'timestamp' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700 font-mono">{value}</span>
-        </div>
-      )
-    },
-    {
-      header: 'Event Type',
-      accessor: 'eventType' as const,
-      render: (value: string) => {
-        const Icon = getEventIcon(value);
+      header: 'Event',
+      accessor: 'event_type' as const,
+      sortable: true,
+      render: (value: string, row: ActivityLog) => {
+        const config = getEventConfig(value);
         return (
-          <div className="flex items-center gap-2">
-            <Icon className="w-4 h-4 text-gray-400" />
-            <Badge variant={getEventBadgeVariant(value)}>{value}</Badge>
+          <div className="flex items-center gap-3">
+            <EventIcon eventType={value} size="sm" />
+            <div>
+              <EventBadge eventType={value} size="sm" />
+              <StatusIndicator
+                severity={config.severity}
+                size="sm"
+                className="mt-1"
+              />
+            </div>
           </div>
         );
       }
     },
     {
       header: 'User',
-      accessor: 'user' as const,
-      render: (value: string) => (
+      accessor: 'user_email' as const,
+      sortable: true,
+      render: (value: string, row: ActivityLog) => (
         <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700">{value}</span>
+          <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-gray-900">{value || 'System'}</p>
+            {row.user_role && (
+              <p className="text-xs text-gray-500">{row.user_role}</p>
+            )}
+          </div>
         </div>
-      )
-    },
-    {
-      header: 'Role',
-      accessor: 'role' as const,
-      render: (value: string) => (
-        <Badge variant={getRoleBadgeVariant(value)}>{value}</Badge>
       )
     },
     {
       header: 'Details',
       accessor: 'details' as const,
       render: (value: string) => (
-        <span className="text-sm text-gray-600">{value}</span>
+        <span className="text-sm text-gray-600 line-clamp-2">{value}</span>
       )
     },
     {
       header: 'Status',
       accessor: 'status' as const,
+      sortable: true,
       render: (value: string) => (
-        <Badge
-          variant={value === 'Success' ? 'success' : 'danger'}
-          icon={value === 'Success' ? CheckCircle2 : AlertCircle}
-        >
-          {value}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {value === 'success' ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-700">Success</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-sm font-medium text-red-700">Failed</span>
+            </>
+          )}
+        </div>
       )
+    },
+    {
+      header: 'Timestamp',
+      accessor: 'timestamp' as const,
+      sortable: true,
+      render: (value: string) => {
+        const date = new Date(value);
+        return (
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium text-gray-900">{date.toLocaleDateString()}</p>
+              <p className="text-xs text-gray-500">{date.toLocaleTimeString()}</p>
+            </div>
+          </div>
+        );
+      }
     },
   ];
 
   // Calculate stats
-  const totalEvents = activities.length;
-  const successfulEvents = activities.filter(a => a.status === 'Success').length;
-  const failedEvents = activities.filter(a => a.status === 'Failed').length;
-  const loginEvents = activities.filter(a => a.eventType.includes('Login')).length;
+  const stats = {
+    total: activities.length,
+    successful: activities.filter(a => a.status === 'success').length,
+    failed: activities.filter(a => a.status === 'failed').length,
+    critical: activities.filter(a => {
+      const config = getEventConfig(a.event_type);
+      return config.severity === 'critical' || config.severity === 'high';
+    }).length,
+  };
 
   return (
-    <AdminLayout role="Admin" userName={user?.fullName || 'System Admin'} pageTitle="Activity Logs" pageDescription="Monitor system events and user activities">
+    <AdminLayout
+      role="Admin"
+      userName={user?.fullName || 'System Admin'}
+      pageTitle="Activity Logs"
+      pageDescription="Monitor system events and user activities with advanced filtering"
+    >
       <Container size="xl">
         <div className="space-y-6">
-        {/* Refresh Button */}
-        <div className="flex justify-end">
-          <RefreshButton onRefresh={fetchActivityLogs} label="Refresh" showLastRefresh={true} />
-        </div>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Events</p>
-                <p className="text-3xl font-bold text-gray-900">{totalEvents}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Successful</p>
-                <p className="text-3xl font-bold text-gray-900">{successfulEvents}</p>
-              </div>
-              <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Failed Events</p>
-                <p className="text-3xl font-bold text-gray-900">{failedEvents}</p>
-              </div>
-              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Login Events</p>
-                <p className="text-3xl font-bold text-gray-900">{loginEvents}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
-                <LogIn className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Activity Logs Table */}
-        <Card title="SYSTEM ACTIVITY LOGS" headerColor="bg-[#D4F4DD]">
-          <EnhancedTable
-            columns={columns}
-            data={activities}
-            searchable
-            paginated
-            pageSize={10}
-            searchPlaceholder="Search by user, event type, or details..."
-          />
-        </Card>
-
-        {/* Info Card */}
-        <Card variant="flat" className="bg-blue-50">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
+          {/* Header with Refresh */}
+          <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-gray-900 mb-1">Activity Log Information</p>
-              <p className="text-sm text-gray-600">
-                This page displays all system activities including user logins, account management, and security events.
-                Use the search and filter features to find specific events. Logs are retained for 90 days.
+              <h2 className="text-2xl font-bold text-gray-900">System Activity Logs</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Showing {filteredActivities.length} of {activities.length} events
               </p>
             </div>
+            <RefreshButton onRefresh={fetchActivityLogs} label="Refresh" showLastRefresh={true} />
           </div>
-        </Card>
-      </div>
-    </Container>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Events</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Activity className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Successful</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.successful}</p>
+                </div>
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Failed Events</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.failed}</p>
+                </div>
+                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <AlertCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Critical Events</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.critical}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <AlertTriangle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <Card variant="flat" className="bg-white">
+            <div className="flex items-center gap-3 mb-4">
+              <Filter className="w-5 h-5 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+              {(activeCategories.size > 0 || activeStatus !== 'all') && (
+                <button
+                  onClick={clearFilters}
+                  className="ml-auto text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Category Filters */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Event Category</p>
+              <EventFilterGroup
+                filters={categoryFilters}
+                onFilterToggle={handleCategoryToggle}
+              />
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Status</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveStatus('all')}
+                  className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                    activeStatus === 'all'
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  All ({activities.length})
+                </button>
+                <button
+                  onClick={() => setActiveStatus('success')}
+                  className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                    activeStatus === 'success'
+                      ? 'bg-green-500 text-white border-green-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  Success ({stats.successful})
+                </button>
+                <button
+                  onClick={() => setActiveStatus('failed')}
+                  className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                    activeStatus === 'failed'
+                      ? 'bg-red-500 text-white border-red-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  Failed ({stats.failed})
+                </button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Activity Logs Table */}
+          <Card title="ACTIVITY HISTORY" headerColor="bg-[#D4F4DD]">
+            <EnhancedTable
+              columns={columns}
+              data={filteredActivities}
+              searchable
+              paginated
+              pageSize={10}
+              searchPlaceholder="Search by user, event type, or details..."
+              getRowColor={(row: ActivityLog) => {
+                const config = getEventConfig(row.event_type);
+                return config.rowColor || '';
+              }}
+            />
+          </Card>
+
+          {/* Info Card */}
+          <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 mb-1">About Activity Logs</p>
+                <p className="text-sm text-gray-600">
+                  This page displays all system activities with color-coded events for easy identification.
+                  Critical events (deletions, failures) are highlighted in red, warnings in orange,
+                  and successful operations in green. Use filters above to narrow down specific event types
+                  or categories. Activity logs are retained for 90 days.
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </Container>
     </AdminLayout>
   );
 }

@@ -10,10 +10,10 @@ import type { UpdateUserRequest, User, ApiResponse } from '@/types/users';
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = params.id;
+    const { id: userId } = await params;
 
     // Verify admin authentication
     const authHeader = request.headers.get('authorization');
@@ -81,11 +81,18 @@ export async function PATCH(
       );
     }
 
-    // BUSINESS RULE 1: Cannot deactivate another ADMIN account
-    // Admins are equal peers - no admin can deactivate another admin
-    if (body.status === 'inactive' && targetUser.role === 'ADMIN' && userId !== user.id) {
+    // BUSINESS RULE 1: Cannot deactivate ANY ADMIN account (including yourself)
+    // This prevents admins from accidentally locking themselves out
+    // Admin accounts should only be deactivated through direct database access for security
+    if (body.status === 'inactive' && targetUser.role === 'ADMIN') {
+      const isSelf = userId === user.id;
       return NextResponse.json<ApiResponse>(
-        { success: false, error: 'Cannot deactivate another admin account. Admins can only deactivate themselves.' },
+        {
+          success: false,
+          error: isSelf
+            ? 'Cannot deactivate your own admin account. This would lock you out of the system.'
+            : 'Cannot deactivate another admin account. Admin accounts require special handling.'
+        },
         { status: 403 }
       );
     }
@@ -176,10 +183,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = params.id;
+    const { id: userId } = await params;
 
     // Verify admin authentication
     const authHeader = request.headers.get('authorization');
