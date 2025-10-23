@@ -1,16 +1,19 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, Card, Container, Badge } from '@/components/ui';
+import { Button, Card, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { AdminLayout } from '@/components/layout';
 import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2 } from 'lucide-react';
 
 export default function TrainingsPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const trainings = [
+  const [trainings, setTrainings] = useState([
     {
       title: 'Web Development Training',
       duration: '3 months',
@@ -63,7 +66,28 @@ export default function TrainingsPage() {
       icon: '🎨',
       color: 'orange'
     },
-  ];
+  ]);
+
+  // Fetch training programs function
+  const fetchTrainings = useCallback(async () => {
+    try {
+      // TODO: Real implementation
+      // const { data } = await supabase
+      //   .from('training_programs')
+      //   .select('*')
+      //   .eq('status', 'active')
+      //   .order('created_at', { ascending: false });
+      showToast('Training programs refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh training programs', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for training programs
+  useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+    showToast('Training programs updated', 'info');
+    // fetchTrainings(); // Uncomment when real data
+  });
 
   const filteredTrainings = trainings.filter(training =>
     training.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -88,8 +112,12 @@ export default function TrainingsPage() {
   };
 
   return (
-    <AdminLayout role="Applicant" userName="User" pageTitle="PESO Training Programs" pageDescription="Enhance your skills with our free training programs">
+    <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="PESO Training Programs" pageDescription="Enhance your skills with our free training programs">
       <Container size="xl">
+        {/* Refresh Button */}
+        <div className="flex justify-end mb-6">
+          <RefreshButton onRefresh={fetchTrainings} label="Refresh" showLastRefresh={true} />
+        </div>
 
         {/* Search Bar */}
         <div className="mb-8">

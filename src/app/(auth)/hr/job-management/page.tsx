@@ -1,12 +1,15 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge } from '@/components/ui';
+import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { Plus, Edit, EyeOff, Trash2, Briefcase, GraduationCap, CheckCircle2, X } from 'lucide-react';
 
 export default function JobManagementPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
     position: '',
@@ -16,7 +19,7 @@ export default function JobManagementPage() {
     experience: '',
   });
 
-  const jobs = [
+  const [jobs, setJobs] = useState([
     {
       id: 1,
       position: 'IT Assistant Technician',
@@ -35,7 +38,27 @@ export default function JobManagementPage() {
       experience: '3 years',
       status: 'Active'
     },
-  ];
+  ]);
+
+  // Fetch jobs function
+  const fetchJobs = useCallback(async () => {
+    try {
+      // TODO: Real implementation
+      // const { data } = await supabase
+      //   .from('jobs')
+      //   .select('*')
+      //   .order('created_at', { ascending: false });
+      showToast('Jobs refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh jobs', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for jobs
+  useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+    showToast('Job listing updated', 'info');
+    // fetchJobs(); // Uncomment when real data
+  });
 
   const columns = [
     {
@@ -129,9 +152,17 @@ export default function JobManagementPage() {
   };
 
   return (
-    <AdminLayout role="HR" userName="HR Admin" pageTitle="Job Management" pageDescription="Create and manage job postings">
+    <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Job Management" pageDescription="Create and manage job postings">
       <Container size="xl">
         <div className="space-y-6">
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between">
+            <Button variant="primary" size="md" icon={Plus} onClick={() => setShowAddModal(true)}>
+              Add New Job
+            </Button>
+            <RefreshButton onRefresh={fetchJobs} label="Refresh" showLastRefresh={true} />
+          </div>
+
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">

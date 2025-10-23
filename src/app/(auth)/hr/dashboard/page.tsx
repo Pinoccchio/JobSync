@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { DashboardTile, Card, Button, Container } from '@/components/ui';
+import { DashboardTile, Card, Button, Container, RefreshButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2 } from 'lucide-react';
@@ -31,7 +31,6 @@ export default function HRDashboard() {
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
-  const hasFetched = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -41,19 +40,7 @@ export default function HRDashboard() {
   }, []);
 
   const fetchDashboardStats = useCallback(async () => {
-    if (authLoading || !isAuthenticated) {
-      console.log('⏳ Waiting for authentication...');
-      return;
-    }
-
-    // Prevent duplicate fetches on strict mode double render
-    if (hasFetched.current) {
-      console.log('⏭️ Already fetched, skipping...');
-      return;
-    }
-
     console.log('📊 Fetching HR dashboard stats...');
-    hasFetched.current = true;
 
     // Only update loading state if component is still mounted
     if (isMounted.current) {
@@ -126,11 +113,14 @@ export default function HRDashboard() {
         setLoading(false);
       }
     }
-  }, [authLoading, isAuthenticated]); // Fixed: removed showToast from dependencies
+  }, []); // Empty deps - stable function, auth check moved to useEffect
 
+  // Fetch data when authentication is ready - fixed race condition
   useEffect(() => {
-    fetchDashboardStats();
-  }, [fetchDashboardStats]);
+    if (!authLoading && isAuthenticated) {
+      fetchDashboardStats();
+    }
+  }, [authLoading, isAuthenticated, fetchDashboardStats]); // All dependencies to prevent race condition
 
   const tiles = [
     {
@@ -180,8 +170,13 @@ export default function HRDashboard() {
     >
       <Container size="xl">
         <div className="space-y-8">
-          {/* Generate Report Button */}
-          <div className="flex items-center justify-end">
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3">
+            <RefreshButton
+              onRefresh={fetchDashboardStats}
+              label="Refresh"
+              showLastRefresh={true}
+            />
             <Button
               variant="success"
               icon={Download}

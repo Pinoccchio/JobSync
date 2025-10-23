@@ -35,6 +35,7 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   icon?: LucideIcon;
   iconPosition?: 'left' | 'right';
+  iconClassName?: string;
   loading?: boolean;
   children: React.ReactNode;
 }
@@ -46,6 +47,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     size,
     icon: Icon,
     iconPosition = 'left',
+    iconClassName,
     loading = false,
     children,
     disabled,
@@ -54,7 +56,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const iconElement = loading ? (
       <Loader2 className="w-4 h-4 animate-spin" />
     ) : Icon ? (
-      <Icon className="w-4 h-4" />
+      <Icon className={cn("w-4 h-4", iconClassName)} />
     ) : null;
 
     return (

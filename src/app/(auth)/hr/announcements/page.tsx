@@ -1,19 +1,22 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Button, Input, Textarea, FileUpload, Container, Badge } from '@/components/ui';
+import { Card, Button, Input, Textarea, FileUpload, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone } from 'lucide-react';
 
 export default function AnnouncementsPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     file: null as File | null,
   });
 
-  const [postedContent] = useState([
+  const [postedContent, setPostedContent] = useState([
     {
       id: 1,
       title: 'We are looking for IT Technician!',
@@ -58,9 +61,34 @@ export default function AnnouncementsPage() {
     }
   };
 
+  // Fetch announcements function
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      // TODO: Real implementation
+      // const { data } = await supabase
+      //   .from('announcements')
+      //   .select('*')
+      //   .order('created_at', { ascending: false });
+      showToast('Announcements refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh announcements', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for announcements
+  useTableRealtime('announcements', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+    showToast('Announcement updated', 'info');
+    // fetchAnnouncements(); // Uncomment when real data
+  });
+
   return (
-    <AdminLayout role="HR" userName="HR Admin" pageTitle="Announcements" pageDescription="Post job announcements and notices">
+    <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Announcements" pageDescription="Post job announcements and notices">
       <Container size="xl">
+        {/* Refresh Button */}
+        <div className="flex justify-end mb-6">
+          <RefreshButton onRefresh={fetchAnnouncements} label="Refresh" showLastRefresh={true} />
+        </div>
+
         {/* Create Announcement Card */}
         <Card variant="elevated" className="mb-8">
           <div className="p-6">

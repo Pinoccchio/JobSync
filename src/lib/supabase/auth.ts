@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { ActivityLogger } from './activityLogger';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -150,6 +151,13 @@ export async function loginUser(credentials: LoginCredentials): Promise<AuthResu
     const finalProfile = updatedProfile || profile;
 
     console.log('✅ Login complete for:', finalProfile.full_name);
+
+    // Log successful login activity
+    await ActivityLogger.login(
+      finalProfile.email || authData.user.email || '',
+      finalProfile.id,
+      finalProfile.role
+    );
 
     return {
       success: true,
@@ -318,11 +326,35 @@ export async function signOut(): Promise<AuthResult<void>> {
   try {
     console.log('🚪 Signing out...');
 
+    // Get user info before signing out for activity logging
+    const { data: { session } } = await supabase.auth.getSession();
+    let userEmail = session?.user?.email;
+    let userId = session?.user?.id;
+    let userRole: string | undefined;
+
+    if (userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email, role')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        userEmail = profile.email || userEmail;
+        userRole = profile.role;
+      }
+    }
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {
       console.error('❌ Sign out error:', error.message);
       return { success: false, error: error.message };
+    }
+
+    // Log successful logout activity
+    if (userEmail && userId && userRole) {
+      await ActivityLogger.logout(userEmail, userId, userRole);
     }
 
     console.log('✅ Sign out successful');

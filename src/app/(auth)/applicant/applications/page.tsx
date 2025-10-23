@@ -1,15 +1,18 @@
 'use client';
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Card, EnhancedTable, Container, Badge } from '@/components/ui';
+import { Card, EnhancedTable, Container, Badge, RefreshButton } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { FileText, CheckCircle, XCircle, Clock, TrendingUp, Info } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 
 export default function MyApplicationsPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
 
-  const applications = [
+  const [applications, setApplications] = useState([
     {
       id: 1,
       position: 'IT Assistant Technician',
@@ -50,7 +53,28 @@ export default function MyApplicationsPage() {
       status: 'Approved',
       matchScore: 'N/A'
     },
-  ];
+  ]);
+
+  // Fetch applications function
+  const fetchApplications = useCallback(async () => {
+    try {
+      // TODO: Real implementation
+      // const { data } = await supabase
+      //   .from('applications')
+      //   .select('*, jobs(*)')
+      //   .eq('applicant_id', user.id)
+      //   .order('created_at', { ascending: false });
+      showToast('Applications refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh applications', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for user's applications
+  useTableRealtime('applications', ['INSERT', 'UPDATE'], `applicant_id=eq.${user?.id}`, () => {
+    showToast('Application status updated', 'info');
+    // fetchApplications(); // Uncomment when real data
+  });
 
   const columns = [
     {
@@ -117,8 +141,12 @@ export default function MyApplicationsPage() {
   };
 
   return (
-    <AdminLayout role="Applicant" userName="User" pageTitle="My Applications" pageDescription="Track the status of your job and training applications">
+    <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="My Applications" pageDescription="Track the status of your job and training applications">
       <Container size="xl">
+        {/* Refresh Button */}
+        <div className="flex justify-end mb-6">
+          <RefreshButton onRefresh={fetchApplications} label="Refresh" showLastRefresh={true} />
+        </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

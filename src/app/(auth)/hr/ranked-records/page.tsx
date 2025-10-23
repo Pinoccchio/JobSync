@@ -1,13 +1,17 @@
 'use client';
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { Download, Trophy, Medal, Award, TrendingUp, User, Mail, Briefcase } from 'lucide-react';
 
 export default function RankedRecordsPage() {
   const { showToast } = useToast();
-  const extractedData = [
+  const { user } = useAuth();
+
+  const [extractedData, setExtractedData] = useState([
     {
       no: 1,
       name: 'Micah Echavarre',
@@ -40,9 +44,9 @@ export default function RankedRecordsPage() {
       education: 'College',
       experience: '4 years in XYZ corp.'
     },
-  ];
+  ]);
 
-  const rankedCandidates = [
+  const [rankedCandidates, setRankedCandidates] = useState([
     {
       ranking: 1,
       name: 'Rodrigo Onias',
@@ -67,7 +71,36 @@ export default function RankedRecordsPage() {
       appliedPosition: 'IT Assistant Tech',
       matchScore: '89.7%'
     },
-  ];
+  ]);
+
+  // Fetch function for ranked records
+  const fetchRankedRecords = useCallback(async () => {
+    try {
+      // TODO: Replace with real Supabase query
+      // const { data, error } = await supabase
+      //   .from('applications')
+      //   .select('*, applicant_profiles(*), jobs(*)')
+      //   .not('rank', 'is', null)
+      //   .order('rank', { ascending: true });
+
+      showToast('Rankings refreshed', 'success');
+    } catch (error) {
+      console.error('Error fetching rankings:', error);
+      showToast('Failed to refresh rankings', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for ranking updates
+  useTableRealtime(
+    'applications',
+    ['UPDATE'],
+    'rank=not.null',
+    (payload) => {
+      console.log('Ranking updated:', payload);
+      showToast('Rankings updated in real-time', 'info');
+      // fetchRankedRecords(); // Uncomment when real fetching is implemented
+    }
+  );
 
   const extractedColumns = [
     { header: '#', accessor: 'no' as const },
@@ -193,9 +226,18 @@ export default function RankedRecordsPage() {
   ];
 
   return (
-    <AdminLayout role="HR" userName="HR Admin" pageTitle="Extracted & Ranked PDS Records" pageDescription="AI-powered applicant ranking and analysis">
+    <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Extracted & Ranked PDS Records" pageDescription="AI-powered applicant ranking and analysis">
       <Container size="xl">
         <div className="space-y-8">
+          {/* Refresh Button */}
+          <div className="flex justify-end">
+            <RefreshButton
+              onRefresh={fetchRankedRecords}
+              label="Refresh Rankings"
+              showLastRefresh={true}
+            />
+          </div>
+
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">

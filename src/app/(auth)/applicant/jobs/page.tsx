@@ -1,8 +1,11 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, Card, ApplicationModal, Container, Badge } from '@/components/ui';
+import { Button, Card, ApplicationModal, Container, Badge, RefreshButton } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
+import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { ChevronLeft, ChevronRight, Briefcase, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 
 interface Job {
@@ -15,11 +18,13 @@ interface Job {
 }
 
 export default function AuthenticatedJobsPage() {
+  const { showToast } = useToast();
+  const { user } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
-  const jobs: Job[] = [
+  const [jobs, setJobs] = useState<Job[]>([
     {
       title: 'IT Assistant Technician',
       company: 'Municipality of Asuncion',
@@ -44,7 +49,28 @@ export default function AuthenticatedJobsPage() {
       location: 'Asuncion Municipal Hall',
       type: 'Full-time'
     },
-  ];
+  ]);
+
+  // Fetch jobs function
+  const fetchJobs = useCallback(async () => {
+    try {
+      // TODO: Real implementation
+      // const { data } = await supabase
+      //   .from('jobs')
+      //   .select('*')
+      //   .eq('status', 'active')
+      //   .order('created_at', { ascending: false });
+      showToast('Jobs refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh jobs', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for jobs
+  useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+    showToast('Job listings updated', 'info');
+    // fetchJobs(); // Uncomment when real data
+  });
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % jobs.length);
@@ -65,8 +91,12 @@ export default function AuthenticatedJobsPage() {
   };
 
   return (
-    <AdminLayout role="Applicant" userName="User" pageTitle="Job Opportunities" pageDescription="Browse and apply for available positions">
+    <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="Job Opportunities" pageDescription="Browse and apply for available positions">
       <Container size="xl">
+        {/* Refresh Button */}
+        <div className="flex justify-end mb-6">
+          <RefreshButton onRefresh={fetchJobs} label="Refresh" showLastRefresh={true} />
+        </div>
 
         {/* Job Carousel */}
         <div className="relative mb-20">

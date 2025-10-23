@@ -1,14 +1,18 @@
 'use client';
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { Eye, CheckCircle, XCircle, FileText } from 'lucide-react';
 
 export default function ScannedRecordsPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
 
-  const applicants = [
+  // State for applicants data (currently mock, ready for real data)
+  const [applicants, setApplicants] = useState([
     {
       no: 1,
       name: 'Angelo Belleza',
@@ -33,7 +37,37 @@ export default function ScannedRecordsPage() {
       fileName: 'CS-Form-No.-212-Personal-Data-Sheet-revised.pdf',
       status: 'pending'
     },
-  ];
+  ]);
+
+  // Fetch function (ready for real implementation)
+  const fetchScannedRecords = useCallback(async () => {
+    try {
+      // TODO: Replace with real data fetching from Supabase
+      // const { data, error } = await supabase
+      //   .from('applications')
+      //   .select('*, applicant_profiles(*)')
+      //   .order('created_at', { ascending: false });
+
+      // For now, just show feedback
+      showToast('Data refreshed', 'success');
+    } catch (error) {
+      console.error('Error fetching records:', error);
+      showToast('Failed to refresh data', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for applications
+  useTableRealtime(
+    'applications',
+    ['INSERT', 'UPDATE'],
+    null,
+    (payload) => {
+      console.log('Application updated:', payload);
+      showToast('New application detected', 'info');
+      // TODO: Refresh data when real fetching is implemented
+      // fetchScannedRecords();
+    }
+  );
 
   const columns = [
     { header: 'No.', accessor: 'no' as const },
@@ -92,9 +126,18 @@ export default function ScannedRecordsPage() {
   ];
 
   return (
-    <AdminLayout role="HR" userName="HR Admin" pageTitle="Scanned PDS Records" pageDescription="Manage uploaded Personal Data Sheets">
+    <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Scanned PDS Records" pageDescription="Manage uploaded Personal Data Sheets">
       <Container size="xl">
         <div className="space-y-6">
+          {/* Refresh Button */}
+          <div className="flex justify-end">
+            <RefreshButton
+              onRefresh={fetchScannedRecords}
+              label="Refresh"
+              showLastRefresh={true}
+            />
+          </div>
+
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">

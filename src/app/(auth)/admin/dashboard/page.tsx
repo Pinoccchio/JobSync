@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Container, Badge } from '@/components/ui';
+import { Card, Container, Badge, RefreshButton } from '@/components/ui';
 import { Users, Shield, Building2, UserCheck, Activity, Clock, UserPlus, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +34,6 @@ export default function AdminDashboard() {
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
-  const hasFetched = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -44,56 +43,64 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    if (authLoading || !isAuthenticated) {
-      console.log('⏳ Waiting for authentication...');
-      return;
-    }
-
-    // Prevent duplicate fetches on strict mode double render
-    if (hasFetched.current) {
-      console.log('⏭️ Already fetched, skipping...');
-      return;
-    }
-
     console.log('📊 Fetching dashboard data...');
-    hasFetched.current = true;
 
     // Only update loading state if component is still mounted
     if (isMounted.current) {
       setLoading(true);
     }
     try {
-      // Fetch total users count
-      const { count: totalUsers } = await supabase
+      // Fetch total users count - handle table not existing gracefully
+      const { count: totalUsers, error: totalUsersError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
+      if (totalUsersError) {
+        console.warn('⚠️ Error fetching total users (table may not exist):', totalUsersError.message);
+      }
+
       // Fetch HR accounts count
-      const { count: hrAccounts } = await supabase
+      const { count: hrAccounts, error: hrError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'HR')
         .eq('status', 'active');
 
+      if (hrError) {
+        console.warn('⚠️ Error fetching HR accounts:', hrError.message);
+      }
+
       // Fetch PESO accounts count
-      const { count: pesoAccounts } = await supabase
+      const { count: pesoAccounts, error: pesoError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'PESO')
         .eq('status', 'active');
 
+      if (pesoError) {
+        console.warn('⚠️ Error fetching PESO accounts:', pesoError.message);
+      }
+
       // Fetch applicants count
-      const { count: applicants } = await supabase
+      const { count: applicants, error: applicantsError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'APPLICANT');
 
+      if (applicantsError) {
+        console.warn('⚠️ Error fetching applicants:', applicantsError.message);
+      }
+
       // Fetch recent activity logs
-      const { data: activities } = await supabase
+      const { data: activities, error: activitiesError } = await supabase
         .from('activity_logs')
         .select('id, event_type, user_email, user_role, timestamp')
         .order('timestamp', { ascending: false })
         .limit(5);
+
+      if (activitiesError) {
+        console.warn('⚠️ Error fetching activities (table may not exist):', activitiesError.message);
+      }
 
       // Only update state if component is still mounted
       if (isMounted.current) {
@@ -115,17 +122,30 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('❌ Error fetching dashboard data:', error);
+      // Even on error, ensure we show zeros instead of infinite loading
+      if (isMounted.current) {
+        setStats({
+          totalUsers: 0,
+          hrAccounts: 0,
+          pesoAccounts: 0,
+          applicants: 0,
+        });
+        setRecentActivities([]);
+      }
     } finally {
       // Only update loading state if component is still mounted
       if (isMounted.current) {
         setLoading(false);
       }
     }
-  }, [authLoading, isAuthenticated]); // Already correct - no unstable dependencies
+  }, []); // Empty deps - stable function, auth check moved to useEffect
 
+  // Fetch data when authentication is ready - fixed race condition
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (!authLoading && isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [authLoading, isAuthenticated, fetchDashboardData]); // All dependencies to prevent race condition
 
   const getEventIcon = (event: string) => {
     if (event.includes('registration') || event.includes('signup') || event.includes('created')) return UserPlus;
@@ -205,6 +225,15 @@ export default function AdminDashboard() {
     <AdminLayout role="Admin" userName={user?.fullName || 'System Admin'} pageTitle="Dashboard" pageDescription="System administration and user management">
       <Container size="xl">
         <div className="space-y-8">
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
+            <RefreshButton
+              onRefresh={fetchDashboardData}
+              label="Refresh"
+              showLastRefresh={true}
+            />
+          </div>
+
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {statsData.map((stat, index) => {

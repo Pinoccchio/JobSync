@@ -1,12 +1,15 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge } from '@/components/ui';
+import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
 import { Plus, Edit, Trash2, GraduationCap, FileText, Clock, Users, Calendar, X, CheckCircle2 } from 'lucide-react';
 
 export default function PESOProgramsPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
     programName: '',
@@ -16,7 +19,7 @@ export default function PESOProgramsPage() {
     startDate: '',
   });
 
-  const programs = [
+  const [programs, setPrograms] = useState([
     {
       id: 1,
       name: 'Web Development Training',
@@ -44,7 +47,27 @@ export default function PESOProgramsPage() {
       startDate: '2025-03-01',
       status: 'Upcoming'
     },
-  ];
+  ]);
+
+  // Fetch training programs function
+  const fetchPrograms = useCallback(async () => {
+    try {
+      // TODO: Real implementation
+      // const { data } = await supabase
+      //   .from('training_programs')
+      //   .select('*')
+      //   .order('created_at', { ascending: false });
+      showToast('Programs refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh programs', 'error');
+    }
+  }, [showToast]);
+
+  // Real-time subscription for training programs
+  useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+    showToast('Training program updated', 'info');
+    // fetchPrograms(); // Uncomment when real data
+  });
 
   const columns = [
     {
@@ -141,7 +164,7 @@ export default function PESOProgramsPage() {
   const totalSlots = programs.reduce((sum, p) => sum + parseInt(p.slots), 0);
 
   return (
-    <AdminLayout role="PESO" userName="PESO Admin" pageTitle="Training Programs" pageDescription="Manage job training programs and opportunities">
+    <AdminLayout role="PESO" userName={user?.fullName || 'PESO Admin'} pageTitle="Training Programs" pageDescription="Manage job training programs and opportunities">
       <Container size="xl">
         <div className="space-y-6">
           {/* Summary Stats */}
@@ -199,8 +222,9 @@ export default function PESOProgramsPage() {
             </Card>
           </div>
 
-          {/* Action Button */}
-          <div className="flex items-center justify-end">
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between">
+            <RefreshButton onRefresh={fetchPrograms} label="Refresh" showLastRefresh={true} />
             <Button variant="success" icon={Plus} onClick={() => setShowAddModal(true)}>
               Add New Program
             </Button>

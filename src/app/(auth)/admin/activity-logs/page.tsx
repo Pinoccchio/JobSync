@@ -1,85 +1,75 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Container, Badge } from '@/components/ui';
+import { Card, EnhancedTable, Container, Badge, RefreshButton } from '@/components/ui';
+import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTableRealtime } from '@/hooks/useTableRealtime';
+import { supabase } from '@/lib/supabase/auth';
 import { Activity, LogIn, LogOut, UserPlus, Trash2, UserX, Calendar, User, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
 export default function ActivityLogsPage() {
-  // Mock activity log data
-  const activities = [
-    {
-      id: 1,
-      timestamp: '2025-01-22 14:30:25',
-      eventType: 'Login',
-      user: 'micah@jobsync.gov',
-      role: 'HR',
-      details: 'Successful login from 192.168.1.100',
-      status: 'Success'
-    },
-    {
-      id: 2,
-      timestamp: '2025-01-22 13:15:10',
-      eventType: 'Account Created',
-      user: 'admin@jobsync.gov',
-      role: 'Admin',
-      details: 'Created new PESO admin account',
-      status: 'Success'
-    },
-    {
-      id: 3,
-      timestamp: '2025-01-22 12:45:00',
-      eventType: 'Login',
-      user: 'juan@email.com',
-      role: 'Applicant',
-      details: 'Successful login from 192.168.1.105',
-      status: 'Success'
-    },
-    {
-      id: 4,
-      timestamp: '2025-01-22 11:20:15',
-      eventType: 'Account Deactivated',
-      user: 'admin@jobsync.gov',
-      role: 'Admin',
-      details: 'Deactivated account: pedro@email.com',
-      status: 'Success'
-    },
-    {
-      id: 5,
-      timestamp: '2025-01-22 10:10:30',
-      eventType: 'Login Failed',
-      user: 'unknown@email.com',
-      role: 'Unknown',
-      details: 'Failed login attempt - Invalid credentials',
-      status: 'Failed'
-    },
-    {
-      id: 6,
-      timestamp: '2025-01-22 09:05:45',
-      eventType: 'Logout',
-      user: 'peso@jobsync.gov',
-      role: 'PESO',
-      details: 'User logged out',
-      status: 'Success'
-    },
-    {
-      id: 7,
-      timestamp: '2025-01-22 08:30:20',
-      eventType: 'User Registration',
-      user: 'maria@email.com',
-      role: 'Applicant',
-      details: 'New applicant registered',
-      status: 'Success'
-    },
-    {
-      id: 8,
-      timestamp: '2025-01-22 07:15:10',
-      eventType: 'Account Deleted',
-      user: 'admin@jobsync.gov',
-      role: 'Admin',
-      details: 'Deleted account: test@email.com',
-      status: 'Success'
-    },
-  ];
+  const { showToast } = useToast();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const [activities, setActivities] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch activity logs function
+  const fetchActivityLogs = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('id, event_type, event_category, user_email, user_role, details, status, metadata, timestamp')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Error fetching activity logs:', error);
+        throw error;
+      }
+
+      // Transform data to match the table format
+      const transformedData = (data || []).map((log: any) => ({
+        id: log.id,
+        timestamp: new Date(log.timestamp).toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }),
+        eventType: log.event_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        user: log.user_email || 'System',
+        role: log.user_role || 'System',
+        details: log.details || `${log.event_type} event`,
+        status: log.status === 'success' ? 'Success' : 'Failed'
+      }));
+
+      setActivities(transformedData);
+      showToast('Activity logs refreshed', 'success');
+    } catch (error: any) {
+      console.error('Failed to fetch activity logs:', error);
+      showToast(error.message || 'Failed to refresh activity logs', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [showToast]); // Added showToast to dependencies
+
+  // Fetch activity logs when authentication is ready - fixed race condition
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchActivityLogs();
+    }
+  }, [authLoading, isAuthenticated, fetchActivityLogs]); // All dependencies to prevent race condition
+
+  // Real-time subscription for activity logs
+  useTableRealtime('activity_logs', ['INSERT'], null, () => {
+    showToast('New activity logged', 'info');
+    fetchActivityLogs(); // Refresh data when new log is inserted
+  });
 
   const getEventIcon = (eventType: string) => {
     switch (eventType) {
@@ -186,9 +176,14 @@ export default function ActivityLogsPage() {
   const loginEvents = activities.filter(a => a.eventType.includes('Login')).length;
 
   return (
-    <AdminLayout role="Admin" userName="System Admin" pageTitle="Activity Logs" pageDescription="Monitor system events and user activities">
+    <AdminLayout role="Admin" userName={user?.fullName || 'System Admin'} pageTitle="Activity Logs" pageDescription="Monitor system events and user activities">
       <Container size="xl">
         <div className="space-y-6">
+        {/* Refresh Button */}
+        <div className="flex justify-end">
+          <RefreshButton onRefresh={fetchActivityLogs} label="Refresh" showLastRefresh={true} />
+        </div>
+
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">

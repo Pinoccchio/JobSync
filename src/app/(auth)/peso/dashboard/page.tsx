@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Container, Badge } from '@/components/ui';
+import { Card, Container, Badge, RefreshButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { GraduationCap, Clock, User, Loader2 } from 'lucide-react';
@@ -37,7 +37,6 @@ export default function PESODashboard() {
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
-  const hasFetched = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -47,19 +46,7 @@ export default function PESODashboard() {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    if (authLoading || !isAuthenticated) {
-      console.log('⏳ Waiting for authentication...');
-      return;
-    }
-
-    // Prevent duplicate fetches on strict mode double render
-    if (hasFetched.current) {
-      console.log('⏭️ Already fetched, skipping...');
-      return;
-    }
-
     console.log('📊 Fetching PESO dashboard data...');
-    hasFetched.current = true;
 
     // Only update loading state if component is still mounted
     if (isMounted.current) {
@@ -125,11 +112,14 @@ export default function PESODashboard() {
         setLoading(false);
       }
     }
-  }, [authLoading, isAuthenticated]); // Fixed: removed showToast from dependencies
+  }, []); // Empty deps - stable function, auth check moved to useEffect
 
+  // Fetch data when authentication is ready - fixed race condition
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (!authLoading && isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [authLoading, isAuthenticated, fetchDashboardData]); // All dependencies to prevent race condition
 
   const tiles = [
     {
@@ -174,6 +164,15 @@ export default function PESODashboard() {
     >
       <Container size="xl">
         <div className="space-y-8">
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
+            <RefreshButton
+              onRefresh={fetchDashboardData}
+              label="Refresh"
+              showLastRefresh={true}
+            />
+          </div>
+
           {/* Dashboard Tiles */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {tiles.map((tile, index) => {

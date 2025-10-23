@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { Button, Card, Container } from '@/components/ui';
+import { Button, Card, Container, RefreshButton } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -36,7 +36,6 @@ export default function ApplicantDashboard() {
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
-  const hasFetched = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -46,19 +45,7 @@ export default function ApplicantDashboard() {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    if (authLoading || !isAuthenticated) {
-      console.log('⏳ Waiting for authentication...');
-      return;
-    }
-
-    // Prevent duplicate fetches on strict mode double render
-    if (hasFetched.current) {
-      console.log('⏭️ Already fetched, skipping...');
-      return;
-    }
-
     console.log('📊 Fetching applicant dashboard data...');
-    hasFetched.current = true;
 
     // Only update loading state if component is still mounted
     if (isMounted.current) {
@@ -116,11 +103,14 @@ export default function ApplicantDashboard() {
         setLoading(false);
       }
     }
-  }, [authLoading, isAuthenticated]); // Fixed: removed user?.id and showToast from dependencies
+  }, []); // Empty deps - stable function, auth check moved to useEffect
 
+  // Fetch data when authentication is ready - fixed race condition
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (!authLoading && isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [authLoading, isAuthenticated, fetchDashboardData]); // All dependencies to prevent race condition
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -176,6 +166,15 @@ export default function ApplicantDashboard() {
       pageDescription="Welcome back! Here's your overview"
     >
       <Container size="xl">
+        {/* Refresh Button */}
+        <div className="flex items-center justify-end mb-8">
+          <RefreshButton
+            onRefresh={fetchDashboardData}
+            label="Refresh"
+            showLastRefresh={true}
+          />
+        </div>
+
         {/* Hero Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
           {/* Left Section - Modern Illustration */}

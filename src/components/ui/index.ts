@@ -11,3 +11,4 @@ export { Toast } from './Toast';
 export { ApplicationModal } from './ApplicationModal';
 export { Badge } from './Badge';
 export { Container } from './Container';
+export { RefreshButton } from './RefreshButton';

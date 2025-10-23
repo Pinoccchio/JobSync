@@ -32,12 +32,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Ref to track if auth listener has been initialized
-  // This prevents double initialization in React 19 Strict Mode
+  // Track component mount state to prevent state updates after unmount
+  const isMounted = useRef(true);
+  // Track if auth listener has been initialized
   const listenerInitialized = useRef(false);
   const fetchingProfile = useRef(false);
+  // Timeout to prevent infinite loading
+  const loadingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    isMounted.current = true;
+
     // Skip if already initialized (React 19 Strict Mode protection)
     if (listenerInitialized.current) {
       console.log('⏭️ Auth listener already initialized, skipping...');
@@ -47,15 +52,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔄 Setting up auth state listener...');
     listenerInitialized.current = true;
 
+    // Safety timeout: If loading takes more than 10 seconds, force it to complete
+    loadingTimeout.current = setTimeout(() => {
+      if (isMounted.current && isLoading) {
+        console.warn('⚠️ Auth loading timeout - forcing loading to false');
+        setIsLoading(false);
+      }
+    }, 10000);
+
     /**
      * Listen for auth state changes (login, logout, token refresh)
      * This fires immediately with the current session state on subscription
      * No need for separate initialization
      */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Clear timeout when auth state changes
+      if (loadingTimeout.current) {
+        clearTimeout(loadingTimeout.current);
+        loadingTimeout.current = null;
+      }
+
       // Prevent duplicate profile fetches
       if (fetchingProfile.current) {
-        console.log('⏭️ Already fetching profile, skipping...');
+        console.log('⏭️ Already fetching profile, waiting...');
         return;
       }
 
@@ -78,8 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (profileError || !profile) {
             console.warn('⚠️ Profile not found or inactive:', profileError?.message);
-            setUser(null);
-            setRole(null);
+            if (isMounted.current) {
+              setUser(null);
+              setRole(null);
+            }
           } else {
             const mappedUser: User = {
               id: profile.id,
@@ -87,34 +108,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               fullName: profile.full_name,
             };
 
-            setUser(mappedUser);
-            setRole(profile.role as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
-            console.log('✨ User state updated:', {
-              email: mappedUser.email,
-              role: profile.role
-            });
+            if (isMounted.current) {
+              setUser(mappedUser);
+              setRole(profile.role as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT');
+              console.log('✨ User state updated:', {
+                email: mappedUser.email,
+                role: profile.role
+              });
+            }
           }
         } catch (error) {
           console.error('❌ Error fetching profile:', error);
-          setUser(null);
-          setRole(null);
+          if (isMounted.current) {
+            setUser(null);
+            setRole(null);
+          }
         } finally {
           fetchingProfile.current = false;
+          if (isMounted.current) {
+            setIsLoading(false);
+          }
         }
       } else {
         console.log('ℹ️ No session, clearing user state');
-        setUser(null);
-        setRole(null);
+        if (isMounted.current) {
+          setUser(null);
+          setRole(null);
+          setIsLoading(false);
+        }
       }
-
-      setIsLoading(false);
     });
 
     return () => {
       console.log('🧹 Cleaning up auth listener...');
+      isMounted.current = false;
       subscription.unsubscribe();
-      // Don't reset listenerInitialized - let it persist across strict mode cycles
-      // This prevents duplicate listeners when React remounts during strict mode testing
+
+      // Clear timeout on cleanup
+      if (loadingTimeout.current) {
+        clearTimeout(loadingTimeout.current);
+        loadingTimeout.current = null;
+      }
+
+      // Reset initialization flag on cleanup to allow fresh setup on remount
+      listenerInitialized.current = false;
+      fetchingProfile.current = false;
     };
   }, []);
 
