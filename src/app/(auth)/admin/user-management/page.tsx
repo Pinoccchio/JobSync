@@ -14,6 +14,8 @@ export default function UserManagementPage() {
   const { user: currentUser } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -205,6 +207,32 @@ export default function UserManagementPage() {
     }
   };
 
+  // Helper function to check if action is restricted
+  const isActionRestricted = (targetUser: User, action: 'delete' | 'deactivate') => {
+    // Cannot perform actions on other ADMIN accounts
+    if (targetUser.role === 'ADMIN' && targetUser.id !== currentUser?.id) {
+      return true;
+    }
+    // Cannot delete your own account
+    if (action === 'delete' && targetUser.id === currentUser?.id) {
+      return true;
+    }
+    return false;
+  };
+
+  const getRestrictionTooltip = (targetUser: User, action: 'delete' | 'deactivate') => {
+    if (targetUser.role === 'ADMIN' && targetUser.id !== currentUser?.id) {
+      if (action === 'delete') {
+        return 'Cannot delete another admin account. Admins can only be removed by themselves or through direct database access.';
+      }
+      return 'Cannot deactivate another admin account. Admins can only deactivate themselves.';
+    }
+    if (action === 'delete' && targetUser.id === currentUser?.id) {
+      return 'Cannot delete your own account. Please contact another administrator.';
+    }
+    return '';
+  };
+
   const columns = [
     {
       header: 'Name',
@@ -259,42 +287,56 @@ export default function UserManagementPage() {
       header: 'Actions',
       accessor: 'id' as const,
       render: (_: any, row: User) => {
-        // For applicants: show view only
-        if (row.role === 'APPLICANT') {
-          return (
+        const canDelete = !isActionRestricted(row, 'delete');
+        const canDeactivate = !isActionRestricted(row, 'deactivate');
+
+        return (
+          <div className="flex gap-2">
+            {/* View Details Button - Available for all users */}
             <Button
               variant="secondary"
               size="sm"
               icon={Eye}
-              onClick={() => showToast('View applicant profile', 'info')}
-            >
-              View Profile
-            </Button>
-          );
-        }
-
-        // For admins, HR, PESO: show activate/deactivate and delete
-        return (
-          <div className="flex gap-2">
-            <Button
-              variant={row.status === 'active' ? 'warning' : 'success'}
-              size="sm"
-              icon={row.status === 'active' ? UserX : CheckCircle2}
-              onClick={() => handleToggleStatus(row.id, row.status)}
-            >
-              {row.status === 'active' ? 'Deactivate' : 'Activate'}
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon={Trash2}
               onClick={() => {
-                setUserToDelete(row);
-                setShowDeleteConfirm(true);
+                setSelectedUser(row);
+                setShowDetailsModal(true);
               }}
             >
-              Delete
+              View
             </Button>
+
+            {/* Activate/Deactivate Button - Only for non-applicants */}
+            {row.role !== 'APPLICANT' && (
+              <Button
+                variant={row.status === 'active' ? 'warning' : 'success'}
+                size="sm"
+                icon={row.status === 'active' ? UserX : CheckCircle2}
+                onClick={() => handleToggleStatus(row.id, row.status)}
+                disabled={row.status === 'active' && !canDeactivate}
+                className={!canDeactivate && row.status === 'active' ? 'opacity-50 cursor-not-allowed' : ''}
+              >
+                {row.status === 'active' ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+
+            {/* Delete Button - Only for non-applicants */}
+            {row.role !== 'APPLICANT' && (
+              <Button
+                variant="danger"
+                size="sm"
+                icon={Trash2}
+                onClick={() => {
+                  if (canDelete) {
+                    setUserToDelete(row);
+                    setShowDeleteConfirm(true);
+                  }
+                }}
+                disabled={!canDelete}
+                className={!canDelete ? 'opacity-50 cursor-not-allowed' : ''}
+              >
+                Delete
+              </Button>
+            )}
           </div>
         );
       }
@@ -388,6 +430,9 @@ export default function UserManagementPage() {
               paginated
               pageSize={10}
               searchPlaceholder="Search by name, email, or role..."
+              getRowClassName={(row) =>
+                row.id === currentUser?.id ? 'bg-blue-50 hover:bg-blue-100' : ''
+              }
             />
           )}
         </Card>
@@ -576,6 +621,152 @@ export default function UserManagementPage() {
                     disabled={isSubmitting}
                   >
                     Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User Details Modal */}
+        {showDetailsModal && selectedUser && (
+          <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">User Details</h2>
+                    <p className="text-sm text-blue-100">Complete profile information</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setSelectedUser(null);
+                  }}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <div className="space-y-6">
+                  {/* Profile Summary */}
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-2xl font-bold text-gray-900">{selectedUser.full_name}</h3>
+                        <p className="text-sm text-gray-600 mt-1">{selectedUser.email}</p>
+                      </div>
+                      <Badge variant={selectedUser.status === 'active' ? 'success' : 'default'} icon={selectedUser.status === 'active' ? CheckCircle2 : AlertCircle}>
+                        {selectedUser.status.charAt(0).toUpperCase() + selectedUser.status.slice(1)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-gray-400" />
+                      <Badge variant={getRoleBadgeVariant(selectedUser.role)} className="text-base px-4 py-1">
+                        {selectedUser.role}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Mail className="w-5 h-5 text-gray-400" />
+                      Contact Information
+                    </h4>
+                    <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">Email Address</p>
+                        <p className="font-medium text-gray-900">{selectedUser.email}</p>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">Phone Number</p>
+                        <p className="font-medium text-gray-900">{selectedUser.phone || 'Not provided'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Account Information */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-gray-400" />
+                      Account Information
+                    </h4>
+                    <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">User ID</p>
+                        <p className="font-mono text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded">{selectedUser.id}</p>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">Role</p>
+                        <p className="font-medium text-gray-900">{selectedUser.role}</p>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">Status</p>
+                        <Badge variant={selectedUser.status === 'active' ? 'success' : 'default'} icon={selectedUser.status === 'active' ? CheckCircle2 : AlertCircle}>
+                          {selectedUser.status.charAt(0).toUpperCase() + selectedUser.status.slice(1)}
+                        </Badge>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">Created Date</p>
+                        <p className="font-medium text-gray-900">
+                          {new Date(selectedUser.created_at).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-1">Last Updated</p>
+                        <p className="font-medium text-gray-900">
+                          {new Date(selectedUser.updated_at).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      {selectedUser.last_login_at && (
+                        <div className="p-4">
+                          <p className="text-sm text-gray-600 mb-1">Last Login</p>
+                          <p className="font-medium text-gray-900">
+                            {new Date(selectedUser.last_login_at).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-end pt-6 border-t border-gray-200 mt-6">
+                  <Button
+                    variant="secondary"
+                    icon={X}
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setSelectedUser(null);
+                    }}
+                  >
+                    Close
                   </Button>
                 </div>
               </div>

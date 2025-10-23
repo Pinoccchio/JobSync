@@ -94,11 +94,12 @@ export async function logActivity(params: ActivityLogParams): Promise<void> {
 }
 
 /**
- * Pre-configured activity loggers for common actions
+ * Enhanced activity loggers using database functions
+ * These call PostgreSQL functions directly for better performance and consistency
  */
 
 export const ActivityLogger = {
-  // Auth events
+  // ============ AUTH EVENTS ============
   login: (email: string, userId: string, role: string) =>
     logActivity({
       eventType: 'login',
@@ -131,108 +132,241 @@ export const ActivityLogger = {
       metadata: { reason }
     }),
 
-  // User management events
-  userCreated: (email: string, role: string, createdByUserId?: string) =>
-    logActivity({
-      eventType: 'user_created',
-      eventCategory: 'user_management',
-      details: `New user account created: ${email} (${role})`,
-      userId: createdByUserId,
-      metadata: { targetEmail: email, targetRole: role }
-    }),
+  // ============ USER MANAGEMENT (Admin Functions) ============
+  adminCreateUser: async (adminId: string, createdUserId: string, createdUserEmail: string, createdUserRole: string) => {
+    const { error } = await supabase.rpc('log_admin_create_user', {
+      p_admin_id: adminId,
+      p_created_user_id: createdUserId,
+      p_created_user_email: createdUserEmail,
+      p_created_user_role: createdUserRole
+    });
+    if (error) console.error('Failed to log admin create user:', error);
+  },
 
-  userDeactivated: (email: string, deactivatedByUserId?: string) =>
-    logActivity({
-      eventType: 'user_deactivated',
-      eventCategory: 'user_management',
-      details: `User account deactivated: ${email}`,
-      userId: deactivatedByUserId,
-      metadata: { targetEmail: email }
-    }),
+  adminDeactivateUser: async (adminId: string, targetUserId: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_admin_deactivate_user', {
+      p_admin_id: adminId,
+      p_target_user_id: targetUserId,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log admin deactivate user:', error);
+  },
 
-  userDeleted: (email: string, deletedByUserId?: string) =>
-    logActivity({
-      eventType: 'user_deleted',
-      eventCategory: 'user_management',
-      details: `User account deleted: ${email}`,
-      userId: deletedByUserId,
-      metadata: { targetEmail: email }
-    }),
+  adminActivateUser: async (adminId: string, targetUserId: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_admin_activate_user', {
+      p_admin_id: adminId,
+      p_target_user_id: targetUserId,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log admin activate user:', error);
+  },
 
-  // Application events
-  applicationSubmitted: (applicantId: string, jobTitle: string) =>
-    logActivity({
-      eventType: 'application_submitted',
-      eventCategory: 'application',
-      details: `Application submitted for: ${jobTitle}`,
-      userId: applicantId,
-      metadata: { jobTitle }
-    }),
+  adminChangeRole: async (adminId: string, targetUserId: string, oldRole: string, newRole: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_admin_change_role', {
+      p_admin_id: adminId,
+      p_target_user_id: targetUserId,
+      p_old_role: oldRole,
+      p_new_role: newRole,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log admin change role:', error);
+  },
 
-  applicationApproved: (applicationId: string, applicantEmail: string, jobTitle: string) =>
-    logActivity({
-      eventType: 'application_approved',
-      eventCategory: 'application',
-      details: `Application approved: ${applicantEmail} for ${jobTitle}`,
-      metadata: { applicationId, applicantEmail, jobTitle }
-    }),
+  adminDeleteUser: async (adminId: string, targetUserId: string, deletionType: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_admin_delete_user', {
+      p_admin_id: adminId,
+      p_target_user_id: targetUserId,
+      p_deletion_type: deletionType,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log admin delete user:', error);
+  },
 
-  applicationDenied: (applicationId: string, applicantEmail: string, jobTitle: string) =>
-    logActivity({
-      eventType: 'application_denied',
-      eventCategory: 'application',
-      details: `Application denied: ${applicantEmail} for ${jobTitle}`,
-      metadata: { applicationId, applicantEmail, jobTitle }
-    }),
+  // ============ APPLICATION EVENTS ============
+  applicationSubmitted: async (applicantId: string, jobId: string, applicationId: string, pdsFileName: string) => {
+    const { error } = await supabase.rpc('log_application_submitted', {
+      p_applicant_id: applicantId,
+      p_job_id: jobId,
+      p_application_id: applicationId,
+      p_pds_file_name: pdsFileName
+    });
+    if (error) console.error('Failed to log application submitted:', error);
+  },
 
-  // Job events
-  jobCreated: (jobTitle: string, createdByUserId?: string) =>
-    logActivity({
-      eventType: 'job_created',
-      eventCategory: 'job',
-      details: `New job posting created: ${jobTitle}`,
-      userId: createdByUserId,
-      metadata: { jobTitle }
-    }),
+  applicationApproved: async (hrId: string, applicationId: string, score: number, rank: number) => {
+    const { error } = await supabase.rpc('log_application_approved', {
+      p_hr_id: hrId,
+      p_application_id: applicationId,
+      p_score: score,
+      p_rank: rank
+    });
+    if (error) console.error('Failed to log application approved:', error);
+  },
 
-  jobUpdated: (jobTitle: string, updatedByUserId?: string) =>
-    logActivity({
-      eventType: 'job_updated',
-      eventCategory: 'job',
-      details: `Job posting updated: ${jobTitle}`,
-      userId: updatedByUserId,
-      metadata: { jobTitle }
-    }),
+  applicationDenied: async (hrId: string, applicationId: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_application_denied', {
+      p_hr_id: hrId,
+      p_application_id: applicationId,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log application denied:', error);
+  },
 
-  jobDeleted: (jobTitle: string, deletedByUserId?: string) =>
-    logActivity({
-      eventType: 'job_deleted',
-      eventCategory: 'job',
-      details: `Job posting deleted: ${jobTitle}`,
-      userId: deletedByUserId,
-      metadata: { jobTitle }
-    }),
+  // ============ JOB MANAGEMENT ============
+  jobCreated: async (hrId: string, jobId: string, jobTitle: string) => {
+    const { error } = await supabase.rpc('log_job_created', {
+      p_hr_id: hrId,
+      p_job_id: jobId,
+      p_job_title: jobTitle
+    });
+    if (error) console.error('Failed to log job created:', error);
+  },
 
-  // Training events
-  trainingProgramCreated: (programTitle: string, createdByUserId?: string) =>
-    logActivity({
-      eventType: 'training_created',
-      eventCategory: 'training',
-      details: `New training program created: ${programTitle}`,
-      userId: createdByUserId,
-      metadata: { programTitle }
-    }),
+  jobUpdated: async (hrId: string, jobId: string, changesMade: string) => {
+    const { error } = await supabase.rpc('log_job_updated', {
+      p_hr_id: hrId,
+      p_job_id: jobId,
+      p_changes_made: changesMade
+    });
+    if (error) console.error('Failed to log job updated:', error);
+  },
 
-  trainingApplicationSubmitted: (applicantId: string, programTitle: string) =>
-    logActivity({
-      eventType: 'training_application_submitted',
-      eventCategory: 'training',
-      details: `Training application submitted for: ${programTitle}`,
-      userId: applicantId,
-      metadata: { programTitle }
-    }),
+  jobDeleted: async (hrId: string, jobId: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_job_deleted', {
+      p_hr_id: hrId,
+      p_job_id: jobId,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log job deleted:', error);
+  },
 
-  // System events
+  jobStatusChanged: async (hrId: string, jobId: string, oldStatus: string, newStatus: string) => {
+    const { error } = await supabase.rpc('log_job_status_changed', {
+      p_hr_id: hrId,
+      p_job_id: jobId,
+      p_old_status: oldStatus,
+      p_new_status: newStatus
+    });
+    if (error) console.error('Failed to log job status changed:', error);
+  },
+
+  // ============ TRAINING PROGRAMS ============
+  trainingCreated: async (pesoId: string, programId: string, programTitle: string) => {
+    const { error } = await supabase.rpc('log_training_created', {
+      p_peso_id: pesoId,
+      p_program_id: programId,
+      p_program_title: programTitle
+    });
+    if (error) console.error('Failed to log training created:', error);
+  },
+
+  trainingUpdated: async (pesoId: string, programId: string, changesMade: string) => {
+    const { error } = await supabase.rpc('log_training_updated', {
+      p_peso_id: pesoId,
+      p_program_id: programId,
+      p_changes_made: changesMade
+    });
+    if (error) console.error('Failed to log training updated:', error);
+  },
+
+  trainingDeleted: async (pesoId: string, programId: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_training_deleted', {
+      p_peso_id: pesoId,
+      p_program_id: programId,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log training deleted:', error);
+  },
+
+  trainingApplicationSubmitted: async (applicantId: string, programId: string, trainingApplicationId: string) => {
+    const { error } = await supabase.rpc('log_training_application_submitted', {
+      p_applicant_id: applicantId,
+      p_program_id: programId,
+      p_training_application_id: trainingApplicationId
+    });
+    if (error) console.error('Failed to log training application submitted:', error);
+  },
+
+  trainingApplicationApproved: async (pesoId: string, trainingApplicationId: string) => {
+    const { error } = await supabase.rpc('log_training_application_approved', {
+      p_peso_id: pesoId,
+      p_training_application_id: trainingApplicationId
+    });
+    if (error) console.error('Failed to log training application approved:', error);
+  },
+
+  trainingApplicationDenied: async (pesoId: string, trainingApplicationId: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_training_application_denied', {
+      p_peso_id: pesoId,
+      p_training_application_id: trainingApplicationId,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log training application denied:', error);
+  },
+
+  // ============ SYSTEM EVENTS ============
+  ocrProcessing: async (applicantId: string, pdsFileName: string, success: boolean, confidenceScore?: number) => {
+    const { error } = await supabase.rpc('log_ocr_processing', {
+      p_applicant_id: applicantId,
+      p_pds_file_name: pdsFileName,
+      p_success: success,
+      p_confidence_score: confidenceScore || null
+    });
+    if (error) console.error('Failed to log OCR processing:', error);
+  },
+
+  aiRanking: async (applicationId: string, algorithmUsed: string, matchScore: number, rank: number) => {
+    const { error } = await supabase.rpc('log_ai_ranking', {
+      p_application_id: applicationId,
+      p_algorithm_used: algorithmUsed,
+      p_match_score: matchScore,
+      p_rank: rank
+    });
+    if (error) console.error('Failed to log AI ranking:', error);
+  },
+
+  emailNotificationSent: async (userId: string, notificationType: string, notificationTitle: string, success: boolean) => {
+    const { error } = await supabase.rpc('log_email_notification_sent', {
+      p_user_id: userId,
+      p_notification_type: notificationType,
+      p_notification_title: notificationTitle,
+      p_success: success
+    });
+    if (error) console.error('Failed to log email notification sent:', error);
+  },
+
+  announcementCreated: async (hrId: string, announcementId: string, announcementTitle: string, category: string) => {
+    const { error } = await supabase.rpc('log_announcement_created', {
+      p_hr_id: hrId,
+      p_announcement_id: announcementId,
+      p_announcement_title: announcementTitle,
+      p_category: category
+    });
+    if (error) console.error('Failed to log announcement created:', error);
+  },
+
+  fileUpload: async (userId: string, bucketName: string, filePath: string, fileSize: number, fileType: string) => {
+    const { error } = await supabase.rpc('log_file_upload', {
+      p_user_id: userId,
+      p_bucket_name: bucketName,
+      p_file_path: filePath,
+      p_file_size: fileSize,
+      p_file_type: fileType
+    });
+    if (error) console.error('Failed to log file upload:', error);
+  },
+
+  fileDeletion: async (userId: string, bucketName: string, filePath: string, reason?: string) => {
+    const { error } = await supabase.rpc('log_file_deletion', {
+      p_user_id: userId,
+      p_bucket_name: bucketName,
+      p_file_path: filePath,
+      p_reason: reason || null
+    });
+    if (error) console.error('Failed to log file deletion:', error);
+  },
+
+  // Generic system event
   systemEvent: (description: string, metadata?: Record<string, any>) =>
     logActivity({
       eventType: 'system_event',

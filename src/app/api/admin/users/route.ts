@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, createAdminUser } from '@/lib/supabase/admin';
 import { supabase } from '@/lib/supabase/auth';
+import { ActivityLogger } from '@/lib/supabase/activityLogger';
 import type { CreateUserRequest, User, UserListResponse, ApiResponse } from '@/types/users';
 
 /**
@@ -198,15 +199,13 @@ export async function POST(request: NextRequest) {
       role: body.role,
     });
 
-    // Log activity
-    await supabaseAdmin.rpc('log_activity', {
-      p_user_id: user.id,
-      p_event_type: 'Create User',
-      p_event_category: 'user_management',
-      p_details: `Created ${body.role} account for ${body.fullName} (${body.email})`,
-      p_status: 'success',
-      p_metadata: { created_user_id: result.user.id, role: body.role },
-    });
+    // Log activity using specialized function
+    await ActivityLogger.adminCreateUser(
+      user.id,
+      result.user.id,
+      body.email,
+      body.role
+    );
 
     return NextResponse.json<ApiResponse<User>>({
       success: true,

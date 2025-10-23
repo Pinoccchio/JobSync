@@ -22,6 +22,7 @@ interface EnhancedTableProps {
   pageSize?: number;
   onExport?: () => void;
   exportLabel?: string;
+  getRowClassName?: (row: any) => string;
 }
 
 export const EnhancedTable: React.FC<EnhancedTableProps> = ({
@@ -33,7 +34,8 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
   paginated = false,
   pageSize = 10,
   onExport,
-  exportLabel = 'Export'
+  exportLabel = 'Export',
+  getRowClassName
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState<{
@@ -161,20 +163,26 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
           </thead>
           <tbody className="bg-white">
             {paginatedData.length > 0 ? (
-              paginatedData.map((row, rowIndex) => (
-                <tr
-                  key={rowIndex}
-                  className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  {columns.map((column, colIndex) => (
-                    <td key={colIndex} className="px-6 py-4 text-sm text-gray-700">
-                      {column.render
-                        ? column.render(row[column.accessor], row)
-                        : row[column.accessor]}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              paginatedData.map((row, rowIndex) => {
+                const customClassName = getRowClassName ? getRowClassName(row) : '';
+                return (
+                  <tr
+                    key={rowIndex}
+                    className={cn(
+                      "border-b border-gray-200 hover:bg-gray-50 transition-colors",
+                      customClassName
+                    )}
+                  >
+                    {columns.map((column, colIndex) => (
+                      <td key={colIndex} className="px-6 py-4 text-sm text-gray-700">
+                        {column.render
+                          ? column.render(row[column.accessor], row)
+                          : row[column.accessor]}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, updateUserProfile, deleteUser } from '@/lib/supabase/admin';
 import { supabase } from '@/lib/supabase/auth';
+import { ActivityLogger } from '@/lib/supabase/activityLogger';
 import type { UpdateUserRequest, User, ApiResponse } from '@/types/users';
 
 /**
@@ -103,20 +104,36 @@ export async function PATCH(
     // Update user
     const result = await updateUserProfile(userId, body);
 
-    // Log activity
-    const changes = [];
-    if (body.full_name) changes.push(`name to "${body.full_name}"`);
-    if (body.phone) changes.push(`phone to "${body.phone}"`);
-    if (body.status) changes.push(`status to "${body.status}"`);
+    // Log activity using specialized functions
+    if (body.status === 'inactive') {
+      // Deactivation
+      await ActivityLogger.adminDeactivateUser(
+        user.id,
+        userId,
+        body.full_name ? `Profile updated during deactivation` : undefined
+      );
+    } else if (body.status === 'active') {
+      // Activation
+      await ActivityLogger.adminActivateUser(
+        user.id,
+        userId,
+        body.full_name ? `Profile updated during activation` : undefined
+      );
+    } else {
+      // Other updates (name, phone) - use generic logging
+      const changes = [];
+      if (body.full_name) changes.push(`name to "${body.full_name}"`);
+      if (body.phone) changes.push(`phone to "${body.phone}"`);
 
-    await supabaseAdmin.rpc('log_activity', {
-      p_user_id: user.id,
-      p_event_type: 'Update User',
-      p_event_category: 'user_management',
-      p_details: `Updated ${targetUser.full_name} (${targetUser.email}): ${changes.join(', ')}`,
-      p_status: 'success',
-      p_metadata: { updated_user_id: userId, changes: body },
-    });
+      await supabaseAdmin.rpc('log_activity', {
+        p_user_id: user.id,
+        p_event_type: 'Update User',
+        p_event_category: 'user_management',
+        p_details: `Updated ${targetUser.full_name} (${targetUser.email}): ${changes.join(', ')}`,
+        p_status: 'success',
+        p_metadata: { updated_user_id: userId, changes: body },
+      });
+    }
 
     return NextResponse.json<ApiResponse<User>>({
       success: true,
@@ -231,15 +248,13 @@ export async function DELETE(
     // Delete user (cascades to profile)
     await deleteUser(userId);
 
-    // Log activity (audit trail preserved even after deletion)
-    await supabaseAdmin.rpc('log_activity', {
-      p_user_id: user.id,
-      p_event_type: 'Delete User',
-      p_event_category: 'user_management',
-      p_details: `Deleted ${targetUser.role} account: ${targetUser.full_name} (${targetUser.email})`,
-      p_status: 'success',
-      p_metadata: { deleted_user_id: userId, deleted_user_role: targetUser.role },
-    });
+    // Log activity using specialized function (audit trail preserved even after deletion)
+    await ActivityLogger.adminDeleteUser(
+      user.id,
+      userId,
+      'hard_delete', // deletion type
+      `Deleted ${targetUser.role} account: ${targetUser.full_name} (${targetUser.email})`
+    );
 
     return NextResponse.json<ApiResponse>({
       success: true,
