@@ -100,34 +100,16 @@ export default function RegisterPage() {
         emailConfirmationSent: result.data.emailConfirmationSent
       });
 
-      // Check if email confirmation is required
-      if (!result.data.emailConfirmationSent) {
-        // User is logged in immediately (email confirmation disabled)
-        console.log('✅ User logged in immediately (no email confirmation required)');
+      // Always redirect to login page after signup
+      // User must log in separately (following INCLOUD pattern)
+      console.log('➡️ Redirecting to /login');
 
-        // Redirect based on selected role
-        const dashboardMap: Record<string, string> = {
-          ADMIN: '/admin/dashboard',
-          HR: '/hr/dashboard',
-          PESO: '/peso/dashboard',
-          APPLICANT: '/applicant/dashboard',
-        };
+      const successMessage = result.data.emailConfirmationSent
+        ? 'Account created! Please check your email to verify your account.'
+        : `Account created successfully as ${formData.role}! Please login to continue.`;
 
-        const redirectPath = dashboardMap[formData.role] || '/applicant/dashboard';
-        console.log(`➡️ Redirecting to ${redirectPath} for role: ${formData.role}`);
-
-        showToast(`Account created successfully as ${formData.role}! Redirecting...`, 'success');
-        router.push(redirectPath);
-      } else {
-        // Email confirmation required
-        console.log('📧 Email confirmation required');
-        console.log('➡️ Redirecting to /login');
-        showToast(
-          'Account created! Please check your email to verify your account.',
-          'success'
-        );
-        router.push('/login');
-      }
+      showToast(successMessage, 'success');
+      router.push('/login');
     } catch (error: any) {
       console.error('❌ Registration error:', error);
       console.error('❌ Error details:', {

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button, Input } from '@/components/ui';
@@ -9,10 +9,9 @@ import { useToast } from '@/contexts/ToastContext';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, role, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login } = useAuth();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -23,41 +22,6 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
-
-  // Auto-redirect after successful login when role is set
-  useEffect(() => {
-    if (shouldRedirect && isAuthenticated && role && !authLoading) {
-      console.log('🔄 Auto-redirecting based on role:', role);
-
-      const dashboardMap: Record<string, string> = {
-        ADMIN: '/admin/dashboard',
-        HR: '/hr/dashboard',
-        PESO: '/peso/dashboard',
-        APPLICANT: '/applicant/dashboard',
-      };
-
-      const dashboardPath = dashboardMap[role] || '/applicant/dashboard';
-      console.log('➡️ Redirecting to:', dashboardPath);
-
-      // Small delay to ensure state is set before redirect
-      setTimeout(() => {
-        router.push(dashboardPath);
-      }, 100);
-    }
-
-    // If redirect is triggered but something fails, reset loading after timeout
-    if (shouldRedirect && !authLoading) {
-      const timeoutId = setTimeout(() => {
-        if (!role) {
-          console.error('❌ Redirect timeout - role not set');
-          setIsLoading(false);
-          showToast('Login succeeded but redirect failed. Please try again.', 'error');
-        }
-      }, 3000);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [shouldRedirect, isAuthenticated, role, authLoading, router, showToast]);
 
   // Validation functions
   const validateEmail = (email: string) => {
@@ -94,22 +58,28 @@ export default function LoginPage() {
     try {
       console.log('✅ Validation passed, calling login...');
 
-      // Login with Supabase - role will be fetched from database
-      await login(formData.email, formData.password);
+      // Login returns the user role directly
+      const userRole = await login(formData.email, formData.password);
 
-      console.log('✅ Login completed successfully');
+      console.log('✅ Login successful, role:', userRole);
 
       showToast('Login successful!', 'success');
 
-      // Trigger redirect via useEffect
-      // useEffect will watch for role to be set and redirect accordingly
-      setShouldRedirect(true);
+      // Direct redirect based on returned role
+      const dashboardMap: Record<string, string> = {
+        ADMIN: '/admin/dashboard',
+        HR: '/hr/dashboard',
+        PESO: '/peso/dashboard',
+        APPLICANT: '/applicant/dashboard',
+      };
 
-      // Keep loading state active until redirect completes
-      // setIsLoading will be false after redirect in useEffect
+      const dashboardPath = dashboardMap[userRole] || '/applicant/dashboard';
+      console.log('➡️ Redirecting to:', dashboardPath);
+
+      // Immediate redirect - no waiting for listener
+      router.push(dashboardPath);
     } catch (error: any) {
-      console.error('❌ Login form error:', error);
-      console.error('❌ Error message:', error.message);
+      console.error('❌ Login error:', error);
       showToast(error.message || 'Invalid credentials', 'error');
       setIsLoading(false);
     }
