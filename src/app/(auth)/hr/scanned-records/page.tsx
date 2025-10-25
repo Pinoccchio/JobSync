@@ -140,19 +140,19 @@ export default function ScannedRecordsPage() {
 
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total PDS Uploaded</p>
                   <p className="text-3xl font-bold text-gray-900">{applicants.length}</p>
                 </div>
-                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
                   <FileText className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100">
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Pending Review</p>
@@ -160,19 +160,19 @@ export default function ScannedRecordsPage() {
                     {applicants.filter(a => a.status === 'pending').length}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
                   <CheckCircle className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Approved Today</p>
                   <p className="text-3xl font-bold text-gray-900">0</p>
                 </div>
-                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
                   <CheckCircle className="w-6 h-6 text-white" />
                 </div>
               </div>

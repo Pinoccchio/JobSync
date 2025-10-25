@@ -240,49 +240,49 @@ export default function RankedRecordsPage() {
 
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Applicants</p>
                   <p className="text-3xl font-bold text-gray-900">{extractedData.length}</p>
                 </div>
-                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
                   <User className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-yellow-50 to-yellow-100">
+            <Card variant="flat" className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-l-4 border-yellow-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Top Ranked</p>
                   <p className="text-3xl font-bold text-gray-900">{rankedCandidates.length}</p>
                 </div>
-                <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
                   <Trophy className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Avg. Match Score</p>
                   <p className="text-3xl font-bold text-gray-900">93.4%</p>
                 </div>
-                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
                   <TrendingUp className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100">
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Active Positions</p>
                   <p className="text-3xl font-bold text-gray-900">1</p>
                 </div>
-                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
                   <Briefcase className="w-6 h-6 text-white" />
                 </div>
               </div>

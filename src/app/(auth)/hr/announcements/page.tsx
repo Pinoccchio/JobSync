@@ -90,15 +90,15 @@ export default function AnnouncementsPage() {
         </div>
 
         {/* Create Announcement Card */}
-        <Card variant="elevated" className="mb-8">
+        <Card variant="elevated" className="mb-8 hover:shadow-xl transition-shadow">
           <div className="p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#22A555] to-[#1a8045] rounded-xl flex items-center justify-center shadow-lg">
                 <Megaphone className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Create Announcement</h2>
-                <p className="text-sm text-gray-600">Share important updates and job openings</p>
+                <p className="text-sm text-gray-600 mt-0.5">Share important updates and job openings</p>
               </div>
             </div>
 
@@ -161,15 +161,15 @@ export default function AnnouncementsPage() {
           {postedContent.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {postedContent.map((item) => (
-                <Card key={item.id} variant="interactive" noPadding className="group">
+                <Card key={item.id} variant="interactive" noPadding className="group hover:shadow-2xl transition-all duration-300">
                   {/* Image Section */}
-                  <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300 overflow-hidden">
+                  <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300 overflow-hidden group-hover:from-gray-300 group-hover:to-gray-400 transition-all">
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <ImageIcon className="w-16 h-16 text-gray-400" />
+                      <ImageIcon className="w-16 h-16 text-gray-400 group-hover:text-gray-500 transition-colors" />
                     </div>
                     {/* Category Badge */}
                     <div className="absolute top-4 right-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(item.category)}`}>
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-md ${getCategoryColor(item.category)}`}>
                         {item.category}
                       </span>
                     </div>
@@ -206,7 +206,7 @@ export default function AnnouncementsPage() {
               ))}
             </div>
           ) : (
-            <Card className="text-center py-16">
+            <Card className="text-center py-16 bg-gradient-to-br from-gray-50 to-white border-2 border-dashed border-gray-200">
               <Megaphone className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No announcements yet</h3>
               <p className="text-gray-600 mb-4">Create your first announcement to get started</p>

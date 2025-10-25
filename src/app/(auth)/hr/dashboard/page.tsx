@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { DashboardTile, Card, Button, Container, RefreshButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
 
 interface DashboardStats {
@@ -191,21 +191,34 @@ export default function HRDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tiles.map((tile, index) => {
               const Icon = tile.icon;
+              const bgGradient = tile.color.includes('blue') ? 'from-blue-50 to-blue-100 border-blue-500' :
+                               tile.color.includes('orange') ? 'from-orange-50 to-orange-100 border-orange-500' :
+                               tile.color.includes('red') ? 'from-red-50 to-red-100 border-red-500' :
+                               tile.color.includes('green') ? 'from-green-50 to-green-100 border-green-500' :
+                               tile.color.includes('gray') ? 'from-gray-50 to-gray-100 border-gray-500' :
+                               'from-purple-50 to-purple-100 border-purple-500';
+              const iconBg = tile.color.includes('blue') ? 'bg-blue-500' :
+                            tile.color.includes('orange') ? 'bg-orange-500' :
+                            tile.color.includes('red') ? 'bg-red-500' :
+                            tile.color.includes('green') ? 'bg-[#22A555]' :
+                            tile.color.includes('gray') ? 'bg-gray-500' :
+                            'bg-purple-500';
+
               return (
-                <Card key={index} variant="elevated" className="hover:shadow-xl transition-all duration-300">
+                <Card key={index} variant="flat" className={`bg-gradient-to-br ${bgGradient} border-l-4 hover:shadow-xl transition-all duration-300`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-2">{tile.title}</p>
-                      <p className="text-4xl font-bold text-gray-900">
+                      <p className="text-sm text-gray-600 mb-1">{tile.title}</p>
+                      <p className="text-3xl font-bold text-gray-900">
                         {loading ? (
-                          <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                         ) : (
                           tile.value
                         )}
                       </p>
                     </div>
-                    <div className={`w-16 h-16 bg-gradient-to-br ${tile.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                      <Icon className="w-8 h-8 text-white" />
+                    <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center shadow-lg`}>
+                      <Icon className="w-6 h-6 text-white" />
                     </div>
                   </div>
                 </Card>
@@ -216,28 +229,36 @@ export default function HRDashboard() {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Monthly Applicants Chart */}
-            <Card title="MONTHLY APPLICANTS" headerColor="bg-[#D4F4DD]" variant="elevated">
-              <div className="h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-lg p-4">
+            <Card title="MONTHLY APPLICANTS" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
+              <div className="h-64 flex items-center justify-center bg-gradient-to-br from-blue-50 to-white rounded-lg p-4 border border-gray-100">
                 {loading ? (
-                  <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-[#22A555] mx-auto mb-3" />
+                    <p className="text-sm text-gray-600">Loading chart data...</p>
+                  </div>
                 ) : (
                   <div className="text-center text-gray-500">
-                    <p className="text-sm">Chart visualization coming soon</p>
-                    <p className="text-xs mt-2">Will display monthly application trends</p>
+                    <Activity className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-sm font-medium text-gray-700">Chart visualization coming soon</p>
+                    <p className="text-xs mt-2 text-gray-500">Will display monthly application trends</p>
                   </div>
                 )}
               </div>
             </Card>
 
             {/* Job Matched Chart */}
-            <Card title="JOB MATCHED" headerColor="bg-[#D4F4DD]" variant="elevated">
-              <div className="h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-lg p-4">
+            <Card title="JOB MATCHED" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
+              <div className="h-64 flex items-center justify-center bg-gradient-to-br from-green-50 to-white rounded-lg p-4 border border-gray-100">
                 {loading ? (
-                  <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-[#22A555] mx-auto mb-3" />
+                    <p className="text-sm text-gray-600">Loading chart data...</p>
+                  </div>
                 ) : (
                   <div className="text-center text-gray-500">
-                    <p className="text-sm">Chart visualization coming soon</p>
-                    <p className="text-xs mt-2">Will display application distribution by job</p>
+                    <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-sm font-medium text-gray-700">Chart visualization coming soon</p>
+                    <p className="text-xs mt-2 text-gray-500">Will display application distribution by job</p>
                   </div>
                 )}
               </div>
