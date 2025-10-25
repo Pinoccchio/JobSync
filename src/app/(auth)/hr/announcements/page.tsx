@@ -1,92 +1,157 @@
 'use client';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, Button, Input, Textarea, FileUpload, Container, Badge, RefreshButton } from '@/components/ui';
+import { Card, Button, Input, Textarea, FileUploadWithProgress, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone } from 'lucide-react';
+import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone, Loader2 } from 'lucide-react';
+
+interface Announcement {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  image_url: string | null;
+  status: string;
+  created_by: string;
+  published_at: string;
+  created_at: string;
+}
 
 export default function AnnouncementsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    file: null as File | null,
+    category: 'general',
+    imageUrl: '',
   });
 
-  const [postedContent, setPostedContent] = useState([
-    {
-      id: 1,
-      title: 'We are looking for IT Technician!',
-      description: 'Join our team as an IT Technician. Great opportunity for skilled professionals.',
-      image: '/sample-job.jpg',
-      date: '2025-01-15',
-      category: 'Job Opening'
-    },
-    {
-      id: 2,
-      title: 'Training Program Registration Open',
-      description: 'New web development training program starting next month.',
-      image: '/sample-training.jpg',
-      date: '2025-01-12',
-      category: 'Training'
-    },
-    {
-      id: 3,
-      title: 'HR Office Relocation Notice',
-      description: 'The HR office will be temporarily relocated during renovations.',
-      image: '/sample-notice.jpg',
-      date: '2025-01-10',
-      category: 'Notice'
-    }
-  ]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleFileSelect = (file: File) => {
-    setFormData({ ...formData, file });
+  // Fetch announcements
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/announcements');
+      const result = await response.json();
+
+      if (result.success) {
+        setAnnouncements(result.data);
+      } else {
+        showToast(result.error || 'Failed to fetch announcements', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      showToast('Failed to fetch announcements', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
+
+  // Handle image upload
+  const handleImageUpload = (url: string) => {
+    setFormData({ ...formData, imageUrl: url });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Handle form submit
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    showToast('Post announcement feature coming soon', 'info');
+
+    if (!formData.title || !formData.description) {
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          image_url: formData.imageUrl || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Announcement posted successfully!', 'success');
+        setFormData({ title: '', description: '', category: 'general', imageUrl: '' });
+        fetchAnnouncements();
+      } else {
+        showToast(result.error || 'Failed to post announcement', 'error');
+      }
+    } catch (error) {
+      console.error('Error posting announcement:', error);
+      showToast('Failed to post announcement', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Delete announcement: "${title}"?`)) return;
+
+    try {
+      setDeletingId(id);
+      const response = await fetch(`/api/announcements/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Announcement deleted successfully', 'success');
+        fetchAnnouncements();
+      } else {
+        showToast(result.error || 'Failed to delete announcement', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      showToast('Failed to delete announcement', 'error');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'Job Opening': return 'bg-blue-100 text-blue-800';
-      case 'Training': return 'bg-purple-100 text-purple-800';
-      case 'Notice': return 'bg-orange-100 text-orange-800';
+      case 'job_opening': return 'bg-blue-100 text-blue-800';
+      case 'training': return 'bg-purple-100 text-purple-800';
+      case 'notice': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // Fetch announcements function
-  const fetchAnnouncements = useCallback(async () => {
-    try {
-      // TODO: Real implementation
-      // const { data } = await supabase
-      //   .from('announcements')
-      //   .select('*')
-      //   .order('created_at', { ascending: false });
-      showToast('Announcements refreshed', 'success');
-    } catch (error) {
-      showToast('Failed to refresh announcements', 'error');
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'job_opening': return 'Job Opening';
+      case 'training': return 'Training';
+      case 'notice': return 'Notice';
+      default: return 'General';
     }
-  }, [showToast]);
-
-  // REMOVED: Real-time subscription disabled for performance
-  // useTableRealtime('announcements', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-  //   showToast('Announcement updated', 'info');
-  //   // fetchAnnouncements(); // Uncomment when real data
-  // });
+  };
 
   return (
     <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Announcements" pageDescription="Post job announcements and notices">
       <Container size="xl">
         {/* Refresh Button */}
         <div className="flex justify-end mb-6">
-          <RefreshButton onRefresh={fetchAnnouncements} label="Refresh" showLastRefresh={true} />
+          <RefreshButton onRefresh={fetchAnnouncements} label="Refresh Announcements" showLastRefresh={true} />
         </div>
 
         {/* Create Announcement Card */}
@@ -108,16 +173,18 @@ export default function AnnouncementsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
                     <ImageIcon className="w-4 h-4" />
-                    Upload Image
+                    Upload Image (Optional)
                   </label>
-                  <FileUpload
-                    onFileSelect={handleFileSelect}
-                    accept="image/*"
+                  <FileUploadWithProgress
+                    bucket="announcements"
+                    onUploadComplete={handleImageUpload}
+                    accept="image/jpeg,image/jpg,image/png"
+                    maxSizeMB={5}
                   />
-                  {formData.file && (
+                  {formData.imageUrl && (
                     <p className="text-sm text-[#22A555] mt-2 flex items-center gap-2">
                       <ImageIcon className="w-4 h-4" />
-                      {formData.file.name}
+                      Image uploaded successfully
                     </p>
                   )}
                 </div>
@@ -131,19 +198,45 @@ export default function AnnouncementsPage() {
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="Enter announcement title"
                     required
+                    disabled={submitting}
                   />
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Category
+                    </label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555]"
+                      disabled={submitting}
+                    >
+                      <option value="general">General</option>
+                      <option value="job_opening">Job Opening</option>
+                      <option value="training">Training</option>
+                      <option value="notice">Notice</option>
+                    </select>
+                  </div>
 
                   <Textarea
                     label="Description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Enter announcement description"
-                    rows={5}
+                    rows={4}
                     required
+                    disabled={submitting}
                   />
 
-                  <Button type="submit" variant="success" size="lg" icon={Send} className="w-full">
-                    Post Announcement
+                  <Button
+                    type="submit"
+                    variant="success"
+                    size="lg"
+                    icon={submitting ? Loader2 : Send}
+                    className="w-full"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Posting...' : 'Post Announcement'}
                   </Button>
                 </div>
               </div>
@@ -155,22 +248,35 @@ export default function AnnouncementsPage() {
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Posted Announcements</h2>
-            <Badge variant="info">{postedContent.length} active</Badge>
+            <Badge variant="info">{announcements.length} active</Badge>
           </div>
 
-          {postedContent.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+              <span className="ml-3 text-gray-600">Loading announcements...</span>
+            </div>
+          ) : announcements.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {postedContent.map((item) => (
+              {announcements.map((item) => (
                 <Card key={item.id} variant="interactive" noPadding className="group hover:shadow-2xl transition-all duration-300">
                   {/* Image Section */}
                   <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300 overflow-hidden group-hover:from-gray-300 group-hover:to-gray-400 transition-all">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <ImageIcon className="w-16 h-16 text-gray-400 group-hover:text-gray-500 transition-colors" />
-                    </div>
+                    {item.image_url ? (
+                      <img
+                        src={item.image_url}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <ImageIcon className="w-16 h-16 text-gray-400 group-hover:text-gray-500 transition-colors" />
+                      </div>
+                    )}
                     {/* Category Badge */}
                     <div className="absolute top-4 right-4">
                       <span className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-md ${getCategoryColor(item.category)}`}>
-                        {item.category}
+                        {getCategoryLabel(item.category)}
                       </span>
                     </div>
                   </div>
@@ -188,18 +294,19 @@ export default function AnnouncementsPage() {
                     {/* Date */}
                     <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>{new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                      <span>{new Date(item.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                     </div>
 
                     {/* Actions */}
                     <Button
                       variant="danger"
                       size="sm"
-                      icon={Trash2}
+                      icon={deletingId === item.id ? Loader2 : Trash2}
                       className="w-full mt-3"
-                      onClick={() => showToast('Delete announcement feature coming soon', 'info')}
+                      onClick={() => handleDelete(item.id, item.title)}
+                      disabled={deletingId !== null}
                     >
-                      Delete
+                      {deletingId === item.id ? 'Deleting...' : 'Delete'}
                     </Button>
                   </div>
                 </Card>

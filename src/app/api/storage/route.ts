@@ -4,101 +4,316 @@ import { createClient } from '@/lib/supabase/server';
 /**
  * File Storage API Routes
  *
- * TODO: Implement the following endpoints:
- * - POST /api/storage/upload - Upload PDS PDF or ID image
- * - GET /api/storage/[id] - Get file URL with signed token
- * - DELETE /api/storage/[id] - Delete file
+ * Endpoints:
+ * - POST /api/storage - Upload file to Supabase Storage
+ * - GET /api/storage - Get signed URL for private file access
  *
- * Supabase Storage Configuration:
- * 1. Create buckets in Supabase:
- *    - pds-files (for Personal Data Sheets)
- *    - id-images (for training application IDs)
- * 2. Set up Row Level Security (RLS) policies:
- *    - Users can only upload their own files
- *    - HR/PESO can view all files
- *    - Files are private by default
- *
- * File Upload Best Practices:
- * - Validate file type (PDF for PDS, JPG/PNG for IDs)
- * - Limit file size (10MB for PDFs, 5MB for images)
- * - Generate unique file names to prevent conflicts
- * - Scan for viruses (if possible)
+ * Storage Buckets:
+ * - pds-files: PDF files (10MB max, private)
+ * - id-images: ID verification images (5MB max, private)
+ * - announcements: Announcement images (5MB max, public)
+ * - profiles: Profile pictures (2MB max, public)
  */
 
+// Bucket configurations
+const BUCKET_CONFIG = {
+  'pds-files': {
+    maxSize: 10 * 1024 * 1024, // 10MB
+    allowedTypes: ['application/pdf'],
+    allowedExtensions: ['.pdf'],
+  },
+  'id-images': {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png'],
+    allowedExtensions: ['.jpg', '.jpeg', '.png'],
+  },
+  'announcements': {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
+    allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
+  },
+  'profiles': {
+    maxSize: 2 * 1024 * 1024, // 2MB
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
+  },
+};
+
+// POST /api/storage - Upload file
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const bucket = formData.get('bucket') as string; // 'pds-files' or 'id-images'
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    // 1. Authenticate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
     }
 
-    // TODO: Validate file
-    // - Check file type
-    // - Check file size
-    // - Verify user is authenticated
+    // 2. Parse form data
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const bucket = formData.get('bucket') as string;
+    const folder = formData.get('folder') as string | null; // Optional subfolder
 
-    // TODO: Upload to Supabase Storage
-    // const fileName = `${Date.now()}-${file.name}`;
-    // const { data, error } = await supabase.storage
-    //   .from(bucket)
-    //   .upload(fileName, file, {
-    //     cacheControl: '3600',
-    //     upsert: false,
-    //   });
+    if (!file) {
+      return NextResponse.json(
+        { success: false, error: 'No file provided' },
+        { status: 400 }
+      );
+    }
 
-    // if (error) throw error;
+    if (!bucket || !BUCKET_CONFIG[bucket as keyof typeof BUCKET_CONFIG]) {
+      return NextResponse.json(
+        { success: false, error: `Invalid bucket. Must be one of: ${Object.keys(BUCKET_CONFIG).join(', ')}` },
+        { status: 400 }
+      );
+    }
 
-    // TODO: Return file URL
-    // const { data: { publicUrl } } = supabase.storage
-    //   .from(bucket)
-    //   .getPublicUrl(fileName);
+    const config = BUCKET_CONFIG[bucket as keyof typeof BUCKET_CONFIG];
+
+    // 3. Validate file size
+    if (file.size > config.maxSize) {
+      const maxSizeMB = config.maxSize / (1024 * 1024);
+      return NextResponse.json(
+        { success: false, error: `File size exceeds ${maxSizeMB}MB limit` },
+        { status: 400 }
+      );
+    }
+
+    // 4. Validate file type
+    if (!config.allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid file type. Allowed types: ${config.allowedExtensions.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // 5. Validate file extension
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!config.allowedExtensions.includes(fileExtension)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid file extension. Allowed: ${config.allowedExtensions.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // 6. Generate unique file name to prevent conflicts
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const uniqueFileName = `${timestamp}-${randomString}-${sanitizedFileName}`;
+
+    // 7. Create file path (with optional folder)
+    const filePath = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
+
+    // 8. Convert File to ArrayBuffer for upload
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = new Uint8Array(arrayBuffer);
+
+    // 9. Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, fileBuffer, {
+        contentType: file.type,
+        cacheControl: '3600',
+        upsert: false, // Don't overwrite existing files
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      return NextResponse.json(
+        { success: false, error: uploadError.message },
+        { status: 500 }
+      );
+    }
+
+    // 10. Get file URL
+    // For private buckets, we'll return the path and generate signed URL on demand
+    // For public buckets, return the public URL
+    let fileUrl = '';
+
+    if (bucket === 'announcements' || bucket === 'profiles') {
+      // Public buckets - get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      fileUrl = publicUrlData.publicUrl;
+    } else {
+      // Private buckets - generate signed URL (1 hour expiry)
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 3600); // 1 hour
+
+      if (signedUrlError) {
+        console.error('Signed URL error:', signedUrlError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to generate file URL' },
+          { status: 500 }
+        );
+      }
+
+      fileUrl = signedUrlData.signedUrl;
+    }
 
     return NextResponse.json({
-      message: 'File upload - Coming soon',
-      todo: [
-        'Create storage buckets in Supabase dashboard',
-        'Set up RLS policies for file access',
-        'Implement file validation and upload logic',
-      ],
-    }, { status: 501 });
+      success: true,
+      data: {
+        fileName: file.name,
+        filePath: filePath,
+        fileUrl: fileUrl,
+        fileSize: file.size,
+        fileType: file.type,
+        bucket: bucket,
+      },
+      message: 'File uploaded successfully',
+    }, { status: 201 });
+
   } catch (error: any) {
-    console.error('File upload error:', error);
+    console.error('Server error in POST /api/storage:', error);
     return NextResponse.json(
-      { error: error.message || 'Upload failed' },
+      { success: false, error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
+// GET /api/storage - Get signed URL for private file
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const bucket = searchParams.get('bucket');
-  const path = searchParams.get('path');
+  try {
+    const supabase = await createClient();
+    const searchParams = request.nextUrl.searchParams;
 
-  if (!bucket || !path) {
-    return NextResponse.json({ error: 'Missing bucket or path' }, { status: 400 });
+    // 1. Authenticate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Get parameters
+    const bucket = searchParams.get('bucket');
+    const path = searchParams.get('path');
+    const expiresIn = parseInt(searchParams.get('expiresIn') || '3600'); // Default 1 hour
+
+    if (!bucket || !path) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required parameters: bucket and path' },
+        { status: 400 }
+      );
+    }
+
+    if (!BUCKET_CONFIG[bucket as keyof typeof BUCKET_CONFIG]) {
+      return NextResponse.json(
+        { success: false, error: `Invalid bucket. Must be one of: ${Object.keys(BUCKET_CONFIG).join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // 3. Validate expiry time (max 7 days)
+    if (expiresIn < 60 || expiresIn > 604800) {
+      return NextResponse.json(
+        { success: false, error: 'expiresIn must be between 60 and 604800 seconds (1 minute to 7 days)' },
+        { status: 400 }
+      );
+    }
+
+    // 4. Generate signed URL
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, expiresIn);
+
+    if (error) {
+      console.error('Signed URL error:', error);
+
+      if (error.message.includes('not found')) {
+        return NextResponse.json(
+          { success: false, error: 'File not found' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        signedUrl: data.signedUrl,
+        expiresIn: expiresIn,
+        expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      },
+    });
+
+  } catch (error: any) {
+    console.error('Server error in GET /api/storage:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
+}
 
+// DELETE /api/storage - Delete file (for future implementation)
+export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // TODO: Generate signed URL for private file access
-    // const { data, error } = await supabase.storage
-    //   .from(bucket)
-    //   .createSignedUrl(path, 3600); // 1 hour expiry
+    // 1. Authenticate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // if (error) throw error;
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Get parameters
+    const { searchParams } = new URL(request.url);
+    const bucket = searchParams.get('bucket');
+    const path = searchParams.get('path');
+
+    if (!bucket || !path) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required parameters: bucket and path' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Delete file
+    const { error: deleteError } = await supabase.storage
+      .from(bucket)
+      .remove([path]);
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError);
+      return NextResponse.json(
+        { success: false, error: deleteError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
-      message: 'File download - Coming soon',
-    }, { status: 501 });
+      success: true,
+      message: 'File deleted successfully',
+    });
+
   } catch (error: any) {
+    console.error('Server error in DELETE /api/storage:', error);
     return NextResponse.json(
-      { error: error.message || 'Download failed' },
+      { success: false, error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

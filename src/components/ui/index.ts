@@ -6,6 +6,7 @@ export { Table } from './Table';
 export { EnhancedTable } from './EnhancedTable';
 export { DashboardTile } from './DashboardTile';
 export { FileUpload } from './FileUpload';
+export { FileUploadWithProgress } from './FileUploadWithProgress';
 export { Modal } from './Modal';
 export { Toast } from './Toast';
 export { ApplicationModal } from './ApplicationModal';

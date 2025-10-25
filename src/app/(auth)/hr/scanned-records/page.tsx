@@ -1,83 +1,152 @@
 'use client';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { FileText, Loader2, Calendar, User, Briefcase } from 'lucide-react';
+
+interface Application {
+  id: string;
+  no: number;
+  applicantName: string;
+  email: string;
+  jobTitle: string;
+  fileName: string;
+  uploadedDate: string;
+  status: string;
+  pdsUrl: string;
+  ocrProcessed: boolean;
+  aiProcessed: boolean;
+  _raw: any;
+}
 
 export default function ScannedRecordsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  // State for applicants data (currently mock, ready for real data)
-  const [applicants, setApplicants] = useState([
-    {
-      no: 1,
-      name: 'Angelo Belleza',
-      fileName: 'CS-Form-No.-212-Personal-Data-Sheet-revised-2.pdf',
-      status: 'pending'
-    },
-    {
-      no: 2,
-      name: 'Roda Ford',
-      fileName: 'CS-Form-No.-212-Personal-Data-Sheet-revised-2.pdf',
-      status: 'pending'
-    },
-    {
-      no: 3,
-      name: 'Diane Wens',
-      fileName: 'CS-Form-No.-212-Personal-Data-Sheet-revised.pdf',
-      status: 'pending'
-    },
-    {
-      no: 4,
-      name: 'James Carter',
-      fileName: 'CS-Form-No.-212-Personal-Data-Sheet-revised.pdf',
-      status: 'pending'
-    },
-  ]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch function (ready for real implementation)
+  // Fetch applications
   const fetchScannedRecords = useCallback(async () => {
     try {
-      // TODO: Replace with real data fetching from Supabase
-      // const { data, error } = await supabase
-      //   .from('applications')
-      //   .select('*, applicant_profiles(*)')
-      //   .order('created_at', { ascending: false });
+      setLoading(true);
+      const response = await fetch('/api/applications');
+      const result = await response.json();
 
-      // For now, just show feedback
-      showToast('Data refreshed', 'success');
+      if (result.success) {
+        setApplications(
+          result.data.map((app: any, index: number) => ({
+            id: app.id,
+            no: index + 1,
+            applicantName: `${app.applicant_profiles?.first_name || ''} ${app.applicant_profiles?.surname || ''}`.trim() || 'Unknown',
+            email: app.applicant_profiles?.profiles?.email || user?.email || 'N/A',
+            jobTitle: app.jobs?.title || 'Unknown Position',
+            fileName: app.pds_file_name || 'No file',
+            uploadedDate: new Date(app.created_at).toLocaleDateString(),
+            status: app.status,
+            pdsUrl: app.pds_file_url,
+            ocrProcessed: app.applicant_profiles?.ocr_processed || false,
+            aiProcessed: app.applicant_profiles?.ai_processed || false,
+            _raw: app,
+          }))
+        );
+      } else {
+        showToast(result.error || 'Failed to fetch applications', 'error');
+      }
     } catch (error) {
       console.error('Error fetching records:', error);
-      showToast('Failed to refresh data', 'error');
+      showToast('Failed to fetch applications', 'error');
+    } finally {
+      setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, user]);
 
-  // REMOVED: Real-time subscription disabled for performance
-  // useTableRealtime(
-  //   'applications',
-  //   ['INSERT', 'UPDATE'],
-  //   null,
-  //   (payload) => {
-  //     console.log('Application updated:', payload);
-  //     showToast('New application detected', 'info');
-  //     // TODO: Refresh data when real fetching is implemented
-  //     // fetchScannedRecords();
-  //   }
-  // );
+  useEffect(() => {
+    fetchScannedRecords();
+  }, [fetchScannedRecords]);
+
+  // Download PDS
+  const handleViewPDS = async (pdsUrl: string, applicantName: string) => {
+    try {
+      if (!pdsUrl) {
+        showToast('PDS file not available', 'error');
+        return;
+      }
+
+      // Extract bucket and path from the URL
+      const url = new URL(pdsUrl);
+      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
+
+      if (!pathMatch) {
+        // Direct download if it's already a signed URL
+        window.open(pdsUrl, '_blank');
+        return;
+      }
+
+      const bucket = pathMatch[1];
+      const path = pathMatch[2];
+
+      // Get fresh signed URL
+      const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
+      const result = await response.json();
+
+      if (result.success) {
+        window.open(result.data.signedUrl, '_blank');
+      } else {
+        showToast(result.error || 'Failed to get download link', 'error');
+      }
+    } catch (error) {
+      console.error('Error viewing PDS:', error);
+      showToast('Failed to view PDS', 'error');
+    }
+  };
 
   const columns = [
-    { header: 'No.', accessor: 'no' as const },
-    { header: 'Applicant Name', accessor: 'name' as const },
     {
-      header: 'File Name',
+      header: 'No.',
+      accessor: 'no' as const,
+      render: (value: number) => (
+        <span className="font-medium text-gray-900">{value}</span>
+      )
+    },
+    {
+      header: 'Applicant Name',
+      accessor: 'applicantName' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <span className="font-medium text-gray-900">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Position Applied',
+      accessor: 'jobTitle' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'PDS File Name',
       accessor: 'fileName' as const,
       render: (value: string) => (
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700 truncate max-w-xs" title={value}>{value}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Upload Date',
+      accessor: 'uploadedDate' as const,
+      render: (value: string) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-700">{value}</span>
         </div>
       )
@@ -86,7 +155,9 @@ export default function ScannedRecordsPage() {
       header: 'Status',
       accessor: 'status' as const,
       render: (value: string) => (
-        <Badge variant="warning" icon={CheckCircle}>
+        <Badge
+          variant={value === 'approved' ? 'success' : value === 'denied' ? 'danger' : 'warning'}
+        >
           {value.charAt(0).toUpperCase() + value.slice(1)}
         </Badge>
       )
@@ -94,36 +165,30 @@ export default function ScannedRecordsPage() {
     {
       header: 'Actions',
       accessor: 'actions' as const,
-      render: (_: any, row: any) => (
+      render: (_: any, row: Application) => (
         <div className="flex gap-2">
           <Button
             variant="secondary"
             size="sm"
-            icon={Eye}
-            onClick={() => showToast('View feature coming soon', 'info')}
+            icon={FileText}
+            onClick={() => handleViewPDS(row.pdsUrl, row.applicantName)}
+            title="View PDS"
           >
-            View
-          </Button>
-          <Button
-            variant="success"
-            size="sm"
-            icon={CheckCircle}
-            onClick={() => showToast('Approve feature coming soon', 'info')}
-          >
-            Approve
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            icon={XCircle}
-            onClick={() => showToast('Disapprove feature coming soon', 'info')}
-          >
-            Disapprove
+            View PDS
           </Button>
         </div>
       )
     },
   ];
+
+  // Calculate stats
+  const totalPDS = applications.length;
+  const pendingCount = applications.filter((a) => a.status === 'pending').length;
+  const approvedToday = applications.filter((a) => {
+    const today = new Date().toDateString();
+    const uploadDate = new Date(a._raw.created_at).toDateString();
+    return a.status === 'approved' && uploadDate === today;
+  }).length;
 
   return (
     <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Scanned PDS Records" pageDescription="Manage uploaded Personal Data Sheets">
@@ -133,7 +198,7 @@ export default function ScannedRecordsPage() {
           <div className="flex justify-end">
             <RefreshButton
               onRefresh={fetchScannedRecords}
-              label="Refresh"
+              label="Refresh Applications"
               showLastRefresh={true}
             />
           </div>
@@ -144,7 +209,7 @@ export default function ScannedRecordsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total PDS Uploaded</p>
-                  <p className="text-3xl font-bold text-gray-900">{applicants.length}</p>
+                  <p className="text-3xl font-bold text-gray-900">{totalPDS}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
                   <FileText className="w-6 h-6 text-white" />
@@ -156,12 +221,10 @@ export default function ScannedRecordsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Pending Review</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {applicants.filter(a => a.status === 'pending').length}
-                  </p>
+                  <p className="text-3xl font-bold text-gray-900">{pendingCount}</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <CheckCircle className="w-6 h-6 text-white" />
+                  <Loader2 className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -170,10 +233,10 @@ export default function ScannedRecordsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Approved Today</p>
-                  <p className="text-3xl font-bold text-gray-900">0</p>
+                  <p className="text-3xl font-bold text-gray-900">{approvedToday}</p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
-                  <CheckCircle className="w-6 h-6 text-white" />
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -181,14 +244,25 @@ export default function ScannedRecordsPage() {
 
           {/* PDS Records Table */}
           <Card title="LIST OF PDS UPLOADED BY APPLICANTS" headerColor="bg-[#D4F4DD]">
-            <EnhancedTable
-              columns={columns}
-              data={applicants}
-              searchable
-              paginated
-              pageSize={10}
-              searchPlaceholder="Search applicants by name or file..."
-            />
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+                <span className="ml-3 text-gray-600">Loading PDS records...</span>
+              </div>
+            ) : applications.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                No PDS files uploaded yet
+              </div>
+            ) : (
+              <EnhancedTable
+                columns={columns}
+                data={applications}
+                searchable
+                paginated
+                pageSize={10}
+                searchPlaceholder="Search by applicant name, position, or file name..."
+              />
+            )}
           </Card>
         </div>
       </Container>

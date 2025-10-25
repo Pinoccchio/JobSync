@@ -1,20 +1,11 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient } from './client';
 import { ActivityLogger } from './activityLogger';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
  * Singleton Supabase client for all authentication operations
- * Uses localStorage for automatic session persistence
+ * Uses cookies for automatic session persistence (via SSR package)
  */
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    storageKey: 'jobsync-auth-token',
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-  },
-});
+export const supabase = createClient();
 
 // ==================== TYPE DEFINITIONS ====================
 
