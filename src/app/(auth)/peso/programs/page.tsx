@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Plus, Edit, Trash2, GraduationCap, FileText, Clock, Users, Calendar, X, CheckCircle2 } from 'lucide-react';
 
 export default function PESOProgramsPage() {
@@ -63,11 +63,11 @@ export default function PESOProgramsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for training programs
-  useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('Training program updated', 'info');
-    // fetchPrograms(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('Training program updated', 'info');
+  //   // fetchPrograms(); // Uncomment when real data
+  // });
 
   const columns = [
     {

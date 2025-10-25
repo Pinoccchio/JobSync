@@ -45,10 +45,39 @@ export function createAdminClient() {
  */
 export async function deleteUser(userId: string) {
   try {
+    // First, check if user exists in auth
+    const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+    // If user doesn't exist, consider it already deleted (idempotent)
+    if (getUserError || !existingUser.user) {
+      console.warn(`User ${userId} not found in auth, may already be deleted`);
+
+      // Clean up orphaned profile if exists
+      await supabaseAdmin
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      return { success: true };
+    }
+
     // Delete auth user (profile cascade deletes via FK)
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) {
+      // Handle "Database error loading user" gracefully
+      if (error.message.includes('Database error loading user')) {
+        console.warn('User may already be deleted:', error.message);
+
+        // Clean up orphaned profile
+        await supabaseAdmin
+          .from('profiles')
+          .delete()
+          .eq('id', userId);
+
+        return { success: true };
+      }
+
       throw new Error(`Failed to delete user: ${error.message}`);
     }
 

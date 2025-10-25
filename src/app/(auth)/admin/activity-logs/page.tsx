@@ -7,7 +7,7 @@ import {
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { supabase } from '@/lib/supabase/auth';
 import {
   getEventConfig, type EventCategory, type EventSeverity,
@@ -96,11 +96,11 @@ export default function ActivityLogsPage() {
     }
   }, [authLoading, isAuthenticated, fetchActivityLogs]);
 
-  // Real-time subscription for activity logs
-  useTableRealtime('activity_logs', ['INSERT'], null, () => {
-    showToast('New activity logged', 'info');
-    fetchActivityLogs();
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('activity_logs', ['INSERT'], null, () => {
+  //   showToast('New activity logged', 'info');
+  //   fetchActivityLogs();
+  // });
 
   // Category filter data
   const categoryStats = React.useMemo(() => {

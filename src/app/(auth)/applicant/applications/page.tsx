@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/layout';
 import { FileText, CheckCircle, XCircle, Clock, TrendingUp, Info } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 
 export default function MyApplicationsPage() {
   const { showToast } = useToast();
@@ -70,11 +70,11 @@ export default function MyApplicationsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for user's applications
-  useTableRealtime('applications', ['INSERT', 'UPDATE'], `applicant_id=eq.${user?.id}`, () => {
-    showToast('Application status updated', 'info');
-    // fetchApplications(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('applications', ['INSERT', 'UPDATE'], `applicant_id=eq.${user?.id}`, () => {
+  //   showToast('Application status updated', 'info');
+  //   // fetchApplications(); // Uncomment when real data
+  // });
 
   const columns = [
     {

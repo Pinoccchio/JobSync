@@ -7,7 +7,7 @@ import {
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { supabase } from '@/lib/supabase/auth';
 import {
   UserPlus, UserX, Trash2, User as UserIcon, User, Mail, Shield, Calendar, X,
@@ -108,16 +108,15 @@ export default function UserManagementPage() {
     fetchRecentActivities();
   }, [fetchUsers, fetchRecentActivities]);
 
-  // Real-time subscription for user profiles
-  useTableRealtime('profiles', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('User profile updated', 'info');
-    fetchUsers();
-  });
+  // REMOVED: Real-time subscriptions disabled for performance
+  // useTableRealtime('profiles', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('User profile updated', 'info');
+  //   fetchUsers();
+  // });
 
-  // Real-time subscription for activities
-  useTableRealtime('activity_logs', ['INSERT'], 'event_category=eq.user_management', () => {
-    fetchRecentActivities();
-  });
+  // useTableRealtime('activity_logs', ['INSERT'], 'event_category=eq.user_management', () => {
+  //   fetchRecentActivities();
+  // });
 
   // Create user
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -204,7 +203,10 @@ export default function UserManagementPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          reason: statusChangeReason || undefined
+        }),
       });
 
       const result = await response.json();
@@ -254,14 +256,20 @@ export default function UserManagementPage() {
       }
 
       showToast('User deleted successfully', 'success');
+
+      // Reset loading state FIRST to prevent stuck loading
+      setIsSubmitting(false);
+
+      // Then close modal and clear selection
       setShowDeleteConfirm(false);
       setUserToDelete(null);
+
+      // Finally refresh data
       fetchUsers();
       fetchRecentActivities();
     } catch (error) {
       console.error('Delete user error:', error);
       showToast(error instanceof Error ? error.message : 'Failed to delete user', 'error');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -737,9 +745,9 @@ export default function UserManagementPage() {
                     <Button
                       type="submit"
                       variant="success"
-                      icon={isSubmitting ? Loader2 : UserPlus}
+                      icon={UserPlus}
+                      loading={isSubmitting}
                       className="flex-1"
-                      disabled={isSubmitting}
                     >
                       {isSubmitting ? 'Creating...' : 'Create Account'}
                     </Button>
@@ -834,10 +842,10 @@ export default function UserManagementPage() {
                     </Button>
                     <Button
                       variant="danger"
-                      icon={isSubmitting ? Loader2 : Trash2}
+                      icon={Trash2}
+                      loading={isSubmitting}
                       onClick={handleDeleteUser}
                       className="flex-1"
-                      disabled={isSubmitting}
                     >
                       {isSubmitting ? 'Deleting...' : 'Delete Account'}
                     </Button>
@@ -977,10 +985,10 @@ export default function UserManagementPage() {
                     </Button>
                     <Button
                       variant={statusChangeType === 'activate' ? 'success' : 'warning'}
-                      icon={isSubmitting ? Loader2 : (statusChangeType === 'activate' ? CheckCircle2 : UserX)}
+                      icon={statusChangeType === 'activate' ? CheckCircle2 : UserX}
+                      loading={isSubmitting}
                       onClick={handleConfirmStatusChange}
                       className="flex-1"
-                      disabled={isSubmitting}
                     >
                       {isSubmitting
                         ? `${statusChangeType === 'activate' ? 'Activating' : 'Deactivating'}...`
@@ -1146,7 +1154,7 @@ export default function UserManagementPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Auth UID</span>
                         <code className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">
-                          {selectedUser.auth_uid}
+                          {selectedUser.id}
                         </code>
                       </div>
                     </div>

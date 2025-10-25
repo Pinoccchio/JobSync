@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Eye, CheckCircle, XCircle, FileText } from 'lucide-react';
 
 export default function ScannedRecordsPage() {
@@ -56,18 +56,18 @@ export default function ScannedRecordsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for applications
-  useTableRealtime(
-    'applications',
-    ['INSERT', 'UPDATE'],
-    null,
-    (payload) => {
-      console.log('Application updated:', payload);
-      showToast('New application detected', 'info');
-      // TODO: Refresh data when real fetching is implemented
-      // fetchScannedRecords();
-    }
-  );
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime(
+  //   'applications',
+  //   ['INSERT', 'UPDATE'],
+  //   null,
+  //   (payload) => {
+  //     console.log('Application updated:', payload);
+  //     showToast('New application detected', 'info');
+  //     // TODO: Refresh data when real fetching is implemented
+  //     // fetchScannedRecords();
+  //   }
+  // );
 
   const columns = [
     { header: 'No.', accessor: 'no' as const },

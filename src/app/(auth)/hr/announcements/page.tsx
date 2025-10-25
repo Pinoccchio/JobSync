@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, Button, Input, Textarea, FileUpload, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone } from 'lucide-react';
 
 export default function AnnouncementsPage() {
@@ -75,11 +75,11 @@ export default function AnnouncementsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for announcements
-  useTableRealtime('announcements', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('Announcement updated', 'info');
-    // fetchAnnouncements(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('announcements', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('Announcement updated', 'info');
+  //   // fetchAnnouncements(); // Uncomment when real data
+  // });
 
   return (
     <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Announcements" pageDescription="Post job announcements and notices">

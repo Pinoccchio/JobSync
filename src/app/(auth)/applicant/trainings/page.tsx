@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button, Card, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { AdminLayout } from '@/components/layout';
 import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2 } from 'lucide-react';
 
@@ -83,11 +83,11 @@ export default function TrainingsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for training programs
-  useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('Training programs updated', 'info');
-    // fetchTrainings(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('Training programs updated', 'info');
+  //   // fetchTrainings(); // Uncomment when real data
+  // });
 
   const filteredTrainings = trainings.filter(training =>
     training.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

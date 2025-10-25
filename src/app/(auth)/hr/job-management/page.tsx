@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Plus, Edit, EyeOff, Trash2, Briefcase, GraduationCap, CheckCircle2, X } from 'lucide-react';
 
 export default function JobManagementPage() {
@@ -54,11 +54,11 @@ export default function JobManagementPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for jobs
-  useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('Job listing updated', 'info');
-    // fetchJobs(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('Job listing updated', 'info');
+  //   // fetchJobs(); // Uncomment when real data
+  // });
 
   const columns = [
     {

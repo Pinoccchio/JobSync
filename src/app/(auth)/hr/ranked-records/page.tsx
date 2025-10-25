@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Download, Trophy, Medal, Award, TrendingUp, User, Mail, Briefcase } from 'lucide-react';
 
 export default function RankedRecordsPage() {
@@ -90,17 +90,17 @@ export default function RankedRecordsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for ranking updates
-  useTableRealtime(
-    'applications',
-    ['UPDATE'],
-    'rank=not.null',
-    (payload) => {
-      console.log('Ranking updated:', payload);
-      showToast('Rankings updated in real-time', 'info');
-      // fetchRankedRecords(); // Uncomment when real fetching is implemented
-    }
-  );
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime(
+  //   'applications',
+  //   ['UPDATE'],
+  //   'rank=not.null',
+  //   (payload) => {
+  //     console.log('Ranking updated:', payload);
+  //     showToast('Rankings updated in real-time', 'info');
+  //     // fetchRankedRecords(); // Uncomment when real fetching is implemented
+  //   }
+  // );
 
   const extractedColumns = [
     { header: '#', accessor: 'no' as const },

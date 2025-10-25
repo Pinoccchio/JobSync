@@ -24,6 +24,7 @@ export interface UpdateUserRequest {
   full_name?: string;
   phone?: string;
   status?: 'active' | 'inactive';
+  reason?: string;
 }
 
 export interface UserListResponse {

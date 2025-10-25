@@ -5,7 +5,7 @@ import { Button, Card, ApplicationModal, Container, Badge, RefreshButton } from 
 import { AdminLayout } from '@/components/layout';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { ChevronLeft, ChevronRight, Briefcase, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 
 interface Job {
@@ -66,11 +66,11 @@ export default function AuthenticatedJobsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for jobs
-  useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('Job listings updated', 'info');
-    // fetchJobs(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('Job listings updated', 'info');
+  //   // fetchJobs(); // Uncomment when real data
+  // });
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % jobs.length);

@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTableRealtime } from '@/hooks/useTableRealtime';
+// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock } from 'lucide-react';
 
 export default function PESOApplicationsPage() {
@@ -58,11 +58,11 @@ export default function PESOApplicationsPage() {
     }
   }, [showToast]);
 
-  // Real-time subscription for training applications
-  useTableRealtime('training_applications', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-    showToast('Training application updated', 'info');
-    // fetchApplications(); // Uncomment when real data
-  });
+  // REMOVED: Real-time subscription disabled for performance
+  // useTableRealtime('training_applications', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
+  //   showToast('Training application updated', 'info');
+  //   // fetchApplications(); // Uncomment when real data
+  // });
 
   const columns = [
     {

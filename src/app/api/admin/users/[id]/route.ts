@@ -108,8 +108,11 @@ export async function PATCH(
       );
     }
 
-    // Update user
-    const result = await updateUserProfile(userId, body);
+    // Extract reason from body (used only for logging, not for profile update)
+    const { reason, ...profileUpdates } = body;
+
+    // Update user profile (without reason field)
+    const result = await updateUserProfile(userId, profileUpdates);
 
     // Log activity using specialized functions
     if (body.status === 'inactive') {
@@ -117,14 +120,14 @@ export async function PATCH(
       await ActivityLogger.adminDeactivateUser(
         user.id,
         userId,
-        body.full_name ? `Profile updated during deactivation` : undefined
+        body.reason || undefined
       );
     } else if (body.status === 'active') {
       // Activation
       await ActivityLogger.adminActivateUser(
         user.id,
         userId,
-        body.full_name ? `Profile updated during activation` : undefined
+        body.reason || undefined
       );
     } else {
       // Other updates (name, phone) - use generic logging
