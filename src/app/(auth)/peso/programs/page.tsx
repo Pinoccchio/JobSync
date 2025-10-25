@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useCallback } from 'react';
+import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
@@ -247,8 +248,8 @@ export default function PESOProgramsPage() {
                 {/* Modal Header */}
                 <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                      <GraduationCap className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                      <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">Create Training Program</h2>
@@ -257,7 +258,7 @@ export default function PESOProgramsPage() {
                   </div>
                   <button
                     onClick={() => setShowAddModal(false)}
-                    className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-colors"
+                    className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                   >
                     <X className="w-5 h-5" />
                   </button>

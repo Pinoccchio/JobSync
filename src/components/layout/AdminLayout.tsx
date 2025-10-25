@@ -11,7 +11,8 @@ import {
   GraduationCap,
   BarChart3,
   Users,
-  Activity
+  Activity,
+  Database
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -26,6 +27,7 @@ const ADMIN_MENU_ITEMS = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
   { label: 'User Management', href: '/admin/user-management', icon: Users },
   { label: 'Activity Logs', href: '/admin/activity-logs', icon: Activity },
+  { label: 'Audit Trail', href: '/admin/audit-trail', icon: Database },
 ];
 
 const HR_MENU_ITEMS = [

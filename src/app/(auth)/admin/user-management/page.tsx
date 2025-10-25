@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
 import {
   Card, EnhancedTable, Button, Container, Badge, Input, RefreshButton,
@@ -645,8 +646,8 @@ export default function UserManagementPage() {
                 <div className="bg-gradient-to-r from-[#22A555] to-[#1a8244] p-6 rounded-t-xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <UserPlus className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Create Admin Account</h3>
@@ -658,7 +659,7 @@ export default function UserManagementPage() {
                         setShowCreateModal(false);
                         setFormData({ role: 'ADMIN', fullName: '', email: '', password: '' });
                       }}
-                      className="text-white/90 hover:text-white transition-colors"
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                     >
                       <X className="w-6 h-6" />
                     </button>
@@ -765,8 +766,8 @@ export default function UserManagementPage() {
                 <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <Trash2 className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Delete User Account</h3>
@@ -778,7 +779,7 @@ export default function UserManagementPage() {
                         setShowDeleteConfirm(false);
                         setUserToDelete(null);
                       }}
-                      className="text-white/90 hover:text-white transition-colors"
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                       disabled={isSubmitting}
                     >
                       <X className="w-6 h-6" />
@@ -867,12 +868,8 @@ export default function UserManagementPage() {
                 } p-6 rounded-t-xl`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        {statusChangeType === 'activate' ? (
-                          <CheckCircle2 className="w-5 h-5 text-white" />
-                        ) : (
-                          <UserX className="w-5 h-5 text-white" />
-                        )}
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">
@@ -887,7 +884,7 @@ export default function UserManagementPage() {
                         setUserToChangeStatus(null);
                         setStatusChangeReason('');
                       }}
-                      className="text-white/90 hover:text-white transition-colors"
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                       disabled={isSubmitting}
                     >
                       <X className="w-6 h-6" />
@@ -1009,8 +1006,8 @@ export default function UserManagementPage() {
                 <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-t-xl sticky top-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <Eye className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">User Account Details</h3>
@@ -1022,7 +1019,7 @@ export default function UserManagementPage() {
                         setShowDetailsModal(false);
                         setSelectedUser(null);
                       }}
-                      className="text-white/90 hover:text-white transition-colors"
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                     >
                       <X className="w-6 h-6" />
                     </button>

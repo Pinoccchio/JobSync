@@ -1,10 +1,11 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, EyeOff, Trash2, Briefcase, GraduationCap, CheckCircle2, X, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Edit, EyeOff, Trash2, Briefcase, GraduationCap, CheckCircle2, X, Loader2, AlertCircle, Eye, Archive, Filter } from 'lucide-react';
 
 interface Job {
   id: string;
@@ -27,18 +28,26 @@ export default function JobManagementPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
+  const [showUnhideConfirm, setShowUnhideConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
   const [jobToHide, setJobToHide] = useState<Job | null>(null);
+  const [jobToUnhide, setJobToUnhide] = useState<Job | null>(null);
+  const [jobToArchive, setJobToArchive] = useState<Job | null>(null);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [applicationCount, setApplicationCount] = useState<number>(0);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden' | 'archived'>('all');
 
   const [formData, setFormData] = useState({
     position: '',
     degree: '',
     eligibilities: '',
     skills: '',
-    experience: '',
+    experience: 'Entry Level (0-1 year)',
     location: 'Asuncion Municipal Hall',
+    remote: false,
     employment_type: 'Full-time',
     description: '',
   });
@@ -57,7 +66,7 @@ export default function JobManagementPage() {
           degree: job.degree_requirement,
           eligibilities: job.eligibilities.join(', '),
           skills: job.skills.join(', '),
-          experience: `${job.years_of_experience} years`,
+          experience: job.experience || `${job.min_years_experience}-${job.max_years_experience} years`,
           status: job.status === 'active' ? 'Active' : job.status === 'hidden' ? 'Hidden' : 'Archived',
           _raw: job
         })));
@@ -112,9 +121,11 @@ Employment Type: ${formData.employment_type}
           degree_requirement: formData.degree,
           eligibilities: formData.eligibilities.split(',').map(e => e.trim()).filter(Boolean),
           skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
-          years_of_experience: parseInt(formData.experience.replace(/\D/g, '')) || 0,
+          years_of_experience: 0, // Will be calculated from experience string in backend
+          experience: formData.experience,
           location: formData.location,
           employment_type: formData.employment_type,
+          remote: formData.remote,
         }),
       });
 
@@ -128,8 +139,9 @@ Employment Type: ${formData.employment_type}
           degree: '',
           eligibilities: '',
           skills: '',
-          experience: '',
+          experience: 'Entry Level (0-1 year)',
           location: 'Asuncion Municipal Hall',
+          remote: false,
           employment_type: 'Full-time',
           description: '',
         });
@@ -153,8 +165,9 @@ Employment Type: ${formData.employment_type}
       degree: job._raw.degree_requirement,
       eligibilities: job._raw.eligibilities.join(', '),
       skills: job._raw.skills.join(', '),
-      experience: `${job._raw.years_of_experience}`,
+      experience: job._raw.experience || `${job._raw.years_of_experience}`,
       location: job._raw.location || 'Asuncion Municipal Hall',
+      remote: job._raw.remote || false,
       employment_type: job._raw.employment_type || 'Full-time',
       description: job._raw.description || '',
     });
@@ -197,9 +210,11 @@ Employment Type: ${formData.employment_type}
           degree_requirement: formData.degree,
           eligibilities: formData.eligibilities.split(',').map(e => e.trim()).filter(Boolean),
           skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
-          years_of_experience: parseInt(formData.experience.replace(/\D/g, '')) || 0,
+          years_of_experience: 0, // Will be calculated from experience string in backend
+          experience: formData.experience,
           location: formData.location,
           employment_type: formData.employment_type,
+          remote: formData.remote,
         }),
       });
 
@@ -214,8 +229,9 @@ Employment Type: ${formData.employment_type}
           degree: '',
           eligibilities: '',
           skills: '',
-          experience: '',
+          experience: 'Entry Level (0-1 year)',
           location: 'Asuncion Municipal Hall',
+          remote: false,
           employment_type: 'Full-time',
           description: '',
         });
@@ -260,13 +276,42 @@ Employment Type: ${formData.employment_type}
     }
   };
 
-  // Delete job
-  const handleDelete = async () => {
-    if (!jobToDelete) return;
+  // Unhide job (restore to active)
+  const handleUnhide = async () => {
+    if (!jobToUnhide) return;
 
     try {
       setSubmitting(true);
-      const response = await fetch(`/api/jobs/${jobToDelete.id}`, {
+      const response = await fetch(`/api/jobs/${jobToUnhide.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Job restored to active successfully', 'success');
+        setShowUnhideConfirm(false);
+        setJobToUnhide(null);
+        fetchJobs();
+      } else {
+        showToast(result.error || 'Failed to restore job', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to restore job', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Archive job (soft delete)
+  const handleArchive = async () => {
+    if (!jobToArchive) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/jobs/${jobToArchive.id}`, {
         method: 'DELETE',
       });
 
@@ -274,16 +319,62 @@ Employment Type: ${formData.employment_type}
 
       if (result.success) {
         showToast(result.message || 'Job archived successfully', 'success');
-        setShowDeleteConfirm(false);
-        setJobToDelete(null);
+        setShowArchiveConfirm(false);
+        setJobToArchive(null);
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to delete job', 'error');
+        showToast(result.error || 'Failed to archive job', 'error');
       }
     } catch (error) {
-      showToast('Failed to delete job', 'error');
+      showToast('Failed to archive job', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Permanently delete job (hard delete)
+  const handlePermanentDelete = async () => {
+    if (!jobToDelete || deleteConfirmText !== 'DELETE') return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/jobs/${jobToDelete.id}?permanent=true`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const deletedMsg = result.deletedApplications > 0
+          ? `Job and ${result.deletedApplications} application(s) permanently deleted`
+          : 'Job permanently deleted';
+        showToast(deletedMsg, 'success');
+        setShowDeleteConfirm(false);
+        setJobToDelete(null);
+        setDeleteConfirmText('');
+        setApplicationCount(0);
+        fetchJobs();
+      } else {
+        showToast(result.error || 'Failed to permanently delete job', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to permanently delete job', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Fetch application count for a job
+  const fetchApplicationCount = async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/applications?job_id=${jobId}`);
+      const result = await response.json();
+      if (result.success) {
+        setApplicationCount(result.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching application count:', error);
+      setApplicationCount(0);
     }
   };
 
@@ -348,51 +439,148 @@ Employment Type: ${formData.employment_type}
     {
       header: 'Status',
       accessor: 'status' as const,
-      render: (value: string) => (
-        <Badge variant={value === 'Active' ? 'success' : value === 'Hidden' ? 'warning' : 'default'} icon={CheckCircle2}>
-          {value}
-        </Badge>
-      )
+      render: (value: string) => {
+        if (value === 'Active') {
+          return (
+            <Badge variant="success" icon={CheckCircle2} className="font-medium">
+              Active
+            </Badge>
+          );
+        } else if (value === 'Hidden') {
+          return (
+            <Badge variant="warning" icon={EyeOff} className="font-medium">
+              Hidden from Applicants
+            </Badge>
+          );
+        } else {
+          return (
+            <Badge variant="default" icon={Archive} className="font-medium">
+              Archived
+            </Badge>
+          );
+        }
+      }
     },
     {
       header: 'Actions',
       accessor: 'actions' as const,
-      render: (_: any, row: Job) => (
-        <div className="flex gap-2">
-          <Button
-            variant="warning"
-            size="sm"
-            icon={Edit}
-            onClick={() => handleEdit(row)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={EyeOff}
-            onClick={() => {
-              setJobToHide(row);
-              setShowHideConfirm(true);
-            }}
-          >
-            Hide
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            icon={Trash2}
-            onClick={() => {
-              setJobToDelete(row);
-              setShowDeleteConfirm(true);
-            }}
-          >
-            Delete
-          </Button>
-        </div>
-      )
+      render: (_: any, row: Job) => {
+        const isActive = row.status === 'Active';
+        const isHidden = row.status === 'Hidden';
+        const isArchived = row.status === 'Archived';
+
+        return (
+          <div className="flex gap-2">
+            {/* Edit - Available for Active and Hidden jobs */}
+            {!isArchived && (
+              <Button
+                variant="warning"
+                size="sm"
+                icon={Edit}
+                onClick={() => handleEdit(row)}
+                title="Edit job details"
+              >
+                Edit
+              </Button>
+            )}
+
+            {/* Hide/Unhide Toggle */}
+            {isActive && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={EyeOff}
+                onClick={() => {
+                  setJobToHide(row);
+                  setShowHideConfirm(true);
+                }}
+                title="Hide job from applicants"
+              >
+                Hide
+              </Button>
+            )}
+
+            {isHidden && (
+              <Button
+                variant="success"
+                size="sm"
+                icon={Eye}
+                onClick={() => {
+                  setJobToUnhide(row);
+                  setShowUnhideConfirm(true);
+                }}
+                title="Restore job to active"
+              >
+                Unhide
+              </Button>
+            )}
+
+            {/* Archive - Available for Active and Hidden */}
+            {!isArchived && (
+              <Button
+                variant="danger"
+                size="sm"
+                icon={Archive}
+                onClick={() => {
+                  setJobToArchive(row);
+                  setShowArchiveConfirm(true);
+                }}
+                title="Archive this job"
+              >
+                Archive
+              </Button>
+            )}
+
+            {/* Restore and Permanent Delete - Available for Archived jobs only */}
+            {isArchived && (
+              <>
+                <Button
+                  variant="success"
+                  size="sm"
+                  icon={CheckCircle2}
+                  onClick={() => {
+                    setJobToUnhide(row);
+                    setShowUnhideConfirm(true);
+                  }}
+                  title="Restore job to active"
+                >
+                  Restore
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={() => {
+                    setJobToDelete(row);
+                    fetchApplicationCount(row.id);
+                    setShowDeleteConfirm(true);
+                  }}
+                  title="Permanently delete this job"
+                >
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      }
     },
   ];
+
+  // Filter jobs based on status
+  const filteredJobs = jobs.filter(job => {
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'active') return job.status === 'Active';
+    if (statusFilter === 'hidden') return job.status === 'Hidden';
+    if (statusFilter === 'archived') return job.status === 'Archived';
+    return true;
+  });
+
+  // Calculate stats
+  const activeCount = jobs.filter(j => j.status === 'Active').length;
+  const hiddenCount = jobs.filter(j => j.status === 'Hidden').length;
+  const archivedCount = jobs.filter(j => j.status === 'Archived').length;
+  const totalCount = jobs.length;
 
   return (
     <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Job Management" pageDescription="Create and manage job postings">
@@ -407,42 +595,106 @@ Employment Type: ${formData.employment_type}
           </div>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Active Jobs */}
             <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Active Job Postings</p>
-                  <p className="text-3xl font-bold text-gray-900">{jobs.filter(j => j.status === 'Active').length}</p>
+                  <p className="text-sm text-gray-600 mb-1">Active Jobs</p>
+                  <p className="text-3xl font-bold text-gray-900">{activeCount}</p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
-                  <Briefcase className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-
-            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Jobs</p>
-                  <p className="text-3xl font-bold text-gray-900">{jobs.length}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-
-            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Hidden/Archived</p>
-                  <p className="text-3xl font-bold text-gray-900">{jobs.filter(j => j.status !== 'Active').length}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
                   <CheckCircle2 className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
+
+            {/* Hidden Jobs */}
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Hidden Jobs</p>
+                  <p className="text-3xl font-bold text-gray-900">{hiddenCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <EyeOff className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            {/* Archived Jobs */}
+            <Card variant="flat" className="bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Archived Jobs</p>
+                  <p className="text-3xl font-bold text-gray-900">{archivedCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-gray-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Archive className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            {/* Total Jobs */}
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Jobs</p>
+                  <p className="text-3xl font-bold text-gray-900">{totalCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Briefcase className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                statusFilter === 'all'
+                  ? 'bg-[#22A555] text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-[#22A555] hover:bg-green-50'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              All Jobs ({totalCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('active')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                statusFilter === 'active'
+                  ? 'bg-green-500 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-green-500 hover:bg-green-50'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Active ({activeCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('hidden')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                statusFilter === 'hidden'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-orange-500 hover:bg-orange-50'
+              }`}
+            >
+              <EyeOff className="w-4 h-4" />
+              Hidden ({hiddenCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('archived')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                statusFilter === 'archived'
+                  ? 'bg-gray-500 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <Archive className="w-4 h-4" />
+              Archived ({archivedCount})
+            </button>
           </div>
 
           {/* Job Postings Table */}
@@ -452,10 +704,33 @@ Employment Type: ${formData.employment_type}
                 <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
                 <span className="ml-3 text-gray-600">Loading jobs...</span>
               </div>
+            ) : filteredJobs.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                  <Briefcase className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {statusFilter === 'all' && 'No jobs found'}
+                  {statusFilter === 'active' && 'No active jobs'}
+                  {statusFilter === 'hidden' && 'No hidden jobs'}
+                  {statusFilter === 'archived' && 'No archived jobs'}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {statusFilter === 'all' && 'Create your first job posting to get started'}
+                  {statusFilter === 'active' && 'All your active jobs will appear here'}
+                  {statusFilter === 'hidden' && 'Jobs you hide will appear here'}
+                  {statusFilter === 'archived' && 'Deleted jobs will appear here'}
+                </p>
+                {statusFilter === 'all' && (
+                  <Button variant="primary" icon={Plus} onClick={() => setShowAddModal(true)}>
+                    Add New Job
+                  </Button>
+                )}
+              </div>
             ) : (
               <EnhancedTable
                 columns={columns}
-                data={jobs}
+                data={filteredJobs}
                 searchable
                 searchPlaceholder="Search by position, skills, or requirements..."
               />
@@ -468,8 +743,8 @@ Employment Type: ${formData.employment_type}
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
                 <div className="bg-gradient-to-r from-[#22A555] to-[#1a8045] px-6 py-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center shadow-lg">
-                      <Briefcase className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg p-1.5">
+                      <Image src="/logo.jpg" alt="JobSync" width={48} height={48} className="rounded-lg object-cover" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">Create Job Post</h2>
@@ -478,7 +753,7 @@ Employment Type: ${formData.employment_type}
                   </div>
                   <button
                     onClick={() => setShowAddModal(false)}
-                    className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-all duration-200"
+                    className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                     disabled={submitting}
                   >
                     <X className="w-6 h-6" />
@@ -527,39 +802,74 @@ Employment Type: ${formData.employment_type}
                       disabled={submitting}
                     />
 
-                    <Input
-                      label="Years of Experience Required"
-                      type="number"
-                      value={formData.experience}
-                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                      placeholder="e.g., 2"
-                      required
-                      disabled={submitting}
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Experience Level <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.experience}
+                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
+                        required
+                        disabled={submitting}
+                      >
+                        <option value="Entry Level (0-1 year)">Entry Level (0-1 year)</option>
+                        <option value="Junior (1-3 years)">Junior (1-3 years)</option>
+                        <option value="Mid-level (3-5 years)">Mid-level (3-5 years)</option>
+                        <option value="Senior (5-8 years)">Senior (5-8 years)</option>
+                        <option value="Lead (8+ years)">Lead (8+ years)</option>
+                        <option value="Expert (10+ years)">Expert (10+ years)</option>
+                      </select>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        label="Location"
-                        type="text"
-                        value={formData.location}
-                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                        disabled={submitting}
-                      />
+                      <div>
+                        <Input
+                          label="Location"
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          disabled={submitting}
+                        />
+                        <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.remote}
+                            onChange={(e) => setFormData({ ...formData, remote: e.target.checked })}
+                            className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
+                            disabled={submitting}
+                          />
+                          <span>Remote work available</span>
+                        </label>
+                      </div>
 
-                      <Input
-                        label="Employment Type"
-                        type="text"
-                        value={formData.employment_type}
-                        onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
-                        disabled={submitting}
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Employment Type <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={formData.employment_type}
+                          onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
+                          required
+                          disabled={submitting}
+                        >
+                          <option value="Full-time">Full-time</option>
+                          <option value="Part-time">Part-time</option>
+                          <option value="Contract">Contract</option>
+                          <option value="Temporary">Temporary</option>
+                          <option value="Internship">Internship</option>
+                          <option value="Casual">Casual</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div className="flex gap-3 pt-4 border-t border-gray-200">
                       <Button
                         type="submit"
                         variant="success"
-                        icon={submitting ? Loader2 : Plus}
+                        icon={Plus}
+                        loading={submitting}
                         className="flex-1"
                         disabled={submitting}
                       >
@@ -588,8 +898,8 @@ Employment Type: ${formData.employment_type}
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
                 <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center shadow-lg">
-                      <Edit className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg p-1.5">
+                      <Image src="/logo.jpg" alt="JobSync" width={48} height={48} className="rounded-lg object-cover" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">Edit Job Post</h2>
@@ -601,7 +911,7 @@ Employment Type: ${formData.employment_type}
                       setShowEditModal(false);
                       setEditingJob(null);
                     }}
-                    className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-all duration-200"
+                    className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                     disabled={submitting}
                   >
                     <X className="w-6 h-6" />
@@ -650,39 +960,74 @@ Employment Type: ${formData.employment_type}
                       disabled={submitting}
                     />
 
-                    <Input
-                      label="Years of Experience Required"
-                      type="number"
-                      value={formData.experience}
-                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                      placeholder="e.g., 2"
-                      required
-                      disabled={submitting}
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Experience Level <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.experience}
+                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
+                        required
+                        disabled={submitting}
+                      >
+                        <option value="Entry Level (0-1 year)">Entry Level (0-1 year)</option>
+                        <option value="Junior (1-3 years)">Junior (1-3 years)</option>
+                        <option value="Mid-level (3-5 years)">Mid-level (3-5 years)</option>
+                        <option value="Senior (5-8 years)">Senior (5-8 years)</option>
+                        <option value="Lead (8+ years)">Lead (8+ years)</option>
+                        <option value="Expert (10+ years)">Expert (10+ years)</option>
+                      </select>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        label="Location"
-                        type="text"
-                        value={formData.location}
-                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                        disabled={submitting}
-                      />
+                      <div>
+                        <Input
+                          label="Location"
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          disabled={submitting}
+                        />
+                        <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.remote}
+                            onChange={(e) => setFormData({ ...formData, remote: e.target.checked })}
+                            className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
+                            disabled={submitting}
+                          />
+                          <span>Remote work available</span>
+                        </label>
+                      </div>
 
-                      <Input
-                        label="Employment Type"
-                        type="text"
-                        value={formData.employment_type}
-                        onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
-                        disabled={submitting}
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Employment Type <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={formData.employment_type}
+                          onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
+                          required
+                          disabled={submitting}
+                        >
+                          <option value="Full-time">Full-time</option>
+                          <option value="Part-time">Part-time</option>
+                          <option value="Contract">Contract</option>
+                          <option value="Temporary">Temporary</option>
+                          <option value="Internship">Internship</option>
+                          <option value="Casual">Casual</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div className="flex gap-3 pt-4 border-t border-gray-200">
                       <Button
                         type="submit"
                         variant="warning"
-                        icon={submitting ? Loader2 : Edit}
+                        icon={Edit}
+                        loading={submitting}
                         className="flex-1"
                         disabled={submitting}
                       >
@@ -716,8 +1061,8 @@ Employment Type: ${formData.employment_type}
                 <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-6 rounded-t-xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <EyeOff className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Hide Job Posting</h3>
@@ -729,7 +1074,7 @@ Employment Type: ${formData.employment_type}
                         setShowHideConfirm(false);
                         setJobToHide(null);
                       }}
-                      className="text-white/90 hover:text-white transition-colors"
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                       disabled={submitting}
                     >
                       <X className="w-6 h-6" />
@@ -793,7 +1138,8 @@ Employment Type: ${formData.employment_type}
                     </Button>
                     <Button
                       variant="warning"
-                      icon={submitting ? Loader2 : EyeOff}
+                      icon={EyeOff}
+                      loading={submitting}
                       onClick={handleHide}
                       className="flex-1"
                       disabled={submitting}
@@ -806,28 +1152,28 @@ Employment Type: ${formData.employment_type}
             </div>
           )}
 
-          {/* Delete Confirmation Modal */}
-          {showDeleteConfirm && jobToDelete && (
+          {/* Archive Confirmation Modal */}
+          {showArchiveConfirm && jobToArchive && (
             <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
                 {/* Modal Header */}
-                <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-xl">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-t-xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <Trash2 className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-white">Delete Job Posting</h3>
-                        <p className="text-sm text-white/90">This action cannot be undone</p>
+                        <h3 className="text-xl font-bold text-white">Archive Job Posting</h3>
+                        <p className="text-sm text-white/90">Job will be hidden but can be restored</p>
                       </div>
                     </div>
                     <button
                       onClick={() => {
-                        setShowDeleteConfirm(false);
-                        setJobToDelete(null);
+                        setShowArchiveConfirm(false);
+                        setJobToArchive(null);
                       }}
-                      className="text-white/90 hover:text-white transition-colors"
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
                       disabled={submitting}
                     >
                       <X className="w-6 h-6" />
@@ -837,28 +1183,121 @@ Employment Type: ${formData.employment_type}
 
                 {/* Modal Body */}
                 <div className="p-6 space-y-4">
-                  {/* Warning Message */}
-                  <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                  {/* Info Message */}
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-red-800 mb-1">Warning: Permanent Archiving</p>
-                        <p className="text-sm text-red-700">
-                          You are about to permanently archive this job posting. This will:
+                        <p className="font-semibold text-blue-800 mb-1">Archiving Job</p>
+                        <p className="text-sm text-blue-700">
+                          This job will be archived and hidden from applicants. You can restore it later from the Archived tab.
                         </p>
-                        <ul className="text-sm text-red-700 list-disc list-inside mt-2 space-y-1">
-                          <li>Remove the job from all active listings</li>
-                          <li>Prevent new applications</li>
-                          <li>Archive all related data</li>
-                          <li>This cannot be undone</li>
-                        </ul>
                       </div>
                     </div>
                   </div>
 
                   {/* Job Info */}
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-2">Job to be deleted:</p>
+                    <p className="text-sm text-gray-600 mb-2">Job to be archived:</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium text-gray-900">{jobToArchive.position}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-700">{jobToArchive.degree}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowArchiveConfirm(false);
+                        setJobToArchive(null);
+                      }}
+                      className="flex-1"
+                      disabled={submitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      icon={Archive}
+                      loading={submitting}
+                      onClick={handleArchive}
+                      className="flex-1"
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Archiving...' : 'Archive Job'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Permanent Delete Confirmation Modal */}
+          {showDeleteConfirm && jobToDelete && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+                {/* Modal Header */}
+                <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 rounded-t-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">⚠️ Permanently Delete Job</h3>
+                        <p className="text-sm text-white/90">This action CANNOT be undone!</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setJobToDelete(null);
+                        setDeleteConfirmText('');
+                        setApplicationCount(0);
+                      }}
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                      disabled={submitting}
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-6 space-y-4">
+                  {/* Critical Warning Message */}
+                  <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-red-900 mb-1">⚠️ CRITICAL WARNING</p>
+                        <p className="text-sm text-red-800 font-semibold mb-2">
+                          You are about to PERMANENTLY DELETE this job posting from the database.
+                        </p>
+                        <p className="text-sm text-red-700 mb-2">This will permanently delete:</p>
+                        <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
+                          <li>The job posting: <span className="font-semibold">{jobToDelete.position}</span></li>
+                          <li className="font-bold text-red-900">ALL {applicationCount} application(s) for this job</li>
+                          <li>All historical data and records</li>
+                        </ul>
+                        <p className="text-sm text-red-900 font-bold mt-3">
+                          This action is IRREVERSIBLE and cannot be undone!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Job Info */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-300">
+                    <p className="text-sm text-gray-600 mb-2 font-semibold">Job to be permanently deleted:</p>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Briefcase className="w-4 h-4 text-gray-400" />
@@ -868,10 +1307,120 @@ Employment Type: ${formData.employment_type}
                         <GraduationCap className="w-4 h-4 text-gray-400" />
                         <span className="text-sm text-gray-700">{jobToDelete.degree}</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Confirmation Input */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-900">
+                      Type <span className="text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">DELETE</span> to confirm permanent deletion:
+                    </label>
+                    <Input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="Type DELETE to confirm"
+                      className="font-mono"
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setJobToDelete(null);
+                        setDeleteConfirmText('');
+                        setApplicationCount(0);
+                      }}
+                      className="flex-1"
+                      disabled={submitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      icon={Trash2}
+                      loading={submitting}
+                      onClick={handlePermanentDelete}
+                      className="flex-1"
+                      disabled={submitting || deleteConfirmText !== 'DELETE'}
+                    >
+                      {submitting ? 'Deleting...' : 'Permanently Delete'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Unhide Confirmation Modal */}
+          {showUnhideConfirm && jobToUnhide && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+                {/* Modal Header */}
+                <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-t-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Restore Job Posting</h3>
+                        <p className="text-sm text-white/90">Make job visible to applicants</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowUnhideConfirm(false);
+                        setJobToUnhide(null);
+                      }}
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                      disabled={submitting}
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-6 space-y-4">
+                  {/* Info Message */}
+                  <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-green-800 mb-1">Restore Job to Active</p>
+                        <p className="text-sm text-green-700">
+                          This will make the job posting visible and allow applicants to view and apply.
+                        </p>
+                        <ul className="text-sm text-green-700 list-disc list-inside mt-2 space-y-1">
+                          <li>Job will appear in public listings</li>
+                          <li>Applicants can apply to this position</li>
+                          <li>Previous applications will be retained</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Job Info */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-2">Job to be restored:</p>
+                    <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-gray-400" />
-                        <Badge variant={jobToDelete.status === 'Active' ? 'success' : 'warning'} className="text-xs">
-                          {jobToDelete.status}
+                        <Briefcase className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium text-gray-900">{jobToUnhide.position}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-700">{jobToUnhide.degree}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <EyeOff className="w-4 h-4 text-gray-400" />
+                        <Badge variant="warning" className="text-xs">
+                          {jobToUnhide.status}
                         </Badge>
                       </div>
                     </div>
@@ -882,8 +1431,8 @@ Employment Type: ${formData.employment_type}
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        setShowDeleteConfirm(false);
-                        setJobToDelete(null);
+                        setShowUnhideConfirm(false);
+                        setJobToUnhide(null);
                       }}
                       className="flex-1"
                       disabled={submitting}
@@ -891,13 +1440,14 @@ Employment Type: ${formData.employment_type}
                       Cancel
                     </Button>
                     <Button
-                      variant="danger"
-                      icon={submitting ? Loader2 : Trash2}
-                      onClick={handleDelete}
+                      variant="success"
+                      icon={Eye}
+                      loading={submitting}
+                      onClick={handleUnhide}
                       className="flex-1"
                       disabled={submitting}
                     >
-                      {submitting ? 'Deleting...' : 'Delete Job'}
+                      {submitting ? 'Restoring...' : 'Restore Job'}
                     </Button>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { notifyAdmins, notifyHR, notifyJobApplicants } from '@/lib/notifications';
 
 /**
  * Job Management API - Individual Job Operations
@@ -29,8 +30,12 @@ export async function GET(
         eligibilities,
         skills,
         years_of_experience,
+        min_years_experience,
+        max_years_experience,
+        experience,
         location,
         employment_type,
+        remote,
         status,
         created_by,
         created_at,
@@ -202,6 +207,48 @@ export async function PATCH(
       updateData.employment_type = body.employment_type || null;
     }
 
+    if (body.remote !== undefined) {
+      updateData.remote = body.remote || false;
+    }
+
+    if (body.experience !== undefined) {
+      updateData.experience = body.experience || null;
+
+      // Map experience level string to min/max range and midpoint
+      if (body.experience) {
+        if (body.experience.includes('Entry Level')) {
+          updateData.min_years_experience = 0;
+          updateData.max_years_experience = 1;
+          updateData.years_of_experience = 1;
+        }
+        else if (body.experience.includes('Junior')) {
+          updateData.min_years_experience = 1;
+          updateData.max_years_experience = 3;
+          updateData.years_of_experience = 2;
+        }
+        else if (body.experience.includes('Mid-level')) {
+          updateData.min_years_experience = 3;
+          updateData.max_years_experience = 5;
+          updateData.years_of_experience = 4;
+        }
+        else if (body.experience.includes('Senior')) {
+          updateData.min_years_experience = 5;
+          updateData.max_years_experience = 8;
+          updateData.years_of_experience = 6;
+        }
+        else if (body.experience.includes('Lead')) {
+          updateData.min_years_experience = 8;
+          updateData.max_years_experience = 15;
+          updateData.years_of_experience = 10;
+        }
+        else if (body.experience.includes('Expert')) {
+          updateData.min_years_experience = 10;
+          updateData.max_years_experience = 99;
+          updateData.years_of_experience = 15;
+        }
+      }
+    }
+
     if (body.status !== undefined) {
       if (!['active', 'hidden', 'archived'].includes(body.status)) {
         return NextResponse.json(
@@ -231,6 +278,74 @@ export async function PATCH(
       );
     }
 
+    // 7. Log activity
+    try {
+      // If status changed, log status change specifically
+      if (body.status && body.status !== existingJob.status) {
+        await supabase.rpc('log_job_status_changed', {
+          p_user_id: user.id,
+          p_job_id: id,
+          p_old_status: existingJob.status,
+          p_new_status: body.status,
+          p_metadata: {
+            job_title: updatedJob.title,
+            action: body.status === 'hidden' ? 'hide' : body.status === 'active' ? 'unhide' : 'status_change',
+          }
+        });
+      } else {
+        // Log general update
+        await supabase.rpc('log_job_updated', {
+          p_user_id: user.id,
+          p_job_id: id,
+          p_metadata: {
+            job_title: updatedJob.title,
+            updated_fields: Object.keys(updateData).filter(key => key !== 'updated_at'),
+            old_title: existingJob.title,
+          }
+        });
+      }
+    } catch (logError) {
+      console.error('Error logging job update:', logError);
+      // Don't fail the request if logging fails
+    }
+
+    // 8. Send notifications
+    try {
+      // Notify HR user (confirmation of their own action)
+      await notifyHR(user.id, {
+        type: 'system',
+        title: 'Job Updated Successfully',
+        message: `Your job posting "${updatedJob.title}" has been updated`,
+        related_entity_type: 'job',
+        related_entity_id: id,
+        link_url: `/hr/job-management`,
+      });
+
+      // Notify all admins that HR updated a job
+      await notifyAdmins({
+        type: 'system',
+        title: 'Job Updated',
+        message: `HR user updated the job: "${updatedJob.title}"`,
+        related_entity_type: 'job',
+        related_entity_id: id,
+        link_url: `/admin/user-management`,
+      });
+
+      // If job status changed to archived/hidden, notify applicants
+      if (body.status && body.status !== 'active' && existingJob.status === 'active') {
+        await notifyJobApplicants(id, {
+          type: 'system',
+          title: `Job Posting ${body.status === 'archived' ? 'Closed' : 'Updated'}`,
+          message: `The job "${updatedJob.title}" has been ${body.status === 'archived' ? 'closed' : 'temporarily hidden'}`,
+          related_entity_type: 'job',
+          related_entity_id: id,
+        });
+      }
+    } catch (notifError) {
+      console.error('Error sending job update notifications:', notifError);
+      // Don't fail the request if notifications fail
+    }
+
     // TODO: If job requirements changed, trigger re-ranking of applicants
     // This will be implemented in Phase 10 (AI Ranking)
 
@@ -249,7 +364,8 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/jobs/[id] - Archive job (soft delete)
+// DELETE /api/jobs/[id] - Archive job (soft delete) or permanently delete
+// Query params: ?permanent=true for hard delete
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -257,6 +373,10 @@ export async function DELETE(
   try {
     const supabase = await createClient();
     const { id } = await params;
+
+    // Check if this is a permanent delete request
+    const searchParams = request.nextUrl.searchParams;
+    const isPermanent = searchParams.get('permanent') === 'true';
 
     // 1. Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -293,7 +413,7 @@ export async function DELETE(
     // 4. Get existing job to verify ownership
     const { data: existingJob, error: fetchError } = await supabase
       .from('jobs')
-      .select('id, created_by, title')
+      .select('id, created_by, title, status')
       .eq('id', id)
       .single();
 
@@ -318,9 +438,82 @@ export async function DELETE(
       );
     }
 
-    // 5. Soft delete: Update status to 'archived' instead of hard delete
+    // 5. Handle permanent deletion
+    if (isPermanent) {
+      // Safety check: Only allow permanent deletion of archived jobs
+      if (existingJob.status !== 'archived') {
+        return NextResponse.json(
+          { success: false, error: 'Jobs must be archived before permanent deletion' },
+          { status: 400 }
+        );
+      }
+
+      // Count applications that will be deleted
+      const { count: applicationCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('job_id', id);
+
+      // PERMANENT DELETE: Remove from database
+      // This will CASCADE delete all applications due to FK constraint
+      const { error: deleteError } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error permanently deleting job:', deleteError);
+        return NextResponse.json(
+          { success: false, error: deleteError.message },
+          { status: 500 }
+        );
+      }
+
+      // Log permanent deletion
+      try {
+        await supabase.rpc('log_job_deleted', {
+          p_user_id: user.id,
+          p_job_id: id,
+          p_metadata: {
+            job_title: existingJob.title,
+            permanent: true,
+            applications_deleted: applicationCount || 0,
+            warning: 'PERMANENT DELETION - All data removed from database',
+          }
+        });
+      } catch (logError) {
+        console.error('Error logging permanent job deletion:', logError);
+      }
+
+      // Send notifications for permanent deletion
+      try {
+        // Notify HR user (confirmation)
+        await notifyHR(user.id, {
+          type: 'system',
+          title: 'Job Permanently Deleted',
+          message: `The job "${existingJob.title}" has been permanently deleted from the system`,
+        });
+
+        // Notify all admins
+        await notifyAdmins({
+          type: 'system',
+          title: 'Job Permanently Deleted',
+          message: `HR user permanently deleted the job: "${existingJob.title}" (${applicationCount || 0} applications removed)`,
+        });
+      } catch (notifError) {
+        console.error('Error sending permanent deletion notifications:', notifError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Job "${existingJob.title}" permanently deleted`,
+        deletedApplications: applicationCount || 0,
+      });
+    }
+
+    // 6. Soft delete (default): Update status to 'archived'
     // This preserves all applications and data for historical records
-    const { error: deleteError } = await supabase
+    const { error: archiveError } = await supabase
       .from('jobs')
       .update({
         status: 'archived',
@@ -328,12 +521,63 @@ export async function DELETE(
       })
       .eq('id', id);
 
-    if (deleteError) {
-      console.error('Error archiving job:', deleteError);
+    if (archiveError) {
+      console.error('Error archiving job:', archiveError);
       return NextResponse.json(
-        { success: false, error: deleteError.message },
+        { success: false, error: archiveError.message },
         { status: 500 }
       );
+    }
+
+    // Log archive operation (status change)
+    try {
+      await supabase.rpc('log_job_status_changed', {
+        p_user_id: user.id,
+        p_job_id: id,
+        p_old_status: existingJob.status,
+        p_new_status: 'archived',
+        p_metadata: {
+          job_title: existingJob.title,
+          action: 'archive',
+          reversible: true,
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging job archive:', logError);
+    }
+
+    // Send notifications for archiving
+    try {
+      // Notify HR user (confirmation)
+      await notifyHR(user.id, {
+        type: 'system',
+        title: 'Job Archived Successfully',
+        message: `The job "${existingJob.title}" has been archived`,
+        related_entity_type: 'job',
+        related_entity_id: id,
+        link_url: `/hr/job-management`,
+      });
+
+      // Notify all admins
+      await notifyAdmins({
+        type: 'system',
+        title: 'Job Archived',
+        message: `HR user archived the job: "${existingJob.title}"`,
+        related_entity_type: 'job',
+        related_entity_id: id,
+        link_url: `/admin/user-management`,
+      });
+
+      // Notify applicants that the job is closed
+      await notifyJobApplicants(id, {
+        type: 'system',
+        title: 'Job Posting Closed',
+        message: `The job "${existingJob.title}" has been closed and is no longer accepting applications`,
+        related_entity_type: 'job',
+        related_entity_id: id,
+      });
+    } catch (notifError) {
+      console.error('Error sending job archive notifications:', notifError);
     }
 
     return NextResponse.json({

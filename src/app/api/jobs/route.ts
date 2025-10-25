@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { notifyAdmins, notifyHR } from '@/lib/notifications';
 
 /**
  * Job Management API Routes
@@ -36,8 +37,12 @@ export async function GET(request: NextRequest) {
         eligibilities,
         skills,
         years_of_experience,
+        min_years_experience,
+        max_years_experience,
+        experience,
         location,
         employment_type,
+        remote,
         status,
         created_by,
         created_at,
@@ -147,6 +152,8 @@ export async function POST(request: NextRequest) {
       years_of_experience = 0,
       location,
       employment_type,
+      remote = false,
+      experience = null,
     } = body;
 
     if (!title || !description || !degree_requirement) {
@@ -192,6 +199,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Map experience level string to min/max range and midpoint
+    let minYears = 0;
+    let maxYears = 1;
+    let experienceYears = years_of_experience;
+
+    if (experience) {
+      if (experience.includes('Entry Level')) {
+        minYears = 0;
+        maxYears = 1;
+        experienceYears = 1;
+      }
+      else if (experience.includes('Junior')) {
+        minYears = 1;
+        maxYears = 3;
+        experienceYears = 2;
+      }
+      else if (experience.includes('Mid-level')) {
+        minYears = 3;
+        maxYears = 5;
+        experienceYears = 4;
+      }
+      else if (experience.includes('Senior')) {
+        minYears = 5;
+        maxYears = 8;
+        experienceYears = 6;
+      }
+      else if (experience.includes('Lead')) {
+        minYears = 8;
+        maxYears = 15;
+        experienceYears = 10;
+      }
+      else if (experience.includes('Expert')) {
+        minYears = 10;
+        maxYears = 99;
+        experienceYears = 15;
+      }
+    }
+
     // 6. Insert job into database
     const { data: job, error: insertError } = await supabase
       .from('jobs')
@@ -201,9 +246,13 @@ export async function POST(request: NextRequest) {
         degree_requirement,
         eligibilities,
         skills,
-        years_of_experience,
+        years_of_experience: experienceYears,
+        min_years_experience: minYears,
+        max_years_experience: maxYears,
+        experience: experience || null,
         location: location || null,
         employment_type: employment_type || null,
+        remote: remote || false,
         status: 'active', // New jobs are active by default
         created_by: user.id,
       })
@@ -216,6 +265,52 @@ export async function POST(request: NextRequest) {
         { success: false, error: insertError.message },
         { status: 500 }
       );
+    }
+
+    // 7. Log activity
+    try {
+      await supabase.rpc('log_job_created', {
+        p_user_id: user.id,
+        p_job_id: job.id,
+        p_metadata: {
+          job_title: job.title,
+          degree_requirement: job.degree_requirement,
+          skills: job.skills,
+          eligibilities: job.eligibilities,
+          years_of_experience: job.years_of_experience,
+          location: job.location,
+          employment_type: job.employment_type,
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging job creation:', logError);
+      // Don't fail the request if logging fails
+    }
+
+    // 8. Send notifications
+    try {
+      // Notify HR user (confirmation of their own action)
+      await notifyHR(user.id, {
+        type: 'system',
+        title: 'Job Posted Successfully',
+        message: `Your job posting "${job.title}" has been created and is now active`,
+        related_entity_type: 'job',
+        related_entity_id: job.id,
+        link_url: `/hr/job-management`,
+      });
+
+      // Notify all admins that HR created a job
+      await notifyAdmins({
+        type: 'system',
+        title: 'New Job Posted',
+        message: `HR user ${profile.role === 'HR' ? 'created' : 'posted'} a new job: "${job.title}"`,
+        related_entity_type: 'job',
+        related_entity_id: job.id,
+        link_url: `/admin/user-management`,
+      });
+    } catch (notifError) {
+      console.error('Error sending job creation notifications:', notifError);
+      // Don't fail the request if notifications fail
     }
 
     return NextResponse.json({

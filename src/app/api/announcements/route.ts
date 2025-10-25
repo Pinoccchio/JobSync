@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { notifyAdmins, notifyHR } from '@/lib/notifications';
 
 /**
  * Announcements Management API Routes
@@ -191,6 +192,48 @@ export async function POST(request: NextRequest) {
         { success: false, error: createError.message },
         { status: 500 }
       );
+    }
+
+    // 7. Log activity
+    try {
+      await supabase.rpc('log_announcement_created', {
+        p_user_id: user.id,
+        p_announcement_id: announcement.id,
+        p_metadata: {
+          announcement_title: announcement.title,
+          category: announcement.category,
+          has_image: !!announcement.image_url,
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging announcement creation:', logError);
+      // Don't fail the request if logging fails
+    }
+
+    // 8. Send notifications
+    try {
+      // Notify HR user (confirmation of their own action)
+      await notifyHR(user.id, {
+        type: 'announcement',
+        title: 'Announcement Published Successfully',
+        message: `Your announcement "${announcement.title}" has been published`,
+        related_entity_type: 'announcement',
+        related_entity_id: announcement.id,
+        link_url: `/hr/announcements`,
+      });
+
+      // Notify all admins that HR created an announcement
+      await notifyAdmins({
+        type: 'announcement',
+        title: 'New Announcement Published',
+        message: `HR user published a new announcement: "${announcement.title}"`,
+        related_entity_type: 'announcement',
+        related_entity_id: announcement.id,
+        link_url: `/admin/user-management`,
+      });
+    } catch (notifError) {
+      console.error('Error sending announcement creation notifications:', notifError);
+      // Don't fail the request if notifications fail
     }
 
     return NextResponse.json(
