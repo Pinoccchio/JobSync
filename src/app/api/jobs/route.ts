@@ -46,7 +46,12 @@ export async function GET(request: NextRequest) {
         status,
         created_by,
         created_at,
-        updated_at
+        updated_at,
+        profiles:created_by (
+          id,
+          full_name,
+          role
+        )
       `)
       .order('created_at', { ascending: false });
 

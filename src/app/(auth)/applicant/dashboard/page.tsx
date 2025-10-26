@@ -66,86 +66,75 @@ export default function ApplicantDashboard() {
       setLoading(true);
     }
     try {
-      // Fetch active jobs count
-      const { count: activeJobs } = await supabase
-        .from('jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+      // Fetch active jobs count (global stat)
+      const activeJobsResponse = await fetch('/api/jobs?status=active');
+      const activeJobsData = await activeJobsResponse.json();
+      const activeJobs = activeJobsData.count || 0;
 
-      // Fetch active training programs count
-      const { count: trainingPrograms } = await supabase
-        .from('training_programs')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+      // Fetch active training programs count (global stat)
+      const trainingResponse = await fetch('/api/training/programs?status=active');
+      const trainingData = await trainingResponse.json();
+      const trainingPrograms = trainingData.count || 0;
 
-      // Fetch total applications count
-      const { count: totalApplications } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true });
+      // Fetch announcements
+      const announcementsResponse = await fetch('/api/announcements?status=active');
+      const announcementsData = await announcementsResponse.json();
+      const announcements = announcementsData.data || [];
 
-      // Fetch recent announcements (last 3)
-      const { data: announcementsData, error } = await supabase
-        .from('announcements')
-        .select('id, title, description, category, image_url, published_at')
-        .eq('status', 'active')
-        .order('published_at', { ascending: false })
-        .limit(3);
+      // Fetch user-specific job applications
+      const jobAppsResponse = await fetch('/api/applications');
+      const jobAppsData = await jobAppsResponse.json();
+      const jobApplications = jobAppsData.data || [];
 
-      if (error) {
-        console.error('Error fetching announcements:', error);
-      }
+      // Fetch user-specific training applications
+      const trainingAppsResponse = await fetch('/api/training/applications');
+      const trainingAppsData = await trainingAppsResponse.json();
+      const trainingApplications = trainingAppsData.data || [];
 
-      // Fetch pending applications count (for applicant's own applications)
-      const { count: pendingApplications } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+      // Calculate stats based on user's applications
+      const totalApplications = jobApplications.length + trainingApplications.length;
+      const pendingApplications = jobApplications.filter((app: any) => app.status === 'pending').length +
+        trainingApplications.filter((app: any) => app.status === 'pending').length;
+      const approvedApplications = jobApplications.filter((app: any) => app.status === 'approved').length +
+        trainingApplications.filter((app: any) => app.status === 'approved').length;
 
-      // Fetch approved applications count
-      const { count: approvedApplications } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved');
-
-      // Fetch recent applications (last 5)
-      // TODO: Filter by user_id when authentication is fully implemented
-      const { data: applicationsData } = await supabase
-        .from('applications')
-        .select('id, created_at, status')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      // Mock recent applications for now
-      const mockRecentApplications: RecentApplication[] = [
-        {
-          id: '1',
-          position: 'IT Assistant Technician',
-          type: 'Job Application',
-          dateApplied: new Date().toISOString(),
-          status: 'Pending Review',
-          matchScore: '96.1%'
-        },
-        {
-          id: '2',
-          position: 'Web Development Training',
-          type: 'Training Application',
-          dateApplied: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'Approved',
-        },
+      // Combine and format recent applications (last 5)
+      const allApplications = [
+        ...jobApplications.map((app: any) => ({
+          id: app.id,
+          position: app.jobs?.title || 'Unknown Position',
+          type: 'Job Application' as const,
+          dateApplied: app.created_at,
+          status: app.status === 'pending' ? 'Pending Review' : app.status === 'approved' ? 'Approved' : 'Disapproved',
+          matchScore: app.match_score ? `${app.match_score}%` : 'N/A'
+        })),
+        ...trainingApplications.map((app: any) => ({
+          id: app.id,
+          position: app.training_programs?.title || 'Unknown Program',
+          type: 'Training Application' as const,
+          dateApplied: app.submitted_at || app.created_at,
+          status: app.status === 'pending' ? 'Pending Review' : app.status === 'approved' ? 'Approved' : 'Disapproved',
+          matchScore: 'N/A'
+        }))
       ];
+
+      // Sort by date and take last 5
+      const recentApplications = allApplications
+        .sort((a, b) => new Date(b.dateApplied).getTime() - new Date(a.dateApplied).getTime())
+        .slice(0, 5);
 
       // Only update state if component is still mounted
       if (isMounted.current) {
         setStats({
-          activeJobs: activeJobs || 0,
-          trainingPrograms: trainingPrograms || 0,
-          totalApplications: totalApplications || 0,
-          pendingApplications: pendingApplications || 0,
-          approvedApplications: approvedApplications || 0,
+          activeJobs,
+          trainingPrograms,
+          totalApplications,
+          pendingApplications,
+          approvedApplications,
         });
 
-        setAnnouncements(announcementsData || []);
-        setRecentApplications(mockRecentApplications);
+        setAnnouncements(announcements.slice(0, 3));
+        setRecentApplications(recentApplications);
       }
     } catch (error) {
       console.error('❌ Error fetching applicant dashboard data:', error);

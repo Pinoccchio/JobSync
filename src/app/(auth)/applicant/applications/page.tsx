@@ -1,79 +1,98 @@
 'use client';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, EnhancedTable, Container, Badge, RefreshButton } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
-import { FileText, CheckCircle, XCircle, Clock, TrendingUp, Info } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, TrendingUp, Info, Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
+
+interface Application {
+  id: string;
+  position: string;
+  type: 'Job Application' | 'Training Application';
+  dateApplied: string;
+  status: 'Pending Review' | 'Approved' | 'Disapproved';
+  matchScore: string;
+}
 
 export default function MyApplicationsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
-
-  const [applications, setApplications] = useState([
-    {
-      id: 1,
-      position: 'IT Assistant Technician',
-      type: 'Job Application',
-      dateApplied: '2025-01-15',
-      status: 'Pending Review',
-      matchScore: '96.1%'
-    },
-    {
-      id: 2,
-      position: 'Web Development Training',
-      type: 'Training Application',
-      dateApplied: '2025-01-10',
-      status: 'Approved',
-      matchScore: 'N/A'
-    },
-    {
-      id: 3,
-      position: 'HR Officer',
-      type: 'Job Application',
-      dateApplied: '2025-01-05',
-      status: 'Disapproved',
-      matchScore: '78.5%'
-    },
-    {
-      id: 4,
-      position: 'Administrative Aide',
-      type: 'Job Application',
-      dateApplied: '2025-01-03',
-      status: 'Pending Review',
-      matchScore: '88.3%'
-    },
-    {
-      id: 5,
-      position: 'Digital Marketing Training',
-      type: 'Training Application',
-      dateApplied: '2024-12-28',
-      status: 'Approved',
-      matchScore: 'N/A'
-    },
-  ]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Fetch applications function
   const fetchApplications = useCallback(async () => {
     try {
-      // TODO: Real implementation
-      // const { data } = await supabase
-      //   .from('applications')
-      //   .select('*, jobs(*)')
-      //   .eq('applicant_id', user.id)
-      //   .order('created_at', { ascending: false });
+      setLoading(true);
+
+      // Fetch job applications
+      const jobAppsResponse = await fetch('/api/applications');
+      const jobAppsData = await jobAppsResponse.json();
+
+      if (!jobAppsResponse.ok) {
+        throw new Error(jobAppsData.error || 'Failed to fetch job applications');
+      }
+
+      const jobApplications = jobAppsData.data || [];
+
+      // Fetch training applications
+      const trainingAppsResponse = await fetch('/api/training/applications');
+      const trainingAppsData = await trainingAppsResponse.json();
+
+      if (!trainingAppsResponse.ok) {
+        throw new Error(trainingAppsData.error || 'Failed to fetch training applications');
+      }
+
+      const trainingApplications = trainingAppsData.data || [];
+
+      // Combine and format applications
+      const allApplications: Application[] = [
+        ...jobApplications.map((app: any) => ({
+          id: app.id,
+          position: app.jobs?.title || 'Unknown Position',
+          type: 'Job Application' as const,
+          dateApplied: app.created_at,
+          status: app.status === 'pending' ? 'Pending Review' : app.status === 'approved' ? 'Approved' : 'Disapproved',
+          matchScore: app.match_score ? `${app.match_score}%` : 'N/A'
+        })),
+        ...trainingApplications.map((app: any) => ({
+          id: app.id,
+          position: app.training_programs?.title || 'Unknown Program',
+          type: 'Training Application' as const,
+          dateApplied: app.submitted_at || app.created_at,
+          status: app.status === 'pending' ? 'Pending Review' : app.status === 'approved' ? 'Approved' : 'Disapproved',
+          matchScore: 'N/A'
+        }))
+      ];
+
+      // Sort by date (most recent first)
+      const sortedApplications = allApplications.sort((a, b) =>
+        new Date(b.dateApplied).getTime() - new Date(a.dateApplied).getTime()
+      );
+
+      setApplications(sortedApplications);
       showToast('Applications refreshed', 'success');
-    } catch (error) {
-      showToast('Failed to refresh applications', 'error');
+    } catch (error: any) {
+      console.error('Error fetching applications:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setLoading(false);
     }
   }, [showToast]);
+
+  // Fetch on mount
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
 
   // REMOVED: Real-time subscription disabled for performance
   // useTableRealtime('applications', ['INSERT', 'UPDATE'], `applicant_id=eq.${user?.id}`, () => {
   //   showToast('Application status updated', 'info');
-  //   // fetchApplications(); // Uncomment when real data
+  //   fetchApplications();
   // });
 
   const columns = [
@@ -140,6 +159,14 @@ export default function MyApplicationsPage() {
     // Export functionality would go here
   };
 
+  // Calculate stats
+  const stats = {
+    total: applications.length,
+    approved: applications.filter(a => a.status === 'Approved').length,
+    pending: applications.filter(a => a.status === 'Pending Review').length,
+    disapproved: applications.filter(a => a.status === 'Disapproved').length,
+  };
+
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="My Applications" pageDescription="Track the status of your job and training applications">
       <Container size="xl">
@@ -155,7 +182,9 @@ export default function MyApplicationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Applications</p>
-                  <p className="text-3xl font-bold text-gray-900">{applications.length}</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loading ? '...' : stats.total}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
                   <FileText className="w-6 h-6 text-white" />
@@ -168,7 +197,7 @@ export default function MyApplicationsPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Approved</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {applications.filter(a => a.status === 'Approved').length}
+                    {loading ? '...' : stats.approved}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
@@ -182,7 +211,7 @@ export default function MyApplicationsPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Pending Review</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {applications.filter(a => a.status === 'Pending Review').length}
+                    {loading ? '...' : stats.pending}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -196,7 +225,7 @@ export default function MyApplicationsPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Disapproved</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {applications.filter(a => a.status === 'Disapproved').length}
+                    {loading ? '...' : stats.disapproved}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -208,16 +237,29 @@ export default function MyApplicationsPage() {
 
           {/* Applications Table */}
           <Card title="APPLICATION HISTORY" headerColor="bg-[#D4F4DD]">
-            <EnhancedTable
-              columns={columns}
-              data={applications}
-              searchable
-              searchPlaceholder="Search applications..."
-              paginated
-              pageSize={10}
-              onExport={handleExport}
-              exportLabel="Export to Excel"
-            />
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+                <span className="ml-3 text-gray-600">Loading applications...</span>
+              </div>
+            ) : applications.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <p className="text-gray-600 font-medium">No applications yet</p>
+                <p className="text-sm text-gray-500 mt-2">Start by applying to available jobs and training programs</p>
+              </div>
+            ) : (
+              <EnhancedTable
+                columns={columns}
+                data={applications}
+                searchable
+                searchPlaceholder="Search applications..."
+                paginated
+                pageSize={10}
+                onExport={handleExport}
+                exportLabel="Export to Excel"
+              />
+            )}
           </Card>
 
           {/* Application Status Guide */}
