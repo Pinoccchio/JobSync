@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Container, Badge, RefreshButton, Modal } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/auth';
 import {
@@ -56,7 +57,7 @@ export default function AuditTrailPage() {
       showToast('Audit trail refreshed', 'success');
     } catch (error: any) {
       console.error('Failed to fetch audit trail:', error);
-      showToast(error.message || 'Failed to refresh audit trail', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsLoading(false);
     }

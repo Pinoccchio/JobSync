@@ -6,6 +6,7 @@ import { Button, Input } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -80,7 +81,11 @@ export default function LoginPage() {
       router.push(dashboardPath);
     } catch (error: any) {
       console.error('❌ Login error:', error);
-      showToast(error.message || 'Invalid credentials', 'error');
+
+      // Translate error to user-friendly message
+      const userFriendlyMessage = getErrorMessage(error);
+      showToast(userFriendlyMessage, 'error');
+
       setIsLoading(false);
     }
   };

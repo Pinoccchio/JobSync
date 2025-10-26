@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Edit, Trash2, GraduationCap, FileText, Clock, Users, Calendar, X, CheckCircle2, AlertCircle, Briefcase, Archive, Loader2, Filter, Undo2 } from 'lucide-react';
 
@@ -69,7 +70,7 @@ export default function PESOProgramsPage() {
       if (result.success) {
         setPrograms(result.data);
       } else {
-        showToast(result.error || 'Failed to fetch programs', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error fetching programs:', error);
@@ -131,7 +132,7 @@ export default function PESOProgramsPage() {
         resetForm();
         fetchPrograms();
       } else {
-        showToast(result.error || 'Failed to create program', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error creating program:', error);
@@ -188,7 +189,7 @@ export default function PESOProgramsPage() {
         resetForm();
         fetchPrograms();
       } else {
-        showToast(result.error || 'Failed to update program', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error updating program:', error);
@@ -227,7 +228,7 @@ export default function PESOProgramsPage() {
         setArchivingProgram(null);
         fetchPrograms();
       } else {
-        showToast(result.error || 'Failed to archive program', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error archiving program:', error);
@@ -266,7 +267,7 @@ export default function PESOProgramsPage() {
         setRestoringProgram(null);
         fetchPrograms();
       } else {
-        showToast(result.error || 'Failed to restore program', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error restoring program:', error);
@@ -300,7 +301,7 @@ export default function PESOProgramsPage() {
         setDeletingProgram(null);
         fetchPrograms();
       } else {
-        showToast(result.error || 'Failed to delete program', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error deleting program:', error);

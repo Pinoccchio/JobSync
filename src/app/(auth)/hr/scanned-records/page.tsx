@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileText, Loader2, Calendar, User, Briefcase } from 'lucide-react';
 
@@ -53,7 +54,7 @@ export default function ScannedRecordsPage() {
           }))
         );
       } else {
-        showToast(result.error || 'Failed to fetch applications', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error fetching records:', error);
@@ -95,7 +96,7 @@ export default function ScannedRecordsPage() {
       if (result.success) {
         window.open(result.data.signedUrl, '_blank');
       } else {
-        showToast(result.error || 'Failed to get download link', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error viewing PDS:', error);

@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Card, Container, Badge, RefreshButton, Modal, Input, Textarea } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { AdminLayout } from '@/components/layout';
@@ -67,7 +68,7 @@ export default function TrainingsPage() {
       showToast('Training programs refreshed', 'success');
     } catch (error: any) {
       console.error('Error fetching programs:', error);
-      showToast(error.message || 'Failed to fetch training programs', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setLoading(false);
     }
@@ -164,7 +165,7 @@ export default function TrainingsPage() {
       fetchUserApplications(); // Refresh applications list
     } catch (error: any) {
       console.error('Error submitting application:', error);
-      showToast(error.message || 'Failed to submit application', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setSubmitLoading(false);
     }

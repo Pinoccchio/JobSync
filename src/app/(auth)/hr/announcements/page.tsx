@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
 import { Card, Button, Input, Textarea, FileUploadWithProgress, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone, Loader2, Plus, Edit, TrendingUp, Briefcase, GraduationCap, Bell, FileText, X, Archive, Eye, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -58,7 +59,7 @@ export default function AnnouncementsPage() {
       if (result.success) {
         setAnnouncements(result.data);
       } else {
-        showToast(result.error || 'Failed to fetch announcements', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error fetching announcements:', error);
@@ -136,7 +137,7 @@ export default function AnnouncementsPage() {
         setShowCreateModal(false);
         fetchAnnouncements();
       } else {
-        showToast(result.error || 'Failed to post announcement', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error posting announcement:', error);
@@ -186,7 +187,7 @@ export default function AnnouncementsPage() {
         setEditingAnnouncement(null);
         fetchAnnouncements();
       } else {
-        showToast(result.error || 'Failed to update announcement', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error updating announcement:', error);
@@ -214,7 +215,7 @@ export default function AnnouncementsPage() {
         setAnnouncementToArchive(null);
         fetchAnnouncements();
       } else {
-        showToast(result.error || 'Failed to archive announcement', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error archiving announcement:', error);
@@ -250,7 +251,7 @@ export default function AnnouncementsPage() {
         setAnnouncementToRestore(null);
         fetchAnnouncements();
       } else {
-        showToast(result.error || 'Failed to restore announcement', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error restoring announcement:', error);
@@ -279,7 +280,7 @@ export default function AnnouncementsPage() {
         setDeleteConfirmText('');
         fetchAnnouncements();
       } else {
-        showToast(result.error || 'Failed to permanently delete announcement', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error permanently deleting announcement:', error);

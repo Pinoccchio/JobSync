@@ -233,6 +233,11 @@ export async function signupUser(signupData: SignupData): Promise<AuthResult<Sig
 
     console.log('✅ Signup complete, profile ID:', profile.id);
 
+    // Force logout after registration to prevent auto-login
+    // User must manually login after registration (INCLOUD pattern)
+    await supabase.auth.signOut();
+    console.log('🚪 User signed out - must login manually');
+
     return {
       success: true,
       data: {

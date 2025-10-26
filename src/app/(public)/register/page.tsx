@@ -6,6 +6,7 @@ import { Button, Input } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
 import { signupUser } from '@/lib/supabase/auth';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,7 +17,6 @@ export default function RegisterPage() {
     fullName: '',
     password: '',
     confirmPassword: '',
-    role: 'APPLICANT' as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT',
     agreeToTerms: false,
   });
 
@@ -75,11 +75,11 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      console.log('📝 Creating user account...');
+      console.log('📝 Creating applicant account...');
       console.log('📋 Registration details:', {
         email: formData.email,
         fullName: formData.fullName,
-        role: formData.role
+        role: 'APPLICANT'
       });
 
       // Use auth.ts signupUser function
@@ -87,7 +87,7 @@ export default function RegisterPage() {
         email: formData.email,
         password: formData.password,
         fullName: formData.fullName,
-        role: formData.role,
+        role: 'APPLICANT',
       });
 
       if (!result.success || !result.data) {
@@ -106,25 +106,16 @@ export default function RegisterPage() {
 
       const successMessage = result.data.emailConfirmationSent
         ? 'Account created! Please check your email to verify your account.'
-        : `Account created successfully as ${formData.role}! Please login to continue.`;
+        : 'Account created successfully! Please login to continue.';
 
       showToast(successMessage, 'success');
       router.push('/login');
     } catch (error: any) {
       console.error('❌ Registration error:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        name: error.name
-      });
 
-      // Handle specific server error messages (keep toast for these)
-      if (error.message?.includes('User already registered')) {
-        console.warn('⚠️ User already exists');
-        showToast('This email is already registered. Please login instead.', 'error');
-      } else {
-        // Show server errors in toast
-        showToast(error.message || 'Registration failed. Please try again.', 'error');
-      }
+      // Translate error to user-friendly message
+      const userFriendlyMessage = getErrorMessage(error);
+      showToast(userFriendlyMessage, 'error');
 
       setIsLoading(false);
     }
@@ -199,7 +190,7 @@ export default function RegisterPage() {
                 Create Account
               </h2>
               <p className="text-gray-600">
-                Join JobSync to find your perfect job match
+                Start your journey to finding government job opportunities in Asuncion
               </p>
             </div>
 
@@ -242,28 +233,6 @@ export default function RegisterPage() {
                   required
                   disabled={isLoading}
                 />
-              </div>
-
-              {/* Role Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Register As
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT' })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#22A555] transition-colors bg-white text-gray-900"
-                  disabled={isLoading}
-                  required
-                >
-                  <option value="APPLICANT">Applicant (Job Seeker)</option>
-                  <option value="HR">HR Admin (Municipal Hall)</option>
-                  <option value="PESO">PESO Admin (Training Programs)</option>
-                  <option value="ADMIN">System Administrator</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Select your role. Admins have full access to the system.
-                </p>
               </div>
 
               {/* Password Input */}

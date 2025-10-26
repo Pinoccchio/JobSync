@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Download,
@@ -77,7 +78,7 @@ export default function RankedRecordsPage() {
         });
         setJobs(uniqueJobs);
       } else {
-        showToast(result.error || 'Failed to fetch applications', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error fetching applications:', error);
@@ -109,7 +110,7 @@ export default function RankedRecordsPage() {
         showToast(`Application approved! Notification sent to ${applicantName}`, 'success');
         fetchApplications();
       } else {
-        showToast(result.error || 'Failed to approve application', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error approving application:', error);
@@ -137,7 +138,7 @@ export default function RankedRecordsPage() {
         showToast(`Application denied. Notification sent to ${applicantName}`, 'success');
         fetchApplications();
       } else {
-        showToast(result.error || 'Failed to deny application', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error denying application:', error);
@@ -175,7 +176,7 @@ export default function RankedRecordsPage() {
       if (result.success) {
         window.open(result.data.signedUrl, '_blank');
       } else {
-        showToast(result.error || 'Failed to get download link', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error downloading PDS:', error);

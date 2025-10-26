@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, Modal } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2 } from 'lucide-react';
@@ -60,7 +61,7 @@ export default function PESOApplicationsPage() {
       showToast('Applications refreshed', 'success');
     } catch (error: any) {
       console.error('Error fetching applications:', error);
-      showToast(error.message || 'Failed to fetch applications', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setLoading(false);
     }
@@ -107,7 +108,7 @@ export default function PESOApplicationsPage() {
       fetchApplications();
     } catch (error: any) {
       console.error('Error approving application:', error);
-      showToast(error.message || 'Failed to approve application', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -137,7 +138,7 @@ export default function PESOApplicationsPage() {
       fetchApplications();
     } catch (error: any) {
       console.error('Error denying application:', error);
-      showToast(error.message || 'Failed to deny application', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setActionLoading(false);
     }

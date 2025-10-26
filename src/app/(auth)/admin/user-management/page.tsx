@@ -10,6 +10,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { supabase } from '@/lib/supabase/auth';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import {
   UserPlus, UserX, Trash2, User as UserIcon, User, Mail, Shield, Calendar, X,
   CheckCircle2, AlertCircle, Eye, Loader2, Briefcase, Building, Clock, Activity
@@ -79,7 +80,7 @@ export default function UserManagementPage() {
       showToast('Users loaded successfully', 'success');
     } catch (error) {
       console.error('Fetch users error:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to load users', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +169,7 @@ export default function UserManagementPage() {
       fetchRecentActivities();
     } catch (error) {
       console.error('Create user error:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to create user', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -224,7 +225,7 @@ export default function UserManagementPage() {
       fetchRecentActivities();
     } catch (error) {
       console.error('Status change error:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to update user', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -270,7 +271,7 @@ export default function UserManagementPage() {
       fetchRecentActivities();
     } catch (error) {
       console.error('Delete user error:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to delete user', 'error');
+      showToast(getErrorMessage(error), 'error');
       setIsSubmitting(false);
     }
   };

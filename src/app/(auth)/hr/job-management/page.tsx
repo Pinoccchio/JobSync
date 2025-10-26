@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Edit, EyeOff, Trash2, Briefcase, GraduationCap, CheckCircle2, X, Loader2, AlertCircle, Eye, Archive, Filter } from 'lucide-react';
 
@@ -71,7 +72,7 @@ export default function JobManagementPage() {
           _raw: job
         })));
       } else {
-        showToast(result.error || 'Failed to fetch jobs', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -147,7 +148,7 @@ Employment Type: ${formData.employment_type}
         });
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to create job', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error creating job:', error);
@@ -237,7 +238,7 @@ Employment Type: ${formData.employment_type}
         });
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to update job', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       console.error('Error updating job:', error);
@@ -267,7 +268,7 @@ Employment Type: ${formData.employment_type}
         setJobToHide(null);
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to hide job', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       showToast('Failed to hide job', 'error');
@@ -296,7 +297,7 @@ Employment Type: ${formData.employment_type}
         setJobToUnhide(null);
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to restore job', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       showToast('Failed to restore job', 'error');
@@ -323,7 +324,7 @@ Employment Type: ${formData.employment_type}
         setJobToArchive(null);
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to archive job', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       showToast('Failed to archive job', 'error');
@@ -355,7 +356,7 @@ Employment Type: ${formData.employment_type}
         setApplicationCount(0);
         fetchJobs();
       } else {
-        showToast(result.error || 'Failed to permanently delete job', 'error');
+        showToast(getErrorMessage(result.error), 'error');
       }
     } catch (error) {
       showToast('Failed to permanently delete job', 'error');

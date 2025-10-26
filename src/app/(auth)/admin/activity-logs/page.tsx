@@ -6,6 +6,7 @@ import {
   StatusIndicator, EventFilterGroup
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { supabase } from '@/lib/supabase/auth';
@@ -58,7 +59,7 @@ export default function ActivityLogsPage() {
       showToast('Activity logs refreshed', 'success');
     } catch (error: any) {
       console.error('Failed to fetch activity logs:', error);
-      showToast(error.message || 'Failed to refresh activity logs', 'error');
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsLoading(false);
     }
