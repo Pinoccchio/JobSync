@@ -1,87 +1,97 @@
 'use client';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, Card, Container, Badge, RefreshButton } from '@/components/ui';
+import { Button, Card, Container, Badge, RefreshButton, Modal, Input, Textarea } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { AdminLayout } from '@/components/layout';
-import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2 } from 'lucide-react';
+import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload } from 'lucide-react';
+import { FileUploadWithProgress } from '@/components/ui';
+
+interface TrainingProgram {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  schedule: string | null;
+  capacity: number;
+  enrolled_count: number;
+  location: string | null;
+  start_date: string;
+  end_date: string | null;
+  skills_covered: string[];
+  icon: string;
+  status: string;
+}
+
+interface UserApplication {
+  id: string;
+  program_id: string;
+  status: 'pending' | 'approved' | 'denied';
+}
 
 export default function TrainingsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [programs, setPrograms] = useState<TrainingProgram[]>([]);
+  const [userApplications, setUserApplications] = useState<UserApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState<TrainingProgram | null>(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
-  const [trainings, setTrainings] = useState([
-    {
-      title: 'Web Development Training',
-      duration: '3 months',
-      description: 'Learn HTML, CSS, JavaScript, and modern web frameworks like React and Next.js',
-      schedule: 'Mon-Fri, 9AM-5PM',
-      totalSlots: 25,
-      availableSlots: 25,
-      location: 'PESO Office - Computer Lab',
-      startDate: 'Feb 15, 2025',
-      skills: ['HTML', 'CSS', 'JavaScript', 'React'],
-      icon: '💻',
-      color: 'blue'
-    },
-    {
-      title: 'Digital Marketing Training',
-      duration: '2 months',
-      description: 'Master social media marketing, SEO, and content creation strategies',
-      schedule: 'Mon-Fri, 1PM-5PM',
-      totalSlots: 30,
-      availableSlots: 12,
-      location: 'PESO Office - Training Room',
-      startDate: 'Feb 20, 2025',
-      skills: ['Social Media', 'SEO', 'Content Marketing'],
-      icon: '📱',
-      color: 'purple'
-    },
-    {
-      title: 'Data Analytics Training',
-      duration: '2 months',
-      description: 'Excel, SQL, and data visualization fundamentals for business analytics',
-      schedule: 'Tue-Thu, 2PM-6PM',
-      totalSlots: 20,
-      availableSlots: 8,
-      location: 'PESO Office - Computer Lab',
-      startDate: 'Feb 18, 2025',
-      skills: ['Excel', 'SQL', 'Data Viz'],
-      icon: '📊',
-      color: 'teal'
-    },
-    {
-      title: 'Graphic Design Training',
-      duration: '2 months',
-      description: 'Adobe Photoshop, Illustrator, and fundamental design principles',
-      schedule: 'Mon-Fri, 9AM-12PM',
-      totalSlots: 15,
-      availableSlots: 3,
-      location: 'PESO Office - Design Lab',
-      startDate: 'Feb 22, 2025',
-      skills: ['Photoshop', 'Illustrator', 'Design'],
-      icon: '🎨',
-      color: 'orange'
-    },
-  ]);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    highest_education: '',
+    id_image_url: '',
+    id_image_name: '',
+  });
 
   // Fetch training programs function
   const fetchTrainings = useCallback(async () => {
     try {
-      // TODO: Real implementation
-      // const { data } = await supabase
-      //   .from('training_programs')
-      //   .select('*')
-      //   .eq('status', 'active')
-      //   .order('created_at', { ascending: false });
+      setLoading(true);
+      const response = await fetch('/api/training/programs?status=active');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch training programs');
+      }
+
+      setPrograms(result.data || []);
       showToast('Training programs refreshed', 'success');
-    } catch (error) {
-      showToast('Failed to refresh training programs', 'error');
+    } catch (error: any) {
+      console.error('Error fetching programs:', error);
+      showToast(error.message || 'Failed to fetch training programs', 'error');
+    } finally {
+      setLoading(false);
     }
   }, [showToast]);
+
+  // Fetch user's applications
+  const fetchUserApplications = useCallback(async () => {
+    try {
+      const response = await fetch('/api/training/applications');
+      const result = await response.json();
+
+      if (response.ok) {
+        setUserApplications(result.data || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching user applications:', error);
+    }
+  }, []);
+
+  // Fetch on mount
+  useEffect(() => {
+    fetchTrainings();
+    fetchUserApplications();
+  }, [fetchTrainings, fetchUserApplications]);
 
   // REMOVED: Real-time subscription disabled for performance
   // useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
@@ -89,9 +99,85 @@ export default function TrainingsPage() {
   //   // fetchTrainings(); // Uncomment when real data
   // });
 
-  const filteredTrainings = trainings.filter(training =>
-    training.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    training.description.toLowerCase().includes(searchQuery.toLowerCase())
+  // Handle apply button click
+  const handleApplyClick = (program: TrainingProgram) => {
+    setSelectedProgram(program);
+    setFormData({
+      full_name: '',
+      email: '',
+      phone: '',
+      address: '',
+      highest_education: '',
+      id_image_url: '',
+      id_image_name: '',
+    });
+    setApplyModalOpen(true);
+  };
+
+  // Handle image upload
+  const handleImageUpload = (data: {
+    fileName: string;
+    filePath: string;
+    fileUrl: string;
+    fileSize: number;
+    fileType: string;
+  }) => {
+    setFormData({
+      ...formData,
+      id_image_url: data.fileUrl,
+      id_image_name: data.fileName,
+    });
+  };
+
+  // Handle form submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedProgram) return;
+
+    // Validate all fields
+    if (!formData.full_name || !formData.email || !formData.phone || !formData.address || !formData.highest_education || !formData.id_image_url) {
+      showToast('Please fill in all required fields and upload your ID', 'error');
+      return;
+    }
+
+    try {
+      setSubmitLoading(true);
+      const response = await fetch('/api/training/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          program_id: selectedProgram.id,
+          ...formData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to submit application');
+      }
+
+      showToast(result.message || 'Application submitted successfully', 'success');
+      setApplyModalOpen(false);
+      setSelectedProgram(null);
+      fetchUserApplications(); // Refresh applications list
+    } catch (error: any) {
+      console.error('Error submitting application:', error);
+      showToast(error.message || 'Failed to submit application', 'error');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  // Check if user has applied to a program
+  const getUserApplication = (programId: string) => {
+    return userApplications.find(app => app.program_id === programId);
+  };
+
+  const filteredPrograms = programs.filter(program =>
+    program.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    program.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getSlotColor = (available: number, total: number) => {
@@ -101,14 +187,19 @@ export default function TrainingsPage() {
     return 'text-red-600 bg-red-100';
   };
 
-  const getCardColor = (color: string) => {
-    const colors = {
-      blue: 'from-blue-500/10 to-blue-600/5',
-      purple: 'from-purple-500/10 to-purple-600/5',
-      teal: 'from-teal-500/10 to-teal-600/5',
-      orange: 'from-orange-500/10 to-orange-600/5',
-    };
-    return colors[color as keyof typeof colors] || colors.blue;
+  const getCardColor = (index: number) => {
+    const colors = [
+      'from-blue-500/10 to-blue-600/5',
+      'from-purple-500/10 to-purple-600/5',
+      'from-teal-500/10 to-teal-600/5',
+      'from-orange-500/10 to-orange-600/5',
+    ];
+    return colors[index % colors.length];
+  };
+
+  const getIcon = (index: number) => {
+    const icons = ['💻', '📱', '📊', '🎨', '🔧', '📚', '🎯', '💡'];
+    return icons[index % icons.length];
   };
 
   return (
@@ -135,101 +226,125 @@ export default function TrainingsPage() {
 
         {/* Training Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredTrainings.map((training, index) => (
-            <Card key={index} variant="interactive" noPadding className="group">
-              <div className={`h-2 bg-gradient-to-r ${getCardColor(training.color)}`}></div>
-              <div className="p-6 space-y-5">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="text-4xl">{training.icon}</div>
-                    <div className="flex-1">
-                      <h2 className="text-2xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-2">
-                        {training.title}
-                      </h2>
-                      <p className="text-gray-600 leading-relaxed">{training.description}</p>
+          {filteredPrograms.map((program, index) => {
+            const availableSlots = program.capacity - program.enrolled_count;
+            const userApp = getUserApplication(program.id);
+
+            return (
+              <Card key={program.id} variant="interactive" noPadding className="group">
+                <div className={`h-2 bg-gradient-to-r ${getCardColor(index)}`}></div>
+                <div className="p-6 space-y-5">
+                  {/* Header */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className="text-4xl">{program.icon || getIcon(index)}</div>
+                      <div className="flex-1">
+                        <h2 className="text-2xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-2">
+                          {program.title}
+                        </h2>
+                        <p className="text-gray-600 leading-relaxed">{program.description}</p>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Skills Tags */}
+                  {program.skills_covered && program.skills_covered.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {program.skills_covered.map((skill, idx) => (
+                        <Badge key={idx} size="sm" variant="default">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Training Details */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-start gap-2">
+                      <Clock className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">Duration</p>
+                        <p className="text-sm font-medium text-gray-900">{program.duration}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      <Calendar className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">Start Date</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {new Date(program.start_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {program.location && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">Location</p>
+                          <p className="text-sm font-medium text-gray-900">{program.location}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {program.schedule && (
+                      <div className="flex items-start gap-2">
+                        <Users className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">Schedule</p>
+                          <p className="text-sm font-medium text-gray-900">{program.schedule}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Slots Availability */}
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${getSlotColor(availableSlots, program.capacity)}`}>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      <span className="font-semibold">
+                        {availableSlots} / {program.capacity} slots available
+                      </span>
+                    </div>
+                    <div className="w-20 h-2 bg-white/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-current rounded-full transition-all"
+                        style={{ width: `${(availableSlots / program.capacity) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Apply Button */}
+                  {userApp ? (
+                    <div className="space-y-2">
+                      <Badge
+                        variant={userApp.status === 'approved' ? 'success' : userApp.status === 'denied' ? 'danger' : 'warning'}
+                        className="w-full justify-center py-3"
+                      >
+                        Application {userApp.status.charAt(0).toUpperCase() + userApp.status.slice(1)}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="success"
+                      className="w-full"
+                      size="lg"
+                      icon={CheckCircle2}
+                      onClick={() => handleApplyClick(program)}
+                      disabled={availableSlots === 0}
+                    >
+                      {availableSlots === 0 ? 'Training Full' : 'Apply for Training'}
+                    </Button>
+                  )}
                 </div>
-
-                {/* Skills Tags */}
-                <div className="flex flex-wrap gap-2">
-                  {training.skills.map((skill, idx) => (
-                    <Badge key={idx} size="sm" variant="default">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Training Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-start gap-2">
-                    <Clock className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-500">Duration</p>
-                      <p className="text-sm font-medium text-gray-900">{training.duration}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <Calendar className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-500">Start Date</p>
-                      <p className="text-sm font-medium text-gray-900">{training.startDate}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-500">Location</p>
-                      <p className="text-sm font-medium text-gray-900">{training.location}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <Users className="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-500">Schedule</p>
-                      <p className="text-sm font-medium text-gray-900">{training.schedule}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Slots Availability */}
-                <div className={`flex items-center justify-between p-3 rounded-lg ${getSlotColor(training.availableSlots, training.totalSlots)}`}>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    <span className="font-semibold">
-                      {training.availableSlots} / {training.totalSlots} slots available
-                    </span>
-                  </div>
-                  <div className="w-20 h-2 bg-white/50 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-current rounded-full transition-all"
-                      style={{ width: `${(training.availableSlots / training.totalSlots) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Apply Button */}
-                <Button
-                  variant="success"
-                  className="w-full"
-                  size="lg"
-                  icon={CheckCircle2}
-                  onClick={() => showToast('Apply for training feature coming soon', 'info')}
-                  disabled={training.availableSlots === 0}
-                >
-                  {training.availableSlots === 0 ? 'Training Full' : 'Apply for Training'}
-                </Button>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
 
         {/* Empty State */}
-        {filteredTrainings.length === 0 && (
+        {filteredPrograms.length === 0 && !loading && (
           <Card className="text-center py-16">
             <GraduationCap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No training programs found</h3>
@@ -237,6 +352,14 @@ export default function TrainingsPage() {
             <Button variant="outline" onClick={() => setSearchQuery('')}>
               Clear Search
             </Button>
+          </Card>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <Card className="text-center py-16">
+            <div className="animate-spin w-12 h-12 border-4 border-[#22A555] border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading training programs...</p>
           </Card>
         )}
 
@@ -256,6 +379,148 @@ export default function TrainingsPage() {
             </div>
           </div>
         </Card>
+
+        {/* Application Modal */}
+        <Modal
+          isOpen={applyModalOpen}
+          onClose={() => {
+            setApplyModalOpen(false);
+            setSelectedProgram(null);
+          }}
+          title={`Apply for ${selectedProgram?.title || 'Training'}`}
+          size="lg"
+        >
+          {selectedProgram && (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Program Info */}
+              <div className="bg-[#22A555]/5 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-2">{selectedProgram.title}</h3>
+                <p className="text-sm text-gray-600">{selectedProgram.description}</p>
+                <div className="mt-3 flex gap-4 text-sm text-gray-700">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    {selectedProgram.duration}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    {new Date(selectedProgram.start_date).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Personal Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      placeholder="Juan Dela Cruz"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="juan@example.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="09123456789"
+                      required
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Complete Address <span className="text-red-500">*</span>
+                    </label>
+                    <Textarea
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="Barangay, Municipality, Province"
+                      rows={3}
+                      required
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Highest Educational Attainment <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.highest_education}
+                      onChange={(e) => setFormData({ ...formData, highest_education: e.target.value })}
+                      placeholder="e.g., Bachelor of Science in Information Technology"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ID Upload */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Valid ID Upload</h3>
+                <FileUploadWithProgress
+                  bucket="id-images"
+                  accept="image/*"
+                  maxSizeMB={5}
+                  onUploadComplete={handleImageUpload}
+                  label="Upload a clear photo of your valid ID (Driver's License, Passport, etc.)"
+                />
+                {formData.id_image_url && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-700 font-medium">✓ ID uploaded successfully</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setApplyModalOpen(false);
+                    setSelectedProgram(null);
+                  }}
+                  disabled={submitLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="success"
+                  icon={CheckCircle2}
+                  loading={submitLoading}
+                >
+                  Submit Application
+                </Button>
+              </div>
+            </form>
+          )}
+        </Modal>
       </Container>
     </AdminLayout>
   );

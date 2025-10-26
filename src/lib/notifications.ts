@@ -95,6 +95,13 @@ export async function notifyHR(hrUserId: string, notification: NotificationData)
 }
 
 /**
+ * Notify PESO user (confirmation of their own action)
+ */
+export async function notifyPESO(pesoUserId: string, notification: NotificationData) {
+  return await createNotification(pesoUserId, notification);
+}
+
+/**
  * Notify the creator of a job when someone applies
  */
 export async function notifyJobCreator(jobId: string, applicantName: string) {
@@ -177,6 +184,43 @@ export async function notifyUsers(userIds: string[], notification: NotificationD
     return notifications.filter((n) => n !== null);
   } catch (error) {
     console.error('Failed to notify users:', error);
+    return [];
+  }
+}
+
+/**
+ * Notify all applicants enrolled in a training program
+ */
+export async function notifyProgramApplicants(programId: string, notification: NotificationData) {
+  try {
+    const supabase = await createClient();
+
+    // Get all applicants for this program
+    const { data: applications, error: appError } = await supabase
+      .from('training_applications')
+      .select('applicant_id')
+      .eq('program_id', programId);
+
+    if (appError) {
+      console.error('Error fetching program applicants:', appError);
+      return [];
+    }
+
+    if (!applications || applications.length === 0) {
+      return [];
+    }
+
+    // Get unique applicant IDs
+    const applicantIds = [...new Set(applications.map((app) => app.applicant_id))];
+
+    // Create notification for each applicant
+    const notifications = await Promise.all(
+      applicantIds.map((applicantId) => createNotification(applicantId, notification))
+    );
+
+    return notifications.filter((n) => n !== null);
+  } catch (error) {
+    console.error('Failed to notify program applicants:', error);
     return [];
   }
 }

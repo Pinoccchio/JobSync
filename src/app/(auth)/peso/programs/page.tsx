@@ -1,79 +1,338 @@
 'use client';
-import React, { useState, useCallback } from 'react';
-import Image from 'next/image';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
-// import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Plus, Edit, Trash2, GraduationCap, FileText, Clock, Users, Calendar, X, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, FileText, Clock, Users, Calendar, X, CheckCircle2, AlertCircle, Briefcase, Archive, Loader2, Filter, Undo2 } from 'lucide-react';
+
+interface TrainingProgram {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  schedule?: string;
+  capacity: number;
+  enrolled_count: number;
+  location?: string;
+  start_date: string;
+  end_date?: string;
+  skills_covered?: string[];
+  icon?: string;
+  status: 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived';
+  created_by: string;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+  };
+}
 
 export default function PESOProgramsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
+
+  const [programs, setPrograms] = useState<TrainingProgram[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived'>('all');
+
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+
+  const [editingProgram, setEditingProgram] = useState<TrainingProgram | null>(null);
+  const [deletingProgram, setDeletingProgram] = useState<TrainingProgram | null>(null);
+  const [archivingProgram, setArchivingProgram] = useState<TrainingProgram | null>(null);
+  const [restoringProgram, setRestoringProgram] = useState<TrainingProgram | null>(null);
+
   const [formData, setFormData] = useState({
-    programName: '',
+    title: '',
     description: '',
     duration: '',
-    slots: '',
-    startDate: '',
+    schedule: '',
+    capacity: '',
+    location: '',
+    start_date: '',
+    end_date: '',
+    skills_covered: '',
   });
 
-  const [programs, setPrograms] = useState([
-    {
-      id: 1,
-      name: 'Web Development Training',
-      description: 'Learn HTML, CSS, JavaScript, and modern frameworks',
-      duration: '3 months',
-      slots: '25',
-      startDate: '2025-02-01',
-      status: 'Active'
-    },
-    {
-      id: 2,
-      name: 'Digital Marketing Training',
-      description: 'Social media marketing, SEO, and content creation',
-      duration: '2 months',
-      slots: '30',
-      startDate: '2025-02-15',
-      status: 'Active'
-    },
-    {
-      id: 3,
-      name: 'Data Analytics Training',
-      description: 'Excel, SQL, and data visualization basics',
-      duration: '2 months',
-      slots: '20',
-      startDate: '2025-03-01',
-      status: 'Upcoming'
-    },
-  ]);
-
-  // Fetch training programs function
+  // Fetch training programs
   const fetchPrograms = useCallback(async () => {
     try {
-      // TODO: Real implementation
-      // const { data } = await supabase
-      //   .from('training_programs')
-      //   .select('*')
-      //   .order('created_at', { ascending: false });
-      showToast('Programs refreshed', 'success');
+      setLoading(true);
+      const response = await fetch('/api/training/programs?status=all');
+      const result = await response.json();
+
+      if (result.success) {
+        setPrograms(result.data);
+      } else {
+        showToast(result.error || 'Failed to fetch programs', 'error');
+      }
     } catch (error) {
-      showToast('Failed to refresh programs', 'error');
+      console.error('Error fetching programs:', error);
+      showToast('Failed to fetch programs', 'error');
+    } finally {
+      setLoading(false);
     }
   }, [showToast]);
 
-  // REMOVED: Real-time subscription disabled for performance
-  // useTableRealtime('training_programs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-  //   showToast('Training program updated', 'info');
-  //   // fetchPrograms(); // Uncomment when real data
-  // });
+  useEffect(() => {
+    fetchPrograms();
+  }, [fetchPrograms]);
 
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      duration: '',
+      schedule: '',
+      capacity: '',
+      location: '',
+      start_date: '',
+      end_date: '',
+      skills_covered: '',
+    });
+  };
+
+  // Handle create
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.title || !formData.description || !formData.duration || !formData.capacity || !formData.start_date) {
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const skillsArray = formData.skills_covered
+        ? formData.skills_covered.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const response = await fetch('/api/training/programs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          skills_covered: skillsArray,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Training program created successfully', 'success');
+        setShowAddModal(false);
+        resetForm();
+        fetchPrograms();
+      } else {
+        showToast(result.error || 'Failed to create program', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating program:', error);
+      showToast('Failed to create program', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle edit
+  const handleEdit = (program: TrainingProgram) => {
+    setEditingProgram(program);
+    setFormData({
+      title: program.title,
+      description: program.description,
+      duration: program.duration,
+      schedule: program.schedule || '',
+      capacity: program.capacity.toString(),
+      location: program.location || '',
+      start_date: program.start_date,
+      end_date: program.end_date || '',
+      skills_covered: program.skills_covered?.join(', ') || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingProgram) return;
+
+    try {
+      setSubmitting(true);
+
+      const skillsArray = formData.skills_covered
+        ? formData.skills_covered.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const response = await fetch(`/api/training/programs/${editingProgram.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          skills_covered: skillsArray,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Training program updated successfully', 'success');
+        setShowEditModal(false);
+        setEditingProgram(null);
+        resetForm();
+        fetchPrograms();
+      } else {
+        showToast(result.error || 'Failed to update program', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating program:', error);
+      showToast('Failed to update program', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle archive
+  const handleArchiveClick = (program: TrainingProgram) => {
+    setArchivingProgram(program);
+    setShowArchiveConfirm(true);
+  };
+
+  const handleArchive = async () => {
+    if (!archivingProgram) return;
+
+    try {
+      setSubmitting(true);
+
+      const response = await fetch(`/api/training/programs/${archivingProgram.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...archivingProgram,
+          status: 'archived',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Training program archived successfully', 'success');
+        setShowArchiveConfirm(false);
+        setArchivingProgram(null);
+        fetchPrograms();
+      } else {
+        showToast(result.error || 'Failed to archive program', 'error');
+      }
+    } catch (error) {
+      console.error('Error archiving program:', error);
+      showToast('Failed to archive program', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle restore
+  const handleRestoreClick = (program: TrainingProgram) => {
+    setRestoringProgram(program);
+    setShowRestoreConfirm(true);
+  };
+
+  const handleRestore = async () => {
+    if (!restoringProgram) return;
+
+    try {
+      setSubmitting(true);
+
+      const response = await fetch(`/api/training/programs/${restoringProgram.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...restoringProgram,
+          status: 'active',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Training program restored successfully', 'success');
+        setShowRestoreConfirm(false);
+        setRestoringProgram(null);
+        fetchPrograms();
+      } else {
+        showToast(result.error || 'Failed to restore program', 'error');
+      }
+    } catch (error) {
+      console.error('Error restoring program:', error);
+      showToast('Failed to restore program', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle delete
+  const handleDeleteClick = (program: TrainingProgram) => {
+    setDeletingProgram(program);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingProgram) return;
+
+    try {
+      setSubmitting(true);
+
+      const response = await fetch(`/api/training/programs/${deletingProgram.id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Training program deleted successfully', 'success');
+        setShowDeleteConfirm(false);
+        setDeletingProgram(null);
+        fetchPrograms();
+      } else {
+        showToast(result.error || 'Failed to delete program', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting program:', error);
+      showToast('Failed to delete program', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Calculate stats
+  const stats = {
+    total: programs.length,
+    active: programs.filter(p => p.status === 'active').length,
+    upcoming: programs.filter(p => p.status === 'upcoming').length,
+    completed: programs.filter(p => p.status === 'completed').length,
+    cancelled: programs.filter(p => p.status === 'cancelled').length,
+    archived: programs.filter(p => p.status === 'archived').length,
+    totalEnrolled: programs.reduce((sum, p) => sum + p.enrolled_count, 0),
+    totalCapacity: programs.reduce((sum, p) => sum + p.capacity, 0),
+  };
+
+  // Filter programs by status
+  const filteredPrograms = programs.filter(p => {
+    if (statusFilter === 'all') return true;
+    return p.status === statusFilter;
+  });
+
+  // Table columns
   const columns = [
     {
       header: 'Program Name',
-      accessor: 'name' as const,
+      accessor: 'title' as const,
       render: (value: string) => (
         <div className="flex items-center gap-2">
           <GraduationCap className="w-4 h-4 text-[#22A555]" />
@@ -87,7 +346,7 @@ export default function PESOProgramsPage() {
       render: (value: string) => (
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700">{value}</span>
+          <span className="text-sm text-gray-700 line-clamp-2">{value}</span>
         </div>
       )
     },
@@ -102,22 +361,22 @@ export default function PESOProgramsPage() {
       )
     },
     {
-      header: 'Available Slots',
-      accessor: 'slots' as const,
-      render: (value: string) => (
+      header: 'Capacity',
+      accessor: 'capacity' as const,
+      render: (value: number, row: TrainingProgram) => (
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-gray-400" />
-          <Badge variant="info">{value} slots</Badge>
+          <span className="text-sm text-gray-700">{row.enrolled_count} / {value}</span>
         </div>
       )
     },
     {
       header: 'Start Date',
-      accessor: 'startDate' as const,
+      accessor: 'start_date' as const,
       render: (value: string) => (
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+          <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString()}</span>
         </div>
       )
     },
@@ -125,216 +384,589 @@ export default function PESOProgramsPage() {
       header: 'Status',
       accessor: 'status' as const,
       render: (value: string) => (
-        <Badge variant={value === 'Active' ? 'success' : 'info'} icon={CheckCircle2}>
+        <Badge variant={value === 'active' ? 'success' : value === 'completed' ? 'default' : 'danger'}>
           {value}
         </Badge>
       )
     },
     {
       header: 'Actions',
-      accessor: 'actions' as const,
-      render: () => (
-        <div className="flex gap-2">
-          <Button
-            variant="warning"
-            size="sm"
-            icon={Edit}
-            onClick={() => showToast('Edit feature coming soon', 'info')}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            icon={Trash2}
-            onClick={() => showToast('Delete feature coming soon', 'info')}
-          >
-            Delete
-          </Button>
-        </div>
-      )
+      accessor: 'id' as const,
+      render: (_: string, row: TrainingProgram) => {
+        const isArchived = row.status === 'archived';
+
+        return (
+          <div className="flex gap-2">
+            {/* Non-archived programs: Edit + Archive */}
+            {!isArchived && (
+              <>
+                <Button variant="warning" size="sm" icon={Edit} onClick={() => handleEdit(row)}>
+                  Edit
+                </Button>
+                <Button variant="danger" size="sm" icon={Archive} onClick={() => handleArchiveClick(row)}>
+                  Archive
+                </Button>
+              </>
+            )}
+
+            {/* Archived programs: Restore + Delete */}
+            {isArchived && (
+              <>
+                <Button variant="success" size="sm" icon={Undo2} onClick={() => handleRestoreClick(row)}>
+                  Restore
+                </Button>
+                <Button variant="danger" size="sm" icon={Trash2} onClick={() => handleDeleteClick(row)}>
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      }
     },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    showToast('Program creation feature coming soon!', 'info');
-    setShowAddModal(false);
-  };
-
-  const totalSlots = programs.reduce((sum, p) => sum + parseInt(p.slots), 0);
-
   return (
-    <AdminLayout role="PESO" userName={user?.fullName || 'PESO Admin'} pageTitle="Training Programs" pageDescription="Manage job training programs and opportunities">
-      <Container size="xl">
-        <div className="space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Programs</p>
-                  <p className="text-3xl font-bold text-gray-900">{programs.length}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-
-            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Active Programs</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {programs.filter(p => p.status === 'Active').length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-
-            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Upcoming</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {programs.filter(p => p.status === 'Upcoming').length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-
-            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Slots</p>
-                  <p className="text-3xl font-bold text-gray-900">{totalSlots}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
+    <AdminLayout
+      role="PESO"
+      userName={user?.fullName || 'PESO Admin'}
+      pageTitle="Training Programs"
+      pageDescription="Manage job training programs and courses"
+    >
+      <Container>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <GraduationCap className="w-8 h-8 text-[#22A555]" />
+              Training Programs
+            </h1>
+            <p className="text-gray-600 mt-1">Manage job training programs and courses</p>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between">
-            <RefreshButton onRefresh={fetchPrograms} label="Refresh" showLastRefresh={true} />
-            <Button variant="success" icon={Plus} onClick={() => setShowAddModal(true)}>
+          <div className="flex gap-3">
+            <RefreshButton onClick={fetchPrograms} />
+            <Button variant="primary" icon={Plus} onClick={() => setShowAddModal(true)}>
               Add New Program
             </Button>
           </div>
+        </div>
 
-          {/* Programs Table */}
-          <Card title="AVAILABLE TRAINING PROGRAMS" headerColor="bg-[#D4F4DD]">
-            <EnhancedTable
-              columns={columns}
-              data={programs}
-              searchable
-              searchPlaceholder="Search by program name, description, or status..."
-            />
+        {/* Stats Tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Programs</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.total}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Briefcase className="w-6 h-6 text-white" />
+              </div>
+            </div>
           </Card>
 
-          {/* Add Program Modal */}
-          {showAddModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
-                {/* Modal Header */}
-                <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                      <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Create Training Program</h2>
-                      <p className="text-sm text-purple-100">Add a new training opportunity</p>
-                    </div>
+          <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Active</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.active}</p>
+              </div>
+              <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="flat" className="bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Completed</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.completed}</p>
+              </div>
+              <div className="w-12 h-12 bg-gray-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Archive className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Cancelled</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.cancelled}</p>
+              </div>
+              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                <AlertCircle className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Enrolled</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalEnrolled}</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Capacity Remaining</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalCapacity - stats.totalEnrolled}</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="flat" className="bg-gradient-to-br from-slate-50 to-slate-100 border-l-4 border-slate-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Archived</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.archived}</p>
+              </div>
+              <div className="w-12 h-12 bg-slate-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Archive className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-2 text-gray-700">
+            <Filter className="w-5 h-5" />
+            <span className="font-medium">Filter by Status:</span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={statusFilter === 'all' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('all')}
+            >
+              All ({stats.total})
+            </Button>
+            <Button
+              variant={statusFilter === 'active' ? 'success' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('active')}
+            >
+              Active ({stats.active})
+            </Button>
+            <Button
+              variant={statusFilter === 'completed' ? 'secondary' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('completed')}
+            >
+              Completed ({stats.completed})
+            </Button>
+            <Button
+              variant={statusFilter === 'cancelled' ? 'danger' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('cancelled')}
+            >
+              Cancelled ({stats.cancelled})
+            </Button>
+            <Button
+              variant={statusFilter === 'archived' ? 'secondary' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('archived')}
+            >
+              <Archive className="w-4 h-4" />
+              Archived ({stats.archived})
+            </Button>
+          </div>
+        </div>
+
+        {/* Programs Table */}
+        <Card title="TRAINING PROGRAMS" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
+          <EnhancedTable
+            data={filteredPrograms}
+            columns={columns}
+            loading={loading}
+            searchPlaceholder="Search programs..."
+            emptyMessage="No training programs found. Click 'Add New Program' to create one."
+          />
+        </Card>
+
+        {/* Add Program Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
+                    <GraduationCap className="w-6 h-6 text-white" />
                   </div>
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Create Training Program</h2>
+                    <p className="text-sm text-gray-600">Add a new job training program</p>
+                  </div>
+                </div>
+                <button onClick={() => { setShowAddModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleCreate} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="e.g., Web Development Training"
+                    required
+                  />
                 </div>
 
-                {/* Modal Body */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="grid grid-cols-1 gap-5">
-                      <Input
-                        label="Program Name"
-                        type="text"
-                        value={formData.programName}
-                        onChange={(e) => setFormData({ ...formData, programName: e.target.value })}
-                        placeholder="e.g., Web Development Training"
-                        required
-                      />
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Description *</label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe the training program..."
+                    rows={4}
+                    required
+                  />
+                </div>
 
-                      <Textarea
-                        label="Description"
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Describe the training program content and objectives"
-                        rows={4}
-                        required
-                      />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Duration *</label>
+                    <Input
+                      value={formData.duration}
+                      onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                      placeholder="e.g., 3 months"
+                      required
+                    />
+                  </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <Input
-                          label="Duration"
-                          type="text"
-                          value={formData.duration}
-                          onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                          placeholder="e.g., 3 months"
-                          required
-                        />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Capacity *</label>
+                    <Input
+                      type="number"
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                      placeholder="e.g., 25"
+                      min="1"
+                      required
+                    />
+                  </div>
+                </div>
 
-                        <Input
-                          label="Available Slots"
-                          type="number"
-                          value={formData.slots}
-                          onChange={(e) => setFormData({ ...formData, slots: e.target.value })}
-                          placeholder="e.g., 25"
-                          required
-                        />
-                      </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Start Date *</label>
+                    <Input
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      required
+                    />
+                  </div>
 
-                      <Input
-                        label="Start Date"
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">End Date</label>
+                    <Input
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    />
+                  </div>
+                </div>
 
-                    <div className="flex gap-3 pt-4 border-t border-gray-200">
-                      <Button type="submit" variant="success" icon={Plus} className="flex-1">
-                        Create Program
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        icon={X}
-                        className="flex-1"
-                        onClick={() => setShowAddModal(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Schedule</label>
+                  <Input
+                    value={formData.schedule}
+                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                    placeholder="e.g., Mon-Fri, 9:00 AM - 5:00 PM"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
+                  <Input
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="e.g., PESO Training Center"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Skills Covered</label>
+                  <Input
+                    value={formData.skills_covered}
+                    onChange={(e) => setFormData({ ...formData, skills_covered: e.target.value })}
+                    placeholder="e.g., HTML, CSS, JavaScript (comma-separated)"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button type="button" variant="secondary" onClick={() => { setShowAddModal(false); resetForm(); }} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary" icon={CheckCircle2} loading={submitting} className="flex-1">
+                    {submitting ? 'Creating...' : 'Create Program'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Program Modal */}
+        {showEditModal && editingProgram && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                    <Edit className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Edit Training Program</h2>
+                    <p className="text-sm text-gray-600">Update program details</p>
+                  </div>
+                </div>
+                <button onClick={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Form - Same as Add but with Update button */}
+              <form onSubmit={handleUpdate} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="e.g., Web Development Training"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Description *</label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe the training program..."
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Duration *</label>
+                    <Input
+                      value={formData.duration}
+                      onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                      placeholder="e.g., 3 months"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Capacity *</label>
+                    <Input
+                      type="number"
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                      placeholder="e.g., 25"
+                      min="1"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Start Date *</label>
+                    <Input
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">End Date</label>
+                    <Input
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Schedule</label>
+                  <Input
+                    value={formData.schedule}
+                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                    placeholder="e.g., Mon-Fri, 9:00 AM - 5:00 PM"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
+                  <Input
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="e.g., PESO Training Center"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Skills Covered</label>
+                  <Input
+                    value={formData.skills_covered}
+                    onChange={(e) => setFormData({ ...formData, skills_covered: e.target.value })}
+                    placeholder="e.g., HTML, CSS, JavaScript (comma-separated)"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button type="button" variant="secondary" onClick={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="warning" icon={CheckCircle2} loading={submitting} className="flex-1">
+                    {submitting ? 'Updating...' : 'Update Program'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Archive Confirmation Modal */}
+        {showArchiveConfirm && archivingProgram && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              <div className="p-6">
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Archive className="w-8 h-8 text-orange-600" />
+                </div>
+
+                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                  Archive Training Program
+                </h3>
+                <p className="text-gray-600 text-center mb-6">
+                  Are you sure you want to archive "<strong>{archivingProgram.title}</strong>"? You can restore it later from the Archived tab.
+                </p>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setShowArchiveConfirm(false); setArchivingProgram(null); }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="warning"
+                    icon={Archive}
+                    loading={submitting}
+                    onClick={handleArchive}
+                    className="flex-1"
+                  >
+                    {submitting ? 'Archiving...' : 'Archive Program'}
+                  </Button>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Restore Confirmation Modal */}
+        {showRestoreConfirm && restoringProgram && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              <div className="p-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Undo2 className="w-8 h-8 text-green-600" />
+                </div>
+
+                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                  Restore Training Program
+                </h3>
+                <p className="text-gray-600 text-center mb-6">
+                  Are you sure you want to restore "<strong>{restoringProgram.title}</strong>"? It will be marked as active again.
+                </p>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setShowRestoreConfirm(false); setRestoringProgram(null); }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="success"
+                    icon={Undo2}
+                    loading={submitting}
+                    onClick={handleRestore}
+                    className="flex-1"
+                  >
+                    {submitting ? 'Restoring...' : 'Restore Program'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && deletingProgram && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              <div className="p-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-red-600" />
+                </div>
+
+                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                  Delete Training Program
+                </h3>
+                <p className="text-gray-600 text-center mb-6">
+                  Are you sure you want to permanently delete "<strong>{deletingProgram.title}</strong>"? This action cannot be undone.
+                </p>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setShowDeleteConfirm(false); setDeletingProgram(null); }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    icon={Trash2}
+                    loading={submitting}
+                    onClick={handleDelete}
+                    className="flex-1"
+                  >
+                    {submitting ? 'Deleting...' : 'Delete Program'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Container>
     </AdminLayout>
   );

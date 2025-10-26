@@ -177,21 +177,29 @@ export default function PESODashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {tiles.map((tile, index) => {
               const Icon = tile.icon;
+              // Define gradient background and border colors based on tile color
+              const bgGradient = tile.color.includes('blue') ? 'from-blue-50 to-blue-100 border-blue-500' :
+                               tile.color.includes('orange') ? 'from-orange-50 to-orange-100 border-orange-500' :
+                               'from-purple-50 to-purple-100 border-purple-500';
+              const iconBg = tile.color.includes('blue') ? 'bg-blue-500' :
+                            tile.color.includes('orange') ? 'bg-orange-500' :
+                            'bg-purple-500';
+
               return (
-                <Card key={index} variant="elevated" className="hover:shadow-xl transition-all duration-300">
+                <Card key={index} variant="flat" className={`bg-gradient-to-br ${bgGradient} border-l-4 hover:shadow-xl transition-all duration-300`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-2">{tile.title}</p>
-                      <p className="text-4xl font-bold text-gray-900">
+                      <p className="text-sm text-gray-600 mb-1">{tile.title}</p>
+                      <p className="text-3xl font-bold text-gray-900">
                         {loading ? (
-                          <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                         ) : (
                           tile.value
                         )}
                       </p>
                     </div>
-                    <div className={`w-16 h-16 bg-gradient-to-br ${tile.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                      <Icon className="w-8 h-8 text-white" />
+                    <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center shadow-lg`}>
+                      <Icon className="w-6 h-6 text-white" />
                     </div>
                   </div>
                 </Card>
@@ -200,14 +208,18 @@ export default function PESODashboard() {
           </div>
 
           {/* Recent Applications */}
-          <Card title="RECENT APPLICATIONS" headerColor="bg-[#D4F4DD]" variant="elevated">
+          <Card title="RECENT APPLICATIONS" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
             {loading ? (
               <div className="flex items-center justify-center h-40">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 animate-spin text-[#22A555] mx-auto mb-3" />
+                  <p className="text-sm text-gray-600">Loading applications...</p>
+                </div>
               </div>
             ) : recentApplications.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No applications yet</p>
+              <div className="text-center py-12 text-gray-500">
+                <User className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <p className="font-medium text-gray-700">No applications yet</p>
                 <p className="text-sm mt-2">Applications will appear here once applicants start applying</p>
               </div>
             ) : (
@@ -215,10 +227,10 @@ export default function PESODashboard() {
                 {recentApplications.map((application) => (
                   <div
                     key={application.id}
-                    className="flex justify-between items-center p-4 hover:bg-gray-50 rounded-lg border border-gray-100 transition-colors"
+                    className="flex justify-between items-center p-4 hover:bg-gray-50 rounded-lg border border-gray-100 transition-all duration-200 cursor-pointer hover:border-[#22A555]/30"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
                         <User className="w-5 h-5 text-white" />
                       </div>
                       <div>
