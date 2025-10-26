@@ -143,100 +143,109 @@ export default function MyApplicationsPage() {
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="My Applications" pageDescription="Track the status of your job and training applications">
       <Container size="xl">
-        {/* Refresh Button */}
-        <div className="flex justify-end mb-6">
-          <RefreshButton onRefresh={fetchApplications} label="Refresh" showLastRefresh={true} />
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card variant="flat">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{applications.length}</p>
-                <p className="text-sm text-gray-600">Total Applications</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {applications.filter(a => a.status === 'Approved').length}
-                </p>
-                <p className="text-sm text-gray-600">Approved</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                <Clock className="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {applications.filter(a => a.status === 'Pending Review').length}
-                </p>
-                <p className="text-sm text-gray-600">Pending Review</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Applications Table */}
-        <Card title="APPLICATION HISTORY">
-          <EnhancedTable
-            columns={columns}
-            data={applications}
-            searchable
-            searchPlaceholder="Search applications..."
-            paginated
-            pageSize={5}
-            onExport={handleExport}
-            exportLabel="Export to Excel"
-          />
-        </Card>
-
-        {/* Application Status Legend */}
-        <Card variant="flat" className="mt-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Info className="w-5 h-5 text-[#22A555]" />
-            <h3 className="font-semibold text-lg text-gray-900">Status Guide</h3>
+        <div className="space-y-6">
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
+            <RefreshButton onRefresh={fetchApplications} label="Refresh" showLastRefresh={true} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-start gap-3 p-4 bg-orange-50 rounded-lg">
-              <Clock className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-gray-900 mb-1">Pending Review</p>
-                <p className="text-sm text-gray-700">Your application is being reviewed by HR</p>
-              </div>
-            </div>
 
-            <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-gray-900 mb-1">Approved</p>
-                <p className="text-sm text-gray-700">Congratulations! Your application has been approved</p>
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Applications</p>
+                  <p className="text-3xl font-bold text-gray-900">{applications.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
               </div>
-            </div>
+            </Card>
 
-            <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg">
-              <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-gray-900 mb-1">Disapproved</p>
-                <p className="text-sm text-gray-700">Unfortunately, your application was not successful this time</p>
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Approved</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applications.filter(a => a.status === 'Approved').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
               </div>
-            </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending Review</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applications.filter(a => a.status === 'Pending Review').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Disapproved</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {applications.filter(a => a.status === 'Disapproved').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <XCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
+
+          {/* Applications Table */}
+          <Card title="APPLICATION HISTORY" headerColor="bg-[#D4F4DD]">
+            <EnhancedTable
+              columns={columns}
+              data={applications}
+              searchable
+              searchPlaceholder="Search applications..."
+              paginated
+              pageSize={10}
+              onExport={handleExport}
+              exportLabel="Export to Excel"
+            />
+          </Card>
+
+          {/* Application Status Guide */}
+          <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Info className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900 mb-1">Application Status Guide</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-orange-600" />
+                    <span className="text-sm text-gray-700"><strong>Pending:</strong> Under review</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-sm text-gray-700"><strong>Approved:</strong> Application accepted</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-red-600" />
+                    <span className="text-sm text-gray-700"><strong>Disapproved:</strong> Not successful</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
       </Container>
     </AdminLayout>
   );

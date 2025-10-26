@@ -1,12 +1,12 @@
 'use client';
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, Card, ApplicationModal, Container, Badge, RefreshButton } from '@/components/ui';
+import { Button, Card, ApplicationModal, Container, Badge, RefreshButton, EnhancedTable } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { ChevronLeft, ChevronRight, Briefcase, MapPin, Clock, CheckCircle2 } from 'lucide-react';
+import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter } from 'lucide-react';
 
 interface Job {
   title: string;
@@ -20,9 +20,10 @@ interface Job {
 export default function AuthenticatedJobsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
-  const [currentSlide, setCurrentSlide] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterLocation, setFilterLocation] = useState<string>('all');
 
   const [jobs, setJobs] = useState<Job[]>([
     {
@@ -72,14 +73,6 @@ export default function AuthenticatedJobsPage() {
   //   // fetchJobs(); // Uncomment when real data
   // });
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % jobs.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + jobs.length) % jobs.length);
-  };
-
   const handleApplyClick = (job: Job) => {
     setSelectedJob(job);
     setIsModalOpen(true);
@@ -90,142 +83,191 @@ export default function AuthenticatedJobsPage() {
     setSelectedJob(null);
   };
 
+  // Filter jobs
+  const filteredJobs = jobs.filter(job => {
+    const matchesType = filterType === 'all' || job.type === filterType;
+    const matchesLocation = filterLocation === 'all' || job.location === filterLocation;
+    return matchesType && matchesLocation;
+  });
+
+  // Calculate stats
+  const stats = {
+    totalJobs: jobs.length,
+    fullTime: jobs.filter(j => j.type === 'Full-time').length,
+    partTime: jobs.filter(j => j.type === 'Part-time').length,
+    remote: jobs.filter(j => j.location?.includes('Remote')).length,
+  };
+
+  // Table columns
+  const columns = [
+    {
+      header: 'Position',
+      accessor: 'title' as const,
+      render: (value: string, row: Job) => (
+        <div className="flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-[#22A555]" />
+          <div>
+            <p className="font-medium text-gray-900">{value}</p>
+            <p className="text-xs text-gray-500">{row.company}</p>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: 'Description',
+      accessor: 'description' as const,
+      render: (value: string) => (
+        <span className="text-sm text-gray-600 line-clamp-2">{value}</span>
+      )
+    },
+    {
+      header: 'Location',
+      accessor: 'location' as const,
+      render: (value?: string) => (
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-700">{value || 'N/A'}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Type',
+      accessor: 'type' as const,
+      render: (value?: string) => (
+        <Badge variant="info" icon={Clock}>{value || 'N/A'}</Badge>
+      )
+    },
+    {
+      header: 'Actions',
+      accessor: 'actions' as const,
+      render: (_: any, row: Job) => (
+        <Button
+          variant="success"
+          size="sm"
+          onClick={() => handleApplyClick(row)}
+        >
+          Apply Now
+        </Button>
+      )
+    },
+  ];
+
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="Job Opportunities" pageDescription="Browse and apply for available positions">
       <Container size="xl">
-        {/* Refresh Button */}
-        <div className="flex justify-end mb-6">
-          <RefreshButton onRefresh={fetchJobs} label="Refresh" showLastRefresh={true} />
-        </div>
+        <div className="space-y-6">
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
+            <RefreshButton onRefresh={fetchJobs} label="Refresh" showLastRefresh={true} />
+          </div>
 
-        {/* Job Carousel */}
-        <div className="relative mb-20">
-          <div className="flex items-center justify-center gap-6">
-            {/* Previous Button */}
-            <button
-              onClick={prevSlide}
-              className="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-[#22A555] hover:text-white transition-all duration-200 group"
-              aria-label="Previous job"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-
-            {/* Current Job Card */}
-            <Card variant="elevated" className="w-full max-w-4xl">
-              <div className="p-10">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex-1">
-                    <h2 className="text-4xl font-bold text-gray-900 mb-3">
-                      {jobs[currentSlide].title}
-                    </h2>
-                    <p className="text-xl text-gray-700 mb-4">{jobs[currentSlide].company}</p>
-                  </div>
-                  <div className="w-16 h-16 bg-[#22A555]/10 rounded-2xl flex items-center justify-center">
-                    <Briefcase className="w-8 h-8 text-[#22A555]" />
-                  </div>
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Jobs</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalJobs}</p>
                 </div>
-
-                {/* Meta Info */}
-                <div className="flex flex-wrap gap-3 mb-6">
-                  <Badge variant="success" icon={MapPin}>
-                    {jobs[currentSlide].location}
-                  </Badge>
-                  <Badge variant="info" icon={Clock}>
-                    {jobs[currentSlide].type}
-                  </Badge>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Briefcase className="w-6 h-6 text-white" />
                 </div>
-
-                <p className="text-gray-600 text-lg mb-8 leading-relaxed">{jobs[currentSlide].description}</p>
-
-                <div className="mb-8">
-                  <h3 className="font-semibold text-xl mb-4 text-gray-900">Requirements:</h3>
-                  <ul className="space-y-3">
-                    {jobs[currentSlide].requirements.map((req, index) => (
-                      <li key={index} className="flex items-start gap-3 text-gray-700">
-                        <CheckCircle2 className="w-5 h-5 text-[#22A555] mt-0.5 flex-shrink-0" />
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <Button
-                  size="lg"
-                  variant="success"
-                  onClick={() => handleApplyClick(jobs[currentSlide])}
-                  className="text-lg"
-                >
-                  Apply for this Position
-                </Button>
               </div>
             </Card>
 
-            {/* Next Button */}
-            <button
-              onClick={nextSlide}
-              className="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-[#22A555] hover:text-white transition-all duration-200 group"
-              aria-label="Next job"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Slide Indicators */}
-          <div className="flex justify-center gap-2 mt-8">
-            {jobs.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  index === currentSlide ? 'bg-[#22A555] w-8' : 'bg-gray-300 w-2 hover:bg-gray-400'
-                }`}
-                aria-label={`Go to job ${index + 1}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* All Jobs Grid */}
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">All Available Positions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {jobs.map((job, index) => (
-              <Card key={index} variant="interactive" noPadding className="group">
-                <div className="p-6 space-y-4">
-                  {/* Icon */}
-                  <div className="w-12 h-12 bg-[#22A555]/10 rounded-xl flex items-center justify-center group-hover:bg-[#22A555] transition-colors">
-                    <Briefcase className="w-6 h-6 text-[#22A555] group-hover:text-white transition-colors" />
-                  </div>
-
-                  {/* Content */}
-                  <div>
-                    <h3 className="font-semibold text-xl mb-2 text-gray-900 group-hover:text-[#22A555] transition-colors">
-                      {job.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3">{job.company}</p>
-                    <p className="text-sm text-gray-700 mb-4 line-clamp-2">{job.description}</p>
-                  </div>
-
-                  {/* Meta */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge size="sm" variant="default">
-                      {job.type}
-                    </Badge>
-                  </div>
-
-                  {/* Button */}
-                  <Button
-                    variant="success"
-                    className="w-full"
-                    onClick={() => handleApplyClick(job)}
-                  >
-                    Apply Now
-                  </Button>
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Full-Time</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.fullTime}</p>
                 </div>
-              </Card>
-            ))}
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Part-Time</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.partTime}</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Remote Available</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.remote}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Building className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
           </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-3">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white"
+            >
+              <option value="all">All Types</option>
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
+              <option value="Contract">Contract</option>
+            </select>
+
+            <select
+              value={filterLocation}
+              onChange={(e) => setFilterLocation(e.target.value)}
+              className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white"
+            >
+              <option value="all">All Locations</option>
+              <option value="Asuncion Municipal Hall">Asuncion Municipal Hall</option>
+              <option value="Remote">Remote</option>
+            </select>
+
+            {(filterType !== 'all' || filterLocation !== 'all') && (
+              <button
+                onClick={() => {
+                  setFilterType('all');
+                  setFilterLocation('all');
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          {/* Jobs Table */}
+          <Card title={`AVAILABLE POSITIONS (${filteredJobs.length})`} headerColor="bg-[#D4F4DD]">
+            {filteredJobs.length === 0 ? (
+              <div className="text-center py-12">
+                <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <p className="text-gray-600 font-medium">No jobs found</p>
+                <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+              </div>
+            ) : (
+              <EnhancedTable
+                columns={columns}
+                data={filteredJobs}
+                searchable
+                paginated
+                pageSize={10}
+                searchPlaceholder="Search by position, company, or description..."
+              />
+            )}
+          </Card>
         </div>
       </Container>
 

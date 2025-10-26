@@ -203,27 +203,85 @@ export default function TrainingsPage() {
     return icons[index % icons.length];
   };
 
+  // Calculate stats
+  const stats = {
+    totalPrograms: programs.length,
+    availableSlots: programs.reduce((sum, p) => sum + (p.capacity - p.enrolled_count), 0),
+    enrolledPrograms: userApplications.filter(app => app.status === 'approved').length,
+    pendingApplications: userApplications.filter(app => app.status === 'pending').length,
+  };
+
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="PESO Training Programs" pageDescription="Enhance your skills with our free training programs">
       <Container size="xl">
-        {/* Refresh Button */}
-        <div className="flex justify-end mb-6">
-          <RefreshButton onRefresh={fetchTrainings} label="Refresh" showLastRefresh={true} />
-        </div>
+        <div className="space-y-6">
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
+            <RefreshButton onRefresh={fetchTrainings} label="Refresh" showLastRefresh={true} />
+          </div>
 
-        {/* Search Bar */}
-        <div className="mb-8">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Programs</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalPrograms}</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Available Slots</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.availableSlots}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Enrolled</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.enrolledPrograms}</p>
+                </div>
+                <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.pendingApplications}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Search Bar */}
           <div className="relative max-w-xl">
             <input
               type="text"
               placeholder="Search training programs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-5 py-3 pl-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555] focus:border-transparent"
+              className="w-full px-5 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] transition-colors"
             />
             <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           </div>
-        </div>
 
         {/* Training Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -364,22 +422,23 @@ export default function TrainingsPage() {
           </Card>
         )}
 
-        {/* Info Card */}
-        <Card variant="flat" className="mt-8 bg-gradient-to-br from-[#22A555]/5 to-[#20C997]/5">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="w-6 h-6 text-white" />
+          {/* Info Card */}
+          <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <GraduationCap className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900 mb-1">About PESO Training Programs</p>
+                <p className="text-sm text-gray-600">
+                  Our training programs are designed to equip job seekers with in-demand skills. All programs
+                  are completely free and include certificates upon completion. Limited slots are available,
+                  so apply early to secure your spot!
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-lg text-gray-900 mb-2">About PESO Training Programs</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Our training programs are designed to equip job seekers with in-demand skills. All programs
-                are completely free and include certificates upon completion. Limited slots are available,
-                so apply early to secure your spot!
-              </p>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
         {/* Application Modal */}
         <Modal
