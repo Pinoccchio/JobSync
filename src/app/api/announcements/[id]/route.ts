@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { notifyAdmins, notifyHR } from '@/lib/notifications';
+import { extractFilePathFromStorageUrl, deleteFileFromStorage } from '@/lib/utils/storage';
 
 /**
  * Announcement Management API - Individual Announcement Operations
  *
  * Endpoints:
  * - GET /api/announcements/[id] - Get announcement details
+ * - PUT /api/announcements/[id] - Update announcement (HR/ADMIN only)
  * - DELETE /api/announcements/[id] - Delete announcement (soft delete by setting status='archived')
  */
 
@@ -60,6 +62,209 @@ export async function GET(
   }
 }
 
+// PUT /api/announcements/[id] - Update announcement
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient();
+    const { id } = await params;
+    const body = await request.json();
+
+    // 1. Authenticate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { success: false, error: 'User profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // 3. Only HR and ADMIN can update announcements
+    if (profile.role !== 'HR' && profile.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - Only HR and Admin can update announcements' },
+        { status: 403 }
+      );
+    }
+
+    // 4. Get existing announcement
+    const { data: existingAnnouncement, error: fetchError } = await supabase
+      .from('announcements')
+      .select('id, created_by, title, status, category')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return NextResponse.json(
+          { success: false, error: 'Announcement not found' },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json(
+        { success: false, error: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    // 5. Check ownership (HR can only update their own, ADMIN can update any)
+    if (profile.role === 'HR' && existingAnnouncement.created_by !== user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - You can only update your own announcements' },
+        { status: 403 }
+      );
+    }
+
+    // 6. Validate required fields
+    const { title, description, category, image_url, status } = body;
+
+    if (!title || !description) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields: title, description' },
+        { status: 400 }
+      );
+    }
+
+    // 7. Validate category if provided
+    const validCategories = ['general', 'job_opening', 'training', 'notice'];
+    if (category && !validCategories.includes(category)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid category. Must be one of: ${validCategories.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // 7b. Validate status if provided
+    const validStatuses = ['active', 'archived'];
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // 8. Build update object
+    const updateData: any = {
+      title,
+      description,
+      category: category || existingAnnouncement.category,
+      image_url: image_url || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add status to update if provided
+    if (status) {
+      updateData.status = status;
+    }
+
+    // 9. Update announcement
+    const { data: updatedAnnouncement, error: updateError } = await supabase
+      .from('announcements')
+      .update(updateData)
+      .eq('id', id)
+      .select(`
+        id,
+        title,
+        description,
+        category,
+        image_url,
+        status,
+        created_by,
+        published_at,
+        created_at,
+        updated_at,
+        profiles:created_by (
+          id,
+          full_name,
+          role
+        )
+      `)
+      .single();
+
+    if (updateError) {
+      console.error('Error updating announcement:', updateError);
+      return NextResponse.json(
+        { success: false, error: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    // 9. Log activity
+    try {
+      await supabase.rpc('log_announcement_updated', {
+        p_user_id: user.id,
+        p_announcement_id: id,
+        p_metadata: {
+          announcement_title: updatedAnnouncement.title,
+          old_title: existingAnnouncement.title,
+          category: updatedAnnouncement.category,
+          old_category: existingAnnouncement.category,
+          has_image: !!updatedAnnouncement.image_url,
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging announcement update:', logError);
+      // Don't fail the request if logging fails
+    }
+
+    // 10. Send notifications
+    try {
+      // Notify HR user (confirmation)
+      await notifyHR(user.id, {
+        type: 'announcement',
+        title: 'Announcement Updated Successfully',
+        message: `Your announcement "${updatedAnnouncement.title}" has been updated`,
+        related_entity_type: 'announcement',
+        related_entity_id: id,
+        link_url: `/hr/announcements`,
+      });
+
+      // Notify all admins
+      await notifyAdmins({
+        type: 'announcement',
+        title: 'Announcement Updated',
+        message: `HR user updated the announcement: "${updatedAnnouncement.title}"`,
+        related_entity_type: 'announcement',
+        related_entity_id: id,
+        link_url: `/admin/user-management`,
+      });
+    } catch (notifError) {
+      console.error('Error sending announcement update notifications:', notifError);
+      // Don't fail the request if notifications fail
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: updatedAnnouncement,
+      message: 'Announcement updated successfully',
+    });
+
+  } catch (error: any) {
+    console.error('Server error in PUT /api/announcements/[id]:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE /api/announcements/[id] - Archive or permanently delete announcement
 // Query params: ?permanent=true for hard delete
 export async function DELETE(
@@ -106,10 +311,10 @@ export async function DELETE(
       );
     }
 
-    // 4. Get existing announcement
+    // 4. Get existing announcement (including image_url for cleanup)
     const { data: existingAnnouncement, error: fetchError } = await supabase
       .from('announcements')
-      .select('id, created_by, title, status')
+      .select('id, created_by, title, status, image_url')
       .eq('id', id)
       .single();
 
@@ -144,7 +349,16 @@ export async function DELETE(
         );
       }
 
-      // PERMANENT DELETE: Remove from database
+      // 6a. Delete associated image from storage (if exists)
+      if (existingAnnouncement.image_url) {
+        const filePath = extractFilePathFromStorageUrl(existingAnnouncement.image_url, 'announcements');
+        if (filePath) {
+          const adminClient = createAdminClient();
+          await deleteFileFromStorage(adminClient, 'announcements', filePath);
+        }
+      }
+
+      // 6b. PERMANENT DELETE: Remove announcement from database
       const { error: deleteError } = await supabase
         .from('announcements')
         .delete()
@@ -160,13 +374,12 @@ export async function DELETE(
 
       // Log permanent deletion
       try {
-        await supabase.rpc('log_activity', {
+        await supabase.rpc('log_announcement_status_changed', {
           p_user_id: user.id,
-          p_event_type: 'ANNOUNCEMENT_DELETED_PERMANENTLY',
-          p_event_category: 'job',
-          p_details: `Permanently deleted announcement: ${existingAnnouncement.title}`,
+          p_announcement_id: id,
+          p_old_status: existingAnnouncement.status,
+          p_new_status: 'deleted_permanently',
           p_metadata: {
-            announcement_id: id,
             announcement_title: existingAnnouncement.title,
             permanent: true,
             warning: 'PERMANENT DELETION - All data removed from database',
@@ -220,16 +433,14 @@ export async function DELETE(
 
     // Log archive operation
     try {
-      await supabase.rpc('log_activity', {
+      await supabase.rpc('log_announcement_status_changed', {
         p_user_id: user.id,
-        p_event_type: 'ANNOUNCEMENT_ARCHIVED',
-        p_event_category: 'job',
-        p_details: `Archived announcement: ${existingAnnouncement.title}`,
+        p_announcement_id: id,
+        p_old_status: existingAnnouncement.status,
+        p_new_status: 'archived',
         p_metadata: {
-          announcement_id: id,
           announcement_title: existingAnnouncement.title,
-          old_status: existingAnnouncement.status,
-          new_status: 'archived',
+          action: 'archive',
           reversible: true,
         }
       });

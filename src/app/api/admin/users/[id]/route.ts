@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, updateUserProfile, deleteUser } from '@/lib/supabase/admin';
 import { supabase } from '@/lib/supabase/auth';
 import { ActivityLogger } from '@/lib/supabase/activityLogger';
+import { extractFilePathFromStorageUrl, deleteFileFromStorage } from '@/lib/utils/storage';
 import type { UpdateUserRequest, User, ApiResponse } from '@/types/users';
 
 /**
@@ -227,7 +228,7 @@ export async function DELETE(
     // Get user info before deletion (for logging and validation)
     const { data: targetUser } = await supabaseAdmin
       .from('profiles')
-      .select('full_name, email, role')
+      .select('full_name, email, role, profile_image_url')
       .eq('id', userId)
       .single();
 
@@ -253,6 +254,14 @@ export async function DELETE(
         { success: false, error: 'Cannot delete another admin account. Admins can only be removed by themselves or through direct database access.' },
         { status: 403 }
       );
+    }
+
+    // Delete profile image from storage (if exists)
+    if (targetUser.profile_image_url) {
+      const filePath = extractFilePathFromStorageUrl(targetUser.profile_image_url, 'profiles');
+      if (filePath) {
+        await deleteFileFromStorage(supabaseAdmin, 'profiles', filePath);
+      }
     }
 
     // Delete user (cascades to profile)

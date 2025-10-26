@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 /**
@@ -29,6 +30,35 @@ export async function createClient() {
           }
         },
       },
+    }
+  );
+}
+
+/**
+ * Admin Supabase client with service role key
+ * Bypasses Row Level Security (RLS) policies
+ * Use ONLY for server-side operations that require admin privileges
+ *
+ * Use cases:
+ * - Deleting files from storage (bypasses RLS)
+ * - Admin operations that need to access all data
+ * - Background jobs and scheduled tasks
+ *
+ * WARNING: Never expose this client to the frontend!
+ */
+export function createAdminClient() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not defined in environment variables');
+  }
+
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     }
   );
 }

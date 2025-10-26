@@ -62,12 +62,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply filters
-    if (status) {
+    if (status && status !== 'all') {
       query = query.eq('status', status);
-    } else {
-      // Default to active announcements only
+    } else if (!status) {
+      // Default to active announcements only if no status specified
       query = query.eq('status', 'active');
     }
+    // If status === 'all', don't filter by status (fetch all)
 
     if (category) {
       query = query.eq('category', category);
@@ -197,12 +198,13 @@ export async function POST(request: NextRequest) {
     // 7. Log activity
     try {
       await supabase.rpc('log_announcement_created', {
-        p_user_id: user.id,
+        p_hr_id: user.id,
         p_announcement_id: announcement.id,
+        p_announcement_title: announcement.title,
+        p_category: announcement.category,
         p_metadata: {
-          announcement_title: announcement.title,
-          category: announcement.category,
           has_image: !!announcement.image_url,
+          description_length: announcement.description.length,
         }
       });
     } catch (logError) {
