@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LucideIcon, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -13,10 +13,11 @@ interface MenuItem {
 interface SidebarProps {
   menuItems: MenuItem[];
   role: 'Admin' | 'HR' | 'PESO' | 'Applicant';
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ menuItems, role }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export const Sidebar: React.FC<SidebarProps> = ({ menuItems, role, isCollapsed, onToggleCollapse }) => {
   const pathname = usePathname();
 
   return (
@@ -77,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ menuItems, role }) => {
 
       {/* Collapse Toggle */}
       <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={onToggleCollapse}
         className="m-4 p-3 hover:bg-white/10 transition-colors rounded-lg border border-white/10 flex items-center justify-center group"
         title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >

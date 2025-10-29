@@ -1,4 +1,5 @@
-import React from 'react';
+'use client';
+import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
 import {
@@ -58,6 +59,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   pageTitle,
   pageDescription
 }) => {
+  // Manage sidebar collapse state
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const menuItems =
     role === 'Admin' ? ADMIN_MENU_ITEMS :
     role === 'HR' ? HR_MENU_ITEMS :
@@ -72,9 +76,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   return (
     <div className="flex h-screen bg-[#F5F5F5]">
-      <Sidebar menuItems={menuItems} role={role} />
+      <Sidebar
+        menuItems={menuItems}
+        role={role}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+      />
 
-      <div className="flex-1 ml-64 flex flex-col">
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${
+        isCollapsed ? 'ml-20' : 'ml-64'
+      }`}>
         <TopNav
           userRole={userRole}
           userName={userName}
