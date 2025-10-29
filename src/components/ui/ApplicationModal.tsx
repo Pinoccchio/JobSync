@@ -1,11 +1,11 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { FileUploadWithProgress } from './FileUploadWithProgress';
 import { Button } from './Button';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
-import { CheckCircle, User } from 'lucide-react';
+import { CheckCircle, User, FileText, Upload, ExternalLink } from 'lucide-react';
 
 interface Job {
   id: string;
@@ -41,7 +41,37 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const [pdsFileUrl, setPdsFileUrl] = useState('');
   const [pdsFileName, setPdsFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [applicationMethod, setApplicationMethod] = useState<'pds' | 'upload' | null>(null);
+  const [pdsData, setPdsData] = useState<any>(null);
+  const [isLoadingPDS, setIsLoadingPDS] = useState(true);
   const { showToast } = useToast();
+
+  // Load user's PDS data on mount
+  useEffect(() => {
+    if (isOpen) {
+      loadPDSData();
+    }
+  }, [isOpen]);
+
+  const loadPDSData = async () => {
+    setIsLoadingPDS(true);
+    try {
+      const response = await fetch('/api/pds');
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setPdsData(result.data);
+        // Auto-select PDS method if completed
+        if (result.data.is_completed) {
+          setApplicationMethod('pds');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading PDS:', error);
+    } finally {
+      setIsLoadingPDS(false);
+    }
+  };
 
   const handleFileUpload = (data: {
     fileName: string;
@@ -59,8 +89,18 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!pdsFileUrl || !pdsFileName) {
+    if (!applicationMethod) {
+      showToast('Please select an application method', 'error');
+      return;
+    }
+
+    if (applicationMethod === 'upload' && (!pdsFileUrl || !pdsFileName)) {
       showToast('Please upload your PDS before submitting', 'error');
+      return;
+    }
+
+    if (applicationMethod === 'pds' && (!pdsData || !pdsData.is_completed)) {
+      showToast('Your PDS is not completed yet', 'error');
       return;
     }
 
@@ -72,16 +112,23 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      const requestBody: any = {
+        job_id: job.id,
+      };
+
+      if (applicationMethod === 'pds') {
+        requestBody.pds_id = pdsData.id;
+      } else {
+        requestBody.pds_file_url = pdsFileUrl;
+        requestBody.pds_file_name = pdsFileName;
+      }
+
       const response = await fetch('/api/applications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          job_id: job.id,
-          pds_file_url: pdsFileUrl,
-          pds_file_name: pdsFileName,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
@@ -95,6 +142,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       // Reset and close
       setPdsFileUrl('');
       setPdsFileName('');
+      setApplicationMethod(null);
       onClose();
 
       // Call success callback to refresh parent data
@@ -112,6 +160,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const handleClose = () => {
     setPdsFileUrl('');
     setPdsFileName('');
+    setApplicationMethod(null);
     onClose();
   };
 
@@ -176,21 +225,137 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
           </div>
         </div>
 
-        {/* PDS Upload Section */}
+        {/* Application Method Selection */}
         <div>
-          <h3 className="font-semibold text-lg mb-3">Upload Personal Data Sheet (PDS)</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Please upload your completed PDS in PDF format. Maximum file size: 10MB.
-          </p>
+          <h3 className="font-semibold text-lg mb-3">Choose Application Method</h3>
 
-          <FileUploadWithProgress
-            bucket="pds-files"
-            accept="application/pdf"
-            onUploadComplete={handleFileUpload}
-            onUploadError={handleFileUploadError}
-            label="Drag and drop your PDS (PDF) here"
-            maxSizeDisplay="10MB"
-          />
+          {isLoadingPDS ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#22A555] mx-auto"></div>
+              <p className="text-sm text-gray-600 mt-2">Checking your PDS...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Option 1: Use Completed PDS */}
+              <button
+                type="button"
+                onClick={() => setApplicationMethod('pds')}
+                disabled={!pdsData || !pdsData.is_completed}
+                className={`
+                  relative border-2 rounded-lg p-6 text-left transition-all
+                  ${
+                    applicationMethod === 'pds'
+                      ? 'border-[#22A555] bg-[#22A555]/5'
+                      : pdsData && pdsData.is_completed
+                      ? 'border-gray-300 hover:border-[#22A555]/50'
+                      : 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                  }
+                `}
+              >
+                <div className="flex items-start gap-3">
+                  <FileText className={`w-6 h-6 mt-1 ${applicationMethod === 'pds' ? 'text-[#22A555]' : 'text-gray-400'}`} />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 mb-1">Use My Completed PDS</h4>
+                    {pdsData && pdsData.is_completed ? (
+                      <>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Your PDS is complete and ready to use
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-[#22A555]">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Completed on {new Date(pdsData.updated_at).toLocaleDateString()}</span>
+                        </div>
+                      </>
+                    ) : pdsData && !pdsData.is_completed ? (
+                      <>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Your PDS is {pdsData.completion_percentage}% complete
+                        </p>
+                        <a
+                          href="/applicant/pds"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Complete your PDS
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-600 mb-2">
+                          You haven't filled out your PDS yet
+                        </p>
+                        <a
+                          href="/applicant/pds"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Fill out PDS online
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {applicationMethod === 'pds' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="w-6 h-6 bg-[#22A555] rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                )}
+              </button>
+
+              {/* Option 2: Upload PDF */}
+              <button
+                type="button"
+                onClick={() => setApplicationMethod('upload')}
+                className={`
+                  relative border-2 rounded-lg p-6 text-left transition-all
+                  ${
+                    applicationMethod === 'upload'
+                      ? 'border-[#22A555] bg-[#22A555]/5'
+                      : 'border-gray-300 hover:border-[#22A555]/50'
+                  }
+                `}
+              >
+                <div className="flex items-start gap-3">
+                  <Upload className={`w-6 h-6 mt-1 ${applicationMethod === 'upload' ? 'text-[#22A555]' : 'text-gray-400'}`} />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 mb-1">Upload PDS File</h4>
+                    <p className="text-sm text-gray-600">
+                      Upload your completed PDS in PDF format
+                    </p>
+                  </div>
+                </div>
+                {applicationMethod === 'upload' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="w-6 h-6 bg-[#22A555] rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* File Upload (shown if upload method selected) */}
+          {applicationMethod === 'upload' && (
+            <div className="mt-4">
+              <FileUploadWithProgress
+                bucket="pds-files"
+                accept="application/pdf"
+                onUploadComplete={handleFileUpload}
+                onUploadError={handleFileUploadError}
+                label="Drag and drop your PDS (PDF) here"
+                maxSizeDisplay="10MB"
+              />
+            </div>
+          )}
         </div>
 
         {/* Important Notice */}
@@ -216,7 +381,12 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
           <Button
             variant="success"
             onClick={handleSubmit}
-            disabled={!pdsFileUrl || isSubmitting}
+            disabled={
+              !applicationMethod ||
+              (applicationMethod === 'upload' && !pdsFileUrl) ||
+              (applicationMethod === 'pds' && (!pdsData || !pdsData.is_completed)) ||
+              isSubmitting
+            }
             loading={isSubmitting}
             icon={CheckCircle}
           >

@@ -195,11 +195,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Validate required fields
-    const { job_id, pds_file_url, pds_file_name } = body;
+    const { job_id, pds_id, pds_file_url, pds_file_name } = body;
 
-    if (!job_id || !pds_file_url || !pds_file_name) {
+    if (!job_id) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: job_id, pds_file_url, pds_file_name' },
+        { success: false, error: 'Missing required field: job_id' },
+        { status: 400 }
+      );
+    }
+
+    // Must provide either pds_id (web-based) OR pds_file_url (upload)
+    if (!pds_id && (!pds_file_url || !pds_file_name)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Must provide either pds_id (web-based PDS) or pds_file_url/pds_file_name (uploaded PDF)',
+        },
         { status: 400 }
       );
     }
@@ -278,22 +289,30 @@ export async function POST(request: NextRequest) {
     }
 
     // 8. Create application
+    const insertData: any = {
+      job_id,
+      applicant_id: user.id,
+      applicant_profile_id: applicantProfileId,
+      status: 'pending',
+      notification_sent: false,
+    };
+
+    // Add PDS reference (either pds_id for web-based or file URL for upload)
+    if (pds_id) {
+      insertData.pds_id = pds_id;
+    } else {
+      insertData.pds_file_url = pds_file_url;
+      insertData.pds_file_name = pds_file_name;
+    }
+
     const { data: application, error: applicationError } = await supabase
       .from('applications')
-      .insert({
-        job_id,
-        applicant_id: user.id,
-        applicant_profile_id: applicantProfileId,
-        pds_file_url,
-        pds_file_name,
-        status: 'pending',
-        // Scores will be populated by AI ranking later
-        notification_sent: false,
-      })
+      .insert(insertData)
       .select(`
         id,
         job_id,
         applicant_id,
+        pds_id,
         pds_file_url,
         pds_file_name,
         status,

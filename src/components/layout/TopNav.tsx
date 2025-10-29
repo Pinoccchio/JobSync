@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, Settings, LogOut, CheckCircle, XCircle, Clock, ChevronDown, Trash2 } from 'lucide-react';
+import { Bell, Settings, LogOut, CheckCircle, XCircle, Clock, ChevronDown, Trash2, FileText } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -393,6 +393,17 @@ export const TopNav: React.FC<TopNavProps> = ({
                   <p className="text-xs text-gray-600">{userRole}</p>
                 </div>
                 <div className="py-2">
+                  {userRole === 'Applicant' && (
+                    <Link href="/applicant/pds">
+                      <button
+                        onClick={() => setShowUserMenu(false)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-3 transition-colors"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span className="text-sm">Fill PDS</span>
+                      </button>
+                    </Link>
+                  )}
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
