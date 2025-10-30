@@ -3,11 +3,12 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Card, ApplicationModal, Container, Badge, RefreshButton, EnhancedTable } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
+import { ApplicationStatusBadge, AppliedBadge } from '@/components/ApplicationStatusBadge';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, LayoutGrid, List, Star, Award, Calendar, TrendingUp, User } from 'lucide-react';
+import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, LayoutGrid, List, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye } from 'lucide-react';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 
 interface Job {
@@ -32,6 +33,22 @@ interface Job {
   } | null;
 }
 
+interface Application {
+  id: string;
+  job_id: string;
+  applicant_id: string;
+  status: 'pending' | 'approved' | 'denied';
+  rank: number | null;
+  match_score: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface JobWithApplication extends Job {
+  userApplication: Application | null;
+  hasApplied: boolean;
+}
+
 export default function AuthenticatedJobsPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -39,8 +56,12 @@ export default function AuthenticatedJobsPage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
+  const [filterApplicationStatus, setFilterApplicationStatus] = useState<string>('all'); // all, applied, not-applied
+  const [filterStatus, setFilterStatus] = useState<string>('all'); // all, pending, approved, denied
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [userApplications, setUserApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingApplications, setLoadingApplications] = useState(true);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card'); // Default to card view
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -65,10 +86,32 @@ export default function AuthenticatedJobsPage() {
     }
   }, [showToast]);
 
-  // Fetch jobs on component mount
+  // Fetch user applications function
+  const fetchUserApplications = useCallback(async () => {
+    try {
+      setLoadingApplications(true);
+      const response = await fetch('/api/applications');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch applications');
+      }
+
+      setUserApplications(result.data || []);
+    } catch (error: any) {
+      console.error('Error fetching applications:', error);
+      // Don't show error toast - this is non-critical data
+      setUserApplications([]);
+    } finally {
+      setLoadingApplications(false);
+    }
+  }, []);
+
+  // Fetch jobs and applications on component mount
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+    fetchUserApplications();
+  }, [fetchJobs, fetchUserApplications]);
 
   // REMOVED: Real-time subscription disabled for performance
   // useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
@@ -87,12 +130,29 @@ export default function AuthenticatedJobsPage() {
   };
 
   const handleApplicationSuccess = () => {
-    // Refresh jobs list after successful application
-    fetchJobs();
+    // Refresh applications list after successful application
+    fetchUserApplications();
+    showToast('Application submitted successfully!', 'success');
   };
 
-  // Filter jobs with search
-  const filteredJobs = jobs.filter(job => {
+  // Helper functions for application status
+  const getApplicationForJob = (jobId: string): Application | null => {
+    return userApplications.find(app => app.job_id === jobId) || null;
+  };
+
+  const hasAppliedToJob = (jobId: string): boolean => {
+    return !!getApplicationForJob(jobId);
+  };
+
+  // Combine jobs with application status
+  const jobsWithApplicationStatus: JobWithApplication[] = jobs.map(job => ({
+    ...job,
+    userApplication: getApplicationForJob(job.id),
+    hasApplied: hasAppliedToJob(job.id),
+  }));
+
+  // Filter jobs with search and application status
+  const filteredJobs = jobsWithApplicationStatus.filter(job => {
     const matchesType = filterType === 'all' || job.employment_type === filterType;
     const matchesLocation = filterLocation === 'all' ||
       (filterLocation === 'Remote' ? job.remote : job.location === filterLocation);
@@ -100,7 +160,19 @@ export default function AuthenticatedJobsPage() {
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.degree_requirement.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesLocation && matchesSearch;
+
+    // Application status filter
+    const matchesApplicationStatus =
+      filterApplicationStatus === 'all' ||
+      (filterApplicationStatus === 'applied' && job.hasApplied) ||
+      (filterApplicationStatus === 'not-applied' && !job.hasApplied);
+
+    // Status filter (for applied jobs only)
+    const matchesStatus =
+      filterStatus === 'all' ||
+      (job.userApplication && job.userApplication.status === filterStatus);
+
+    return matchesType && matchesLocation && matchesSearch && matchesApplicationStatus && matchesStatus;
   });
 
   // Helper function to get card gradient color
@@ -145,6 +217,7 @@ export default function AuthenticatedJobsPage() {
     fullTime: jobs.filter(j => j.employment_type === 'Full-time').length,
     partTime: jobs.filter(j => j.employment_type === 'Part-time').length,
     remote: jobs.filter(j => j.remote).length,
+    applied: userApplications.length,
   };
 
   // Get unique employment types and locations for filters
@@ -156,7 +229,7 @@ export default function AuthenticatedJobsPage() {
     {
       header: 'Position',
       accessor: 'title' as const,
-      render: (value: string, row: Job) => (
+      render: (value: string, row: JobWithApplication) => (
         <div className="flex items-center gap-2">
           <Briefcase className="w-4 h-4 text-[#22A555]" />
           <div>
@@ -169,7 +242,7 @@ export default function AuthenticatedJobsPage() {
     {
       header: 'Posted By',
       accessor: 'profiles' as const,
-      render: (_: any, row: Job) => (
+      render: (_: any, row: JobWithApplication) => (
         <div
           className="flex items-start gap-2"
           title={getCreatorTooltip(row.profiles || null, row.created_at)}
@@ -196,7 +269,7 @@ export default function AuthenticatedJobsPage() {
     {
       header: 'Location',
       accessor: 'location' as const,
-      render: (value: string | null, row: Job) => (
+      render: (value: string | null, row: JobWithApplication) => (
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-gray-400" />
           <div>
@@ -214,17 +287,49 @@ export default function AuthenticatedJobsPage() {
       )
     },
     {
+      header: 'Application Status',
+      accessor: 'userApplication' as const,
+      render: (_: any, row: JobWithApplication) => {
+        if (!row.hasApplied || !row.userApplication) {
+          return <span className="text-sm text-gray-400">Not applied</span>;
+        }
+        return (
+          <ApplicationStatusBadge
+            status={row.userApplication.status}
+            createdAt={row.userApplication.created_at}
+            matchScore={row.userApplication.match_score}
+            showDate={true}
+          />
+        );
+      }
+    },
+    {
       header: 'Actions',
       accessor: 'actions' as const,
-      render: (_: any, row: Job) => (
-        <Button
-          variant="success"
-          size="sm"
-          onClick={() => handleApplyClick(row)}
-        >
-          Apply Now
-        </Button>
-      )
+      render: (_: any, row: JobWithApplication) => {
+        if (row.hasApplied && row.userApplication) {
+          return (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Eye}
+              disabled
+              title={`Applied on ${new Date(row.userApplication.created_at).toLocaleDateString()}`}
+            >
+              Applied
+            </Button>
+          );
+        }
+        return (
+          <Button
+            variant="success"
+            size="sm"
+            onClick={() => handleApplyClick(row)}
+          >
+            Apply Now
+          </Button>
+        );
+      }
     },
   ];
 
@@ -264,7 +369,7 @@ export default function AuthenticatedJobsPage() {
           </div>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -275,6 +380,20 @@ export default function AuthenticatedJobsPage() {
                 </div>
                 <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
                   <Briefcase className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-teal-50 to-teal-100 border-l-4 border-teal-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">My Applications</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loadingApplications ? '...' : stats.applied}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -345,8 +464,32 @@ export default function AuthenticatedJobsPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Filter className="w-5 h-5 text-gray-600 hidden md:block" />
+
+              <select
+                value={filterApplicationStatus}
+                onChange={(e) => setFilterApplicationStatus(e.target.value)}
+                className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[150px]"
+              >
+                <option value="all">All Jobs</option>
+                <option value="not-applied">Not Applied</option>
+                <option value="applied">Applied</option>
+              </select>
+
+              {filterApplicationStatus === 'applied' && userApplications.length > 0 && (
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[140px]"
+                >
+                  <option value="all">Any Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="denied">Denied</option>
+                </select>
+              )}
+
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
@@ -370,11 +513,13 @@ export default function AuthenticatedJobsPage() {
                 <option value="Remote">Remote</option>
               </select>
 
-              {(filterType !== 'all' || filterLocation !== 'all' || searchQuery) && (
+              {(filterType !== 'all' || filterLocation !== 'all' || filterApplicationStatus !== 'all' || filterStatus !== 'all' || searchQuery) && (
                 <button
                   onClick={() => {
                     setFilterType('all');
                     setFilterLocation('all');
+                    setFilterApplicationStatus('all');
+                    setFilterStatus('all');
                     setSearchQuery('');
                   }}
                   className="px-4 py-2.5 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
@@ -446,7 +591,7 @@ export default function AuthenticatedJobsPage() {
 
                           {/* Badges */}
                           <div className="flex flex-col gap-2">
-                            {isNewJob(job.created_at) && (
+                            {isNewJob(job.created_at) && !job.hasApplied && (
                               <Badge variant="success" size="sm" className="whitespace-nowrap">
                                 🆕 New
                               </Badge>
@@ -458,6 +603,13 @@ export default function AuthenticatedJobsPage() {
                             )}
                           </div>
                         </div>
+
+                        {/* Applied Badge - Inline below title */}
+                        {job.hasApplied && job.userApplication && (
+                          <div className="flex items-center gap-2 -mt-2">
+                            <AppliedBadge createdAt={job.userApplication.created_at} />
+                          </div>
+                        )}
 
                         {/* Description */}
                         <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
@@ -538,16 +690,36 @@ export default function AuthenticatedJobsPage() {
                           </div>
                         </div>
 
-                        {/* Apply Button */}
-                        <Button
-                          variant="success"
-                          className="w-full shadow-md hover:shadow-lg transition-shadow"
-                          size="lg"
-                          icon={CheckCircle2}
-                          onClick={() => handleApplyClick(job)}
-                        >
-                          Apply Now
-                        </Button>
+                        {/* Application Status & Apply Button */}
+                        {job.hasApplied && job.userApplication ? (
+                          <div className="space-y-3">
+                            <ApplicationStatusBadge
+                              status={job.userApplication.status}
+                              createdAt={job.userApplication.created_at}
+                              matchScore={job.userApplication.match_score}
+                              className="w-full justify-center py-2"
+                            />
+                            <Button
+                              variant="secondary"
+                              className="w-full"
+                              size="lg"
+                              icon={Eye}
+                              disabled
+                            >
+                              View Application
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="success"
+                            className="w-full shadow-md hover:shadow-lg transition-shadow"
+                            size="lg"
+                            icon={CheckCircle2}
+                            onClick={() => handleApplyClick(job)}
+                          >
+                            Apply Now
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   ))}
