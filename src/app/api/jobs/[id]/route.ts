@@ -346,13 +346,29 @@ export async function PATCH(
       // Don't fail the request if notifications fail
     }
 
-    // TODO: If job requirements changed, trigger re-ranking of applicants
-    // This will be implemented in Phase 10 (AI Ranking)
+    // 9. If job requirements changed, trigger re-ranking of applicants
+    const requirementFields = ['degree_requirement', 'skills', 'eligibilities', 'years_of_experience'];
+    const requirementsChanged = requirementFields.some(field => updateData.hasOwnProperty(field));
+
+    if (requirementsChanged) {
+      // Trigger re-ranking in background (fire and forget)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/jobs/${id}/rank`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(error => {
+        console.error('Background re-ranking failed:', error);
+        // Don't fail the request if re-ranking fails
+      });
+
+      console.log(`Job requirements updated for "${updatedJob.title}". Triggered background re-ranking of applicants.`);
+    }
 
     return NextResponse.json({
       success: true,
       data: updatedJob,
-      message: 'Job updated successfully',
+      message: requirementsChanged
+        ? 'Job updated successfully. Applicants are being re-ranked in the background.'
+        : 'Job updated successfully',
     });
 
   } catch (error) {

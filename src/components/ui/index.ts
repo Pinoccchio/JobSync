@@ -8,6 +8,7 @@ export { DashboardTile } from './DashboardTile';
 export { FileUpload } from './FileUpload';
 export { FileUploadWithProgress } from './FileUploadWithProgress';
 export { Modal } from './Modal';
+export { ConfirmModal } from './ConfirmModal';
 export { Toast } from './Toast';
 export { ApplicationModal } from './ApplicationModal';
 export { Badge } from './Badge';

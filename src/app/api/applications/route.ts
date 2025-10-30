@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
         eligibility_score,
         algorithm_used,
         ranking_reasoning,
+        algorithm_details,
         reviewed_by,
         reviewed_at,
         notification_sent,
@@ -334,7 +335,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. TODO: Trigger OCR processing (Phase 10)
-    // 10. TODO: Trigger AI ranking (Phase 10)
+
+    // 10. Trigger AI ranking in background (don't wait for completion)
+    try {
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/jobs/${job_id}/rank`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(error => {
+        console.error('Background ranking trigger failed:', error);
+        // Don't fail the application submission if ranking fails
+      });
+      console.log(`New application submitted for "${job.title}". Triggered background ranking.`);
+    } catch (error) {
+      console.error('Error triggering background ranking:', error);
+      // Don't fail the application submission if ranking trigger fails
+    }
+
     // 11. TODO: Send notification to applicant (Phase 5)
 
     return NextResponse.json({
