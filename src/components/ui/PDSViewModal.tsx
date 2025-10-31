@@ -1,9 +1,10 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { formatAddress, formatPermanentAddress } from '@/lib/utils/formatAddress';
 import { ensureArray, ensureString } from '@/lib/utils/dataTransformers';
+import { createClient } from '@/lib/supabase/client';
 import {
   User,
   GraduationCap,
@@ -26,6 +27,40 @@ interface PDSViewModalProps {
 
 export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSViewModalProps) {
   const [includeSignature, setIncludeSignature] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [loadingSignature, setLoadingSignature] = useState(false);
+
+  // Fetch signed URL for signature when modal opens
+  useEffect(() => {
+    const fetchSignatureUrl = async () => {
+      if (!pdsData?.signature_url || !isOpen) {
+        setSignatureUrl(null);
+        return;
+      }
+
+      setLoadingSignature(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.storage
+          .from('pds-signatures')
+          .createSignedUrl(pdsData.signature_url, 3600); // 1 hour expiry
+
+        if (error) {
+          console.error('Error creating signed URL:', error);
+          setSignatureUrl(null);
+        } else {
+          setSignatureUrl(data.signedUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching signature:', error);
+        setSignatureUrl(null);
+      } finally {
+        setLoadingSignature(false);
+      }
+    };
+
+    fetchSignatureUrl();
+  }, [pdsData?.signature_url, isOpen]);
 
   if (!pdsData) return null;
 
@@ -531,55 +566,55 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
           </div>
         </section>
 
-        {/* Questions */}
-        {pdsData.questions && (
+        {/* Questions (34-40) */}
+        {otherInformation && (
           <section>
             <div className="flex items-center gap-2 mb-3">
               <FileText className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Questions</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Questions (34-40)</h3>
             </div>
             <div className="space-y-3">
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Related within 3rd degree:</span> {pdsData.questions.relatedThirdDegree ? 'Yes' : 'No'}
+                  <span className="font-medium">34a. Related within 3rd degree:</span> {otherInformation.relatedThirdDegree ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.relatedThirdDegree && pdsData.questions.relatedThirdDegreeDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.relatedThirdDegreeDetails}</p>
+                {otherInformation.relatedThirdDegree && otherInformation.relatedThirdDegreeDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.relatedThirdDegreeDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Related within 4th degree (LGU):</span> {pdsData.questions.relatedFourthDegree ? 'Yes' : 'No'}
+                  <span className="font-medium">34b. Related within 4th degree (LGU):</span> {otherInformation.relatedFourthDegree ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.relatedFourthDegree && pdsData.questions.relatedFourthDegreeDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.relatedFourthDegreeDetails}</p>
+                {otherInformation.relatedFourthDegree && otherInformation.relatedFourthDegreeDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.relatedFourthDegreeDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Guilty of administrative offense:</span> {pdsData.questions.guiltyAdministrativeOffense ? 'Yes' : 'No'}
+                  <span className="font-medium">35a. Guilty of administrative offense:</span> {otherInformation.guiltyAdministrativeOffense ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.guiltyAdministrativeOffense && pdsData.questions.guiltyAdministrativeOffenseDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.guiltyAdministrativeOffenseDetails}</p>
+                {otherInformation.guiltyAdministrativeOffense && otherInformation.guiltyAdministrativeOffenseDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.guiltyAdministrativeOffenseDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Criminally charged:</span> {pdsData.questions.criminallyCharged ? 'Yes' : 'No'}
+                  <span className="font-medium">35b. Criminally charged:</span> {otherInformation.criminallyCharged ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.criminallyCharged && (
+                {otherInformation.criminallyCharged && (
                   <>
-                    {pdsData.questions.criminallyChargedDetails && (
-                      <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.criminallyChargedDetails}</p>
+                    {otherInformation.criminallyChargedDetails && (
+                      <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.criminallyChargedDetails}</p>
                     )}
-                    {pdsData.questions.criminallyChargedDateFiled && (
-                      <p className="text-sm text-gray-600 pl-4">Date Filed: {pdsData.questions.criminallyChargedDateFiled}</p>
+                    {otherInformation.criminallyChargedDateFiled && (
+                      <p className="text-sm text-gray-600 pl-4">Date Filed: {otherInformation.criminallyChargedDateFiled}</p>
                     )}
-                    {pdsData.questions.criminallyChargedStatus && (
-                      <p className="text-sm text-gray-600 pl-4">Status: {pdsData.questions.criminallyChargedStatus}</p>
+                    {otherInformation.criminallyChargedStatus && (
+                      <p className="text-sm text-gray-600 pl-4">Status: {otherInformation.criminallyChargedStatus}</p>
                     )}
                   </>
                 )}
@@ -587,73 +622,73 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Convicted of any crime:</span> {pdsData.questions.convicted ? 'Yes' : 'No'}
+                  <span className="font-medium">36. Convicted of any crime:</span> {otherInformation.convicted ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.convicted && pdsData.questions.convictedDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.convictedDetails}</p>
+                {otherInformation.convicted && otherInformation.convictedDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.convictedDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Separated from service:</span> {pdsData.questions.separatedFromService ? 'Yes' : 'No'}
+                  <span className="font-medium">37. Separated from service:</span> {otherInformation.separatedFromService ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.separatedFromService && pdsData.questions.separatedFromServiceDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.separatedFromServiceDetails}</p>
+                {otherInformation.separatedFromService && otherInformation.separatedFromServiceDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.separatedFromServiceDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Candidate in national/local election:</span> {pdsData.questions.candidateNationalLocal ? 'Yes' : 'No'}
+                  <span className="font-medium">38a. Candidate in national/local election:</span> {otherInformation.candidateNationalLocal ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.candidateNationalLocal && pdsData.questions.candidateNationalLocalDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.candidateNationalLocalDetails}</p>
+                {otherInformation.candidateNationalLocal && otherInformation.candidateNationalLocalDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.candidateNationalLocalDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Resigned for candidacy:</span> {pdsData.questions.resignedForCandidacy ? 'Yes' : 'No'}
+                  <span className="font-medium">38b. Resigned for candidacy:</span> {otherInformation.resignedForCandidacy ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.resignedForCandidacy && pdsData.questions.resignedForCandidacyDetails && (
-                  <p className="text-sm text-gray-600 pl-4">Details: {pdsData.questions.resignedForCandidacyDetails}</p>
+                {otherInformation.resignedForCandidacy && otherInformation.resignedForCandidacyDetails && (
+                  <p className="text-sm text-gray-600 pl-4">Details: {otherInformation.resignedForCandidacyDetails}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Immigrant/permanent resident:</span> {pdsData.questions.immigrantOrPermanentResident ? 'Yes' : 'No'}
+                  <span className="font-medium">39. Immigrant/permanent resident:</span> {otherInformation.immigrantOrPermanentResident ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.immigrantOrPermanentResident && pdsData.questions.immigrantOrPermanentResidentCountry && (
-                  <p className="text-sm text-gray-600 pl-4">Country: {pdsData.questions.immigrantOrPermanentResidentCountry}</p>
+                {otherInformation.immigrantOrPermanentResident && otherInformation.immigrantOrPermanentResidentCountry && (
+                  <p className="text-sm text-gray-600 pl-4">Country: {otherInformation.immigrantOrPermanentResidentCountry}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Member of indigenous group:</span> {pdsData.questions.indigenousGroupMember ? 'Yes' : 'No'}
+                  <span className="font-medium">40a. Member of indigenous group:</span> {otherInformation.indigenousGroupMember ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.indigenousGroupMember && pdsData.questions.indigenousGroupName && (
-                  <p className="text-sm text-gray-600 pl-4">Group: {pdsData.questions.indigenousGroupName}</p>
+                {otherInformation.indigenousGroupMember && otherInformation.indigenousGroupName && (
+                  <p className="text-sm text-gray-600 pl-4">Group: {otherInformation.indigenousGroupName}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Person with disability (PWD):</span> {pdsData.questions.personWithDisability ? 'Yes' : 'No'}
+                  <span className="font-medium">40b. Person with disability (PWD):</span> {otherInformation.personWithDisability ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.personWithDisability && pdsData.questions.pwdIdNumber && (
-                  <p className="text-sm text-gray-600 pl-4">ID Number: {pdsData.questions.pwdIdNumber}</p>
+                {otherInformation.personWithDisability && otherInformation.pwdIdNumber && (
+                  <p className="text-sm text-gray-600 pl-4">ID Number: {otherInformation.pwdIdNumber}</p>
                 )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-indigo-500">
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Solo parent:</span> {pdsData.questions.soloParent ? 'Yes' : 'No'}
+                  <span className="font-medium">40c. Solo parent:</span> {otherInformation.soloParent ? 'Yes' : 'No'}
                 </p>
-                {pdsData.questions.soloParent && pdsData.questions.soloParentIdNumber && (
-                  <p className="text-sm text-gray-600 pl-4">ID Number: {pdsData.questions.soloParentIdNumber}</p>
+                {otherInformation.soloParent && otherInformation.soloParentIdNumber && (
+                  <p className="text-sm text-gray-600 pl-4">ID Number: {otherInformation.soloParentIdNumber}</p>
                 )}
               </div>
             </div>
@@ -671,12 +706,23 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
               <div className="flex items-start gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-700 mb-2">Applicant's Signature</p>
-                  <img
-                    src={pdsData.signature_url}
-                    alt="Signature"
-                    className="border-2 border-gray-300 rounded bg-white p-2"
-                    style={{ maxWidth: '300px', height: 'auto' }}
-                  />
+                  {loadingSignature ? (
+                    <div className="flex items-center gap-2 text-gray-500 py-4">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                      <span className="text-sm">Loading signature...</span>
+                    </div>
+                  ) : signatureUrl ? (
+                    <img
+                      src={signatureUrl}
+                      alt="Signature"
+                      className="border-2 border-gray-300 rounded bg-white p-2"
+                      style={{ maxWidth: '300px', height: 'auto' }}
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-500 py-2">
+                      Unable to load signature
+                    </div>
+                  )}
                   {pdsData.signature_uploaded_at && (
                     <p className="text-xs text-gray-500 mt-2">
                       Signed on: {new Date(pdsData.signature_uploaded_at).toLocaleDateString()}

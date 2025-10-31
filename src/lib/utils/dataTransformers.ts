@@ -262,3 +262,22 @@ export function transformPDSFromDatabase(dbData: any): any {
     signature_uploaded_at: dbData.signature_uploaded_at,
   };
 }
+
+/**
+ * Convert Supabase storage path to public URL
+ * Database stores relative paths, but we need full URLs to display images
+ * @param path - Relative path in storage (e.g., "user-id/signature-123.png")
+ * @param bucket - Storage bucket name (default: "pds-signatures")
+ * @returns Full public URL to access the file
+ */
+export function getSupabasePublicUrl(path: string, bucket: string = 'pds-signatures'): string {
+  if (!path) {
+    return '';
+  }
+
+  // Supabase project reference ID
+  const projectRef = 'ajmftwhmskcvljlfvhjf';
+
+  // Construct full public URL
+  return `https://${projectRef}.supabase.co/storage/v1/object/public/${bucket}/${path}`;
+}
