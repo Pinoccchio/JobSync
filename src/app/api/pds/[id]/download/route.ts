@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
+import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
 
 export async function GET(
   request: NextRequest,
@@ -60,8 +61,14 @@ export async function GET(
 
     const applicantName = applicantProfile?.full_name || 'Unknown Applicant';
 
+    // Read includeSignature from query parameters
+    const includeSignature = request.nextUrl.searchParams.get('includeSignature') === 'true';
+
+    // Transform database format (snake_case) to application format (camelCase)
+    const transformedPDSData = transformPDSFromDatabase(pdsData);
+
     // Generate PDF using pdfGenerator (returnDoc = true to get the jsPDF object)
-    const doc = generatePDSPDF(pdsData, false, true);
+    const doc = generatePDSPDF(transformedPDSData, includeSignature, true);
 
     if (!doc) {
       return NextResponse.json(

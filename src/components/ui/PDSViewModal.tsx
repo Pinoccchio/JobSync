@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { formatAddress, formatPermanentAddress } from '@/lib/utils/formatAddress';
@@ -25,6 +25,8 @@ interface PDSViewModalProps {
 }
 
 export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSViewModalProps) {
+  const [includeSignature, setIncludeSignature] = useState(false);
+
   if (!pdsData) return null;
 
   const personalInfo = pdsData.personal_info || {};
@@ -38,7 +40,7 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
 
   const handleDownloadPDF = () => {
     if (pdsData.id) {
-      window.open(`/api/pds/${pdsData.id}/download`, '_blank');
+      window.open(`/api/pds/${pdsData.id}/download?includeSignature=${includeSignature}`, '_blank');
     }
   };
 
@@ -62,15 +64,38 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
               <p className="text-sm text-gray-600">Civil Service Form 212 - Revised 2025</p>
             </div>
           </div>
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Download}
-            onClick={handleDownloadPDF}
-            title="Download PDS as PDF"
-          >
-            Download PDF
-          </Button>
+          <div>
+            {/* Signature inclusion checkbox */}
+            {(pdsData.signature_url || otherInformation.declaration?.signatureUrl || otherInformation.declaration?.signatureData) && (
+              <div className="mb-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeSignature}
+                    onChange={(e) => setIncludeSignature(e.target.checked)}
+                    className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      Include digital signature in PDF
+                    </span>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      Check this if submitting digitally. Leave unchecked for traditional wet signature.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Download}
+              onClick={handleDownloadPDF}
+              title="Download PDS as PDF"
+            >
+              Download PDS as PDF
+            </Button>
+          </div>
         </div>
 
         {/* Personal Information */}

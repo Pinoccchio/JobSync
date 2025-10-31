@@ -216,3 +216,49 @@ export function ensureBoolean(value: any, defaultValue: boolean = false): boolea
 
   return defaultValue;
 }
+
+/**
+ * Transform PDS data from database format (snake_case) to application format (camelCase)
+ * Database stores data with snake_case column names, but PDF generator and app expect camelCase
+ * @param dbData - Raw data from the database (applicant_pds table)
+ * @returns Transformed PDS data in camelCase format
+ */
+export function transformPDSFromDatabase(dbData: any): any {
+  if (!dbData) {
+    return null;
+  }
+
+  return {
+    id: dbData.id,
+    userId: dbData.user_id,
+    personalInfo: dbData.personal_info,
+    familyBackground: dbData.family_background,
+    educationalBackground: dbData.educational_background,
+    eligibility: dbData.eligibility,
+    workExperience: dbData.work_experience,
+    voluntaryWork: dbData.voluntary_work,
+    trainings: dbData.trainings,
+    otherInformation: dbData.other_information,
+    completionPercentage: dbData.completion_percentage,
+    isCompleted: dbData.is_completed,
+    lastSavedSection: dbData.last_saved_section,
+    createdAt: dbData.created_at,
+    updatedAt: dbData.updated_at,
+    // Keep snake_case fields for backward compatibility with components that might use them
+    personal_info: dbData.personal_info,
+    family_background: dbData.family_background,
+    educational_background: dbData.educational_background,
+    work_experience: dbData.work_experience,
+    voluntary_work: dbData.voluntary_work,
+    other_information: dbData.other_information,
+    completion_percentage: dbData.completion_percentage,
+    is_completed: dbData.is_completed,
+    last_saved_section: dbData.last_saved_section,
+    created_at: dbData.created_at,
+    updated_at: dbData.updated_at,
+    user_id: dbData.user_id,
+    // Signature fields (can be in either location)
+    signature_url: dbData.signature_url,
+    signature_uploaded_at: dbData.signature_uploaded_at,
+  };
+}
