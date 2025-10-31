@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
         job_id,
         applicant_id,
         applicant_profile_id,
+        pds_id,
         pds_file_url,
         pds_file_name,
         status,

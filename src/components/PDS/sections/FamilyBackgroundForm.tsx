@@ -116,19 +116,6 @@ export const FamilyBackgroundForm: React.FC<FamilyBackgroundFormProps> = ({
             )}
           />
           <Controller
-            name="spouse.nameExtension"
-            control={control}
-            render={({ field }) => (
-              <FormField
-                label="Extension"
-                name="spouse.nameExtension"
-                value={field.value || ''}
-                onChange={field.onChange}
-                placeholder="JR, SR, III (Optional)"
-              />
-            )}
-          />
-          <Controller
             name="spouse.occupation"
             control={control}
             render={({ field }) => (
@@ -278,19 +265,6 @@ export const FamilyBackgroundForm: React.FC<FamilyBackgroundFormProps> = ({
                 onBlur={field.onBlur}
                 error={errors.father?.middleName?.message}
                 required
-              />
-            )}
-          />
-          <Controller
-            name="father.nameExtension"
-            control={control}
-            render={({ field }) => (
-              <FormField
-                label="Extension"
-                name="father.nameExtension"
-                value={field.value || ''}
-                onChange={field.onChange}
-                placeholder="JR, SR, III (Optional)"
               />
             )}
           />

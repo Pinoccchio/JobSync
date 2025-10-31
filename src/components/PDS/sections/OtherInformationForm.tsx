@@ -77,11 +77,15 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
   }, [data?.declaration?.signatureData]);
 
   // Update parent component when form changes
-  // Use JSON.stringify to prevent infinite loop (object comparison by value, not reference)
+  // Use debounce to prevent infinite loop and excessive re-renders
   const watchedDataString = JSON.stringify(watchedData);
   useEffect(() => {
-    onChange(watchedData);
-  }, [watchedDataString]);
+    const timer = setTimeout(() => {
+      onChange(watchedData);
+    }, 100); // Debounce 100ms
+
+    return () => clearTimeout(timer);
+  }, [watchedDataString, onChange]);
 
   // Handle signature - Upload to Supabase Storage
   const handleSignatureEnd = async () => {
@@ -119,8 +123,10 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
       setValue('declaration.signatureUploadedAt', result.data.uploadedAt);
 
       // Keep legacy Base64 for backward compatibility (optional)
-      const signatureData = signatureRef.current.toDataURL();
-      setValue('declaration.signatureData', signatureData);
+      if (signatureRef.current) {
+        const signatureData = signatureRef.current.toDataURL();
+        setValue('declaration.signatureData', signatureData);
+      }
 
       setSignatureUploadStatus('success');
 
@@ -444,6 +450,415 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
               />
             )}
           />
+        </div>
+      </div>
+
+      {/* Questions 34-40 (part of Section VIII in CS Form 212) */}
+      <div className="space-y-4">
+        <h4 className="font-medium text-gray-900 text-lg border-b border-gray-200 pb-2">
+          Questions (34-40)
+        </h4>
+        <p className="text-sm text-gray-600 mb-6">
+          Answer each question by checking the box if YES and provide details where necessary.
+        </p>
+
+        <div className="space-y-4">
+          {/* Q34: Related by consanguinity/affinity */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <p className="text-sm font-semibold text-gray-800 mb-4 leading-relaxed">
+              <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">34</span>
+              Are you related by consanguinity or affinity to the appointing or recommending authority, or to the chief of bureau or office or to the person who has immediate supervision over you in the Office, Bureau or Department where you will be appointed,
+            </p>
+
+            <div className="space-y-4 ml-9">
+              {/* Q34a: 3rd degree */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="relatedThirdDegree"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">a.</strong> within the third degree?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.relatedThirdDegree && (
+                  <Input
+                    value={watchedData.relatedThirdDegreeDetails || ''}
+                    onChange={(e) => setValue('relatedThirdDegreeDetails', e.target.value)}
+                    placeholder="If YES, give details..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+
+              {/* Q34b: 4th degree (LGU) */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="relatedFourthDegree"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">b.</strong> within the fourth degree (for Local Government Unit - Career Employees)?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.relatedFourthDegree && (
+                  <Input
+                    value={watchedData.relatedFourthDegreeDetails || ''}
+                    onChange={(e) => setValue('relatedFourthDegreeDetails', e.target.value)}
+                    placeholder="If YES, give details..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Q35: Administrative offense and criminal charges */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <p className="text-sm font-semibold text-gray-800 mb-4">
+              <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">35</span>
+              Legal and Administrative History
+            </p>
+
+            <div className="space-y-4 ml-9">
+              {/* Q35a: Administrative offense */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="guiltyAdministrativeOffense"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">a.</strong> Have you ever been found guilty of any administrative offense?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.guiltyAdministrativeOffense && (
+                  <Input
+                    value={watchedData.guiltyAdministrativeOffenseDetails || ''}
+                    onChange={(e) => setValue('guiltyAdministrativeOffenseDetails', e.target.value)}
+                    placeholder="If YES, give details..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+
+              {/* Q35b: Criminally charged */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="criminallyCharged"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">b.</strong> Have you been criminally charged before any court?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.criminallyCharged && (
+                  <Input
+                    value={watchedData.criminallyChargedDetails || ''}
+                    onChange={(e) => setValue('criminallyChargedDetails', e.target.value)}
+                    placeholder="If YES, give details..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Q36: Convicted */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <Controller
+              name="convicted"
+              control={control}
+              render={({ field }) => (
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <Input
+                    type="checkbox"
+                    checked={field.value || false}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-800 font-medium">
+                    <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">36</span>
+                    Have you ever been convicted of any crime or violation of any law, decree, ordinance or regulation by any court or tribunal?
+                  </span>
+                </label>
+              )}
+            />
+            {watchedData.convicted && (
+              <div className="ml-12 mt-3">
+                <Input
+                  value={watchedData.convictedDetails || ''}
+                  onChange={(e) => setValue('convictedDetails', e.target.value)}
+                  placeholder="If YES, give details..."
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Q37: Separated from service */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <Controller
+              name="separatedFromService"
+              control={control}
+              render={({ field }) => (
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <Input
+                    type="checkbox"
+                    checked={field.value || false}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-800 font-medium">
+                    <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">37</span>
+                    Have you ever been separated from the service in any of the following modes: resignation, retirement, dropped from the rolls, dismissal, termination, end of term, finished contract or phased out (abolition) in the public or private sector?
+                  </span>
+                </label>
+              )}
+            />
+            {watchedData.separatedFromService && (
+              <div className="ml-12 mt-3">
+                <Input
+                  value={watchedData.separatedFromServiceDetails || ''}
+                  onChange={(e) => setValue('separatedFromServiceDetails', e.target.value)}
+                  placeholder="If YES, give details..."
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Q38: Election candidacy */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <p className="text-sm font-semibold text-gray-800 mb-4">
+              <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">38</span>
+              Election Candidacy
+            </p>
+
+            <div className="space-y-4 ml-9">
+              {/* Q38a: Candidate in election */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="candidateNationalLocal"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">a.</strong> Have you ever been a candidate in a national or local election held within the last year (except Barangay election)?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.candidateNationalLocal && (
+                  <Input
+                    value={watchedData.candidateNationalLocalDetails || ''}
+                    onChange={(e) => setValue('candidateNationalLocalDetails', e.target.value)}
+                    placeholder="If YES, give details..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+
+              {/* Q38b: Resigned for candidacy */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="resignedForCandidacy"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">b.</strong> Have you resigned from the government service during the three (3)-month period before the last election to promote/actively campaign for a national or local candidate?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.resignedForCandidacy && (
+                  <Input
+                    value={watchedData.resignedForCandidacyDetails || ''}
+                    onChange={(e) => setValue('resignedForCandidacyDetails', e.target.value)}
+                    placeholder="If YES, give details..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Q39: Immigrant or permanent resident */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <Controller
+              name="immigrantOrPermanentResident"
+              control={control}
+              render={({ field }) => (
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <Input
+                    type="checkbox"
+                    checked={field.value || false}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-800 font-medium">
+                    <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">39</span>
+                    Have you acquired the status of an immigrant or permanent resident of another country?
+                  </span>
+                </label>
+              )}
+            />
+            {watchedData.immigrantOrPermanentResident && (
+              <div className="ml-12 mt-3">
+                <Input
+                  value={watchedData.immigrantOrPermanentResidentCountry || ''}
+                  onChange={(e) => setValue('immigrantOrPermanentResidentCountry', e.target.value)}
+                  placeholder="If YES, give country..."
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Q40: Special status - Indigenous/PWD/Solo Parent */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <p className="text-sm font-semibold text-gray-800 mb-4 leading-relaxed">
+              <span className="inline-block bg-[#22A555] text-white rounded-full w-7 h-7 text-center leading-7 mr-2 text-xs">40</span>
+              Pursuant to: (a) Indigenous People's Act (RA 8371); (b) Magna Carta for Disabled Persons (RA 7277); and (c) Solo Parents Welfare Act of 2000 (RA 8972), please answer the following items:
+            </p>
+
+            <div className="space-y-4 ml-9">
+              {/* Q40a: Indigenous group member */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="indigenousGroupMember"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">a.</strong> Are you a member of any indigenous group?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.indigenousGroupMember && (
+                  <Input
+                    value={watchedData.indigenousGroupName || ''}
+                    onChange={(e) => setValue('indigenousGroupName', e.target.value)}
+                    placeholder="If YES, please specify..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+
+              {/* Q40b: Person with disability */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="personWithDisability"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">b.</strong> Are you a person with disability?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.personWithDisability && (
+                  <Input
+                    value={watchedData.pwdIdNumber || ''}
+                    onChange={(e) => setValue('pwdIdNumber', e.target.value)}
+                    placeholder="If YES, please give ID No..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+
+              {/* Q40c: Solo parent */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <Controller
+                  name="soloParent"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 flex-shrink-0 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">
+                        <strong className="text-[#22A555]">c.</strong> Are you a solo parent?
+                      </span>
+                    </label>
+                  )}
+                />
+                {watchedData.soloParent && (
+                  <Input
+                    value={watchedData.soloParentIdNumber || ''}
+                    onChange={(e) => setValue('soloParentIdNumber', e.target.value)}
+                    placeholder="If YES, please give ID No..."
+                    className="mt-3 w-full"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

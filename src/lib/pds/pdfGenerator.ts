@@ -7,8 +7,9 @@ import { PDSData } from '@/types/pds.types';
  * Based on CS Form No. 212, Revised 2025
  * @param pdsData - The PDS data to export
  * @param includeSignature - Whether to include the digital signature image (default: false)
+ * @param returnDoc - Whether to return the document instead of auto-downloading (default: false)
  */
-export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: boolean = false): void {
+export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: boolean = false, returnDoc: boolean = false): jsPDF | void {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 15;
@@ -158,7 +159,7 @@ export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: bool
       yPosition += 5;
 
       const childrenData = fb.children.map((child) => [
-        `${child.surname}, ${child.firstName} ${child.middleName || ''}`.trim(),
+        child.fullName || 'N/A',
         child.dateOfBirth || 'N/A',
       ]);
 
@@ -485,6 +486,96 @@ export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: bool
       yPosition += 5;
     }
 
+    // Questions 34-40 (part of Section VIII in CS Form 212, Revised 2025)
+    if (oi.relatedThirdDegree !== undefined || oi.guiltyAdministrativeOffense !== undefined) {
+      checkPageBreak(80);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Questions (34-40):', 14, yPosition);
+      yPosition += 5;
+
+      const questionsData: any[] = [
+        [
+          '34a. Related by consanguinity/affinity to appointing authority within 3rd degree?',
+          oi.relatedThirdDegree ? 'YES' : 'NO',
+          oi.relatedThirdDegreeDetails || 'N/A'
+        ],
+        [
+          '34b. Related by consanguinity/affinity within 4th degree (for LGU)?',
+          oi.relatedFourthDegree ? 'YES' : 'NO',
+          oi.relatedFourthDegreeDetails || 'N/A'
+        ],
+        [
+          '35a. Have you ever been found guilty of any administrative offense?',
+          oi.guiltyAdministrativeOffense ? 'YES' : 'NO',
+          oi.guiltyAdministrativeOffenseDetails || 'N/A'
+        ],
+        [
+          '35b. Have you been criminally charged before any court?',
+          oi.criminallyCharged ? 'YES' : 'NO',
+          oi.criminallyCharged
+            ? `${oi.criminallyChargedDetails || 'N/A'}${oi.criminallyChargedDateFiled ? ' | Date: ' + oi.criminallyChargedDateFiled : ''}${oi.criminallyChargedStatus ? ' | Status: ' + oi.criminallyChargedStatus : ''}`
+            : 'N/A'
+        ],
+        [
+          '36. Have you ever been convicted of any crime or violation?',
+          oi.convicted ? 'YES' : 'NO',
+          oi.convictedDetails || 'N/A'
+        ],
+        [
+          '37. Have you ever been separated from service (resignation, retirement, etc.)?',
+          oi.separatedFromService ? 'YES' : 'NO',
+          oi.separatedFromServiceDetails || 'N/A'
+        ],
+        [
+          '38a. Have you ever been a candidate in a national/local election (except Barangay)?',
+          oi.candidateNationalLocal ? 'YES' : 'NO',
+          oi.candidateNationalLocalDetails || 'N/A'
+        ],
+        [
+          '38b. Have you resigned from government service during candidacy?',
+          oi.resignedForCandidacy ? 'YES' : 'NO',
+          oi.resignedForCandidacyDetails || 'N/A'
+        ],
+        [
+          '39. Have you acquired the status of immigrant or permanent resident?',
+          oi.immigrantOrPermanentResident ? 'YES' : 'NO',
+          oi.immigrantOrPermanentResidentCountry || 'N/A'
+        ],
+        [
+          '40a. Are you a member of any indigenous group?',
+          oi.indigenousGroupMember ? 'YES' : 'NO',
+          oi.indigenousGroupName || 'N/A'
+        ],
+        [
+          '40b. Are you a person with disability?',
+          oi.personWithDisability ? 'YES' : 'NO',
+          oi.pwdIdNumber ? `ID: ${oi.pwdIdNumber}` : 'N/A'
+        ],
+        [
+          '40c. Are you a solo parent?',
+          oi.soloParent ? 'YES' : 'NO',
+          oi.soloParentIdNumber ? `ID: ${oi.soloParentIdNumber}` : 'N/A'
+        ],
+      ];
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Question', 'Answer', 'Details']],
+        body: questionsData,
+        theme: 'striped',
+        headStyles: { fillColor: [34, 165, 85], fontSize: 7.5 },
+        styles: { fontSize: 7, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 90 },
+        },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 5;
+    }
+
     yPosition += 3;
   }
 
@@ -568,7 +659,12 @@ export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: bool
     );
   }
 
-  // Generate filename
+  // If returnDoc is true, return the document for API use
+  if (returnDoc) {
+    return doc;
+  }
+
+  // Otherwise, generate filename and auto-download
   const surname = pdsData.personalInfo?.surname || 'Unknown';
   const firstName = pdsData.personalInfo?.firstName || 'User';
   const fileName = `PDS_${surname}_${firstName}_${new Date().getTime()}.pdf`;

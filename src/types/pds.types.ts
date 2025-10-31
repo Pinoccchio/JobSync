@@ -74,7 +74,6 @@ export interface FamilyBackground {
     surname: string;
     firstName: string;
     middleName: string;
-    nameExtension?: string;
     occupation?: string;
     employerBusinessName?: string;
     businessAddress?: string;
@@ -92,7 +91,6 @@ export interface FamilyBackground {
     surname: string;
     firstName: string;
     middleName: string;
-    nameExtension?: string;
   };
 
   // Mother's Maiden Name
@@ -133,7 +131,6 @@ export interface WorkExperience {
   departmentAgencyOfficeCompany: string;
   monthlySalary?: number;
   salaryGrade?: string;
-  stepIncrement?: string;
   statusOfAppointment?: string; // Permanent, Temporary, Contractual, etc.
   governmentService: boolean; // Y/N
   periodOfService: {
@@ -190,6 +187,57 @@ export interface OtherInformation {
     idNumber: string;
     dateIssued?: string; // ISO date format
   };
+
+  // Questions 34-40 (part of Section VIII in CS Form 212, Revised 2025)
+  // Q34: Related by consanguinity/affinity to appointing/recommending authority within 3rd degree?
+  relatedThirdDegree?: boolean;
+  relatedThirdDegreeDetails?: string;
+
+  // Q35: Related by consanguinity/affinity to appointing/recommending authority within 4th degree (LGU)?
+  relatedFourthDegree?: boolean;
+  relatedFourthDegreeDetails?: string;
+
+  // Q36: Found guilty of any administrative offense?
+  guiltyAdministrativeOffense?: boolean;
+  guiltyAdministrativeOffenseDetails?: string;
+
+  // Q37: Criminally charged before any court?
+  criminallyCharged?: boolean;
+  criminallyChargedDetails?: string;
+  criminallyChargedDateFiled?: string;
+  criminallyChargedStatus?: string;
+
+  // Q38: Ever been convicted of any crime or violation?
+  convicted?: boolean;
+  convictedDetails?: string;
+
+  // Q39: Separated from service in government or private employment?
+  separatedFromService?: boolean;
+  separatedFromServiceDetails?: string;
+
+  // Q40a: Candidate in a national or local election (except Barangay)?
+  candidateNationalLocal?: boolean;
+  candidateNationalLocalDetails?: string;
+
+  // Q40b: Resigned from government service during candidacy?
+  resignedForCandidacy?: boolean;
+  resignedForCandidacyDetails?: string;
+
+  // Q41: Immigrant or permanent resident of another country?
+  immigrantOrPermanentResident?: boolean;
+  immigrantOrPermanentResidentCountry?: string;
+
+  // Q42: Member of any indigenous group?
+  indigenousGroupMember?: boolean;
+  indigenousGroupName?: string;
+
+  // Q43: Person with disability (PWD)?
+  personWithDisability?: boolean;
+  pwdIdNumber?: string;
+
+  // Q44: Solo parent?
+  soloParent?: boolean;
+  soloParentIdNumber?: string;
 
   // Declaration
   declaration: {

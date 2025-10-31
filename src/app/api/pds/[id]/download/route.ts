@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    // Get the authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Fetch PDS data
+    const { data: pdsData, error: pdsError } = await supabase
+      .from('applicant_pds')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (pdsError || !pdsData) {
+      return NextResponse.json(
+        { success: false, error: 'PDS not found' },
+        { status: 404 }
+      );
+    }
+
+    // Authorization check: User can only download their own PDS, or HR/ADMIN can download any
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const isOwner = pdsData.user_id === user.id;
+    const isAuthorized = isOwner || profile?.role === 'HR' || profile?.role === 'ADMIN';
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: 'Not authorized to download this PDS' },
+        { status: 403 }
+      );
+    }
+
+    // Get applicant name
+    const { data: applicantProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', pdsData.user_id)
+      .single();
+
+    const applicantName = applicantProfile?.full_name || 'Unknown Applicant';
+
+    // Generate PDF using pdfGenerator (returnDoc = true to get the jsPDF object)
+    const doc = generatePDSPDF(pdsData, false, true);
+
+    if (!doc) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to generate PDF document' },
+        { status: 500 }
+      );
+    }
+
+    const pdfBuffer = doc.output('arraybuffer');
+
+    // Create filename
+    const surname = pdsData.personal_info?.surname || applicantName.split(' ')[0] || 'Unknown';
+    const firstName = pdsData.personal_info?.firstName || applicantName.split(' ').slice(1).join('_') || 'User';
+    const fileName = `PDS_${surname}_${firstName}_${new Date().getTime()}.pdf`;
+
+    // Return PDF as downloadable file
+    return new NextResponse(pdfBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Length': pdfBuffer.byteLength.toString(),
+      },
+    });
+  } catch (error) {
+    console.error('Error generating PDS PDF:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to generate PDF' },
+      { status: 500 }
+    );
+  }
+}

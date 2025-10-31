@@ -295,6 +295,111 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
                   : 'None'}
               </p>
             </div>
+
+            {/* Questions 34-40 */}
+            <div>
+              <span className="font-medium text-gray-700">Questions (34-40):</span>
+              <div className="mt-2 space-y-1.5">
+                {(() => {
+                  const oi = pdsData.otherInformation;
+                  const hasAnyYes =
+                    oi.relatedThirdDegree ||
+                    oi.relatedFourthDegree ||
+                    oi.guiltyAdministrativeOffense ||
+                    oi.criminallyCharged ||
+                    oi.convicted ||
+                    oi.separatedFromService ||
+                    oi.candidateNationalLocal ||
+                    oi.resignedForCandidacy ||
+                    oi.immigrantOrPermanentResident ||
+                    oi.indigenousGroupMember ||
+                    oi.personWithDisability ||
+                    oi.soloParent;
+
+                  if (!hasAnyYes) {
+                    return <p className="text-xs text-gray-600 italic">All questions answered NO</p>;
+                  }
+
+                  return (
+                    <div className="text-xs space-y-1">
+                      {oi.relatedThirdDegree && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 34a:</span> Related within 3rd degree
+                          {oi.relatedThirdDegreeDetails && <span className="text-gray-700"> - {oi.relatedThirdDegreeDetails}</span>}
+                        </p>
+                      )}
+                      {oi.relatedFourthDegree && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 34b:</span> Related within 4th degree (LGU)
+                          {oi.relatedFourthDegreeDetails && <span className="text-gray-700"> - {oi.relatedFourthDegreeDetails}</span>}
+                        </p>
+                      )}
+                      {oi.guiltyAdministrativeOffense && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 35a:</span> Administrative offense
+                          {oi.guiltyAdministrativeOffenseDetails && <span className="text-gray-700"> - {oi.guiltyAdministrativeOffenseDetails}</span>}
+                        </p>
+                      )}
+                      {oi.criminallyCharged && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 35b:</span> Criminally charged
+                          {oi.criminallyChargedDetails && <span className="text-gray-700"> - {oi.criminallyChargedDetails}</span>}
+                        </p>
+                      )}
+                      {oi.convicted && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 36:</span> Convicted of crime/violation
+                          {oi.convictedDetails && <span className="text-gray-700"> - {oi.convictedDetails}</span>}
+                        </p>
+                      )}
+                      {oi.separatedFromService && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 37:</span> Separated from service
+                          {oi.separatedFromServiceDetails && <span className="text-gray-700"> - {oi.separatedFromServiceDetails}</span>}
+                        </p>
+                      )}
+                      {oi.candidateNationalLocal && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 38a:</span> Election candidate
+                          {oi.candidateNationalLocalDetails && <span className="text-gray-700"> - {oi.candidateNationalLocalDetails}</span>}
+                        </p>
+                      )}
+                      {oi.resignedForCandidacy && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 38b:</span> Resigned for candidacy
+                          {oi.resignedForCandidacyDetails && <span className="text-gray-700"> - {oi.resignedForCandidacyDetails}</span>}
+                        </p>
+                      )}
+                      {oi.immigrantOrPermanentResident && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 39:</span> Immigrant/Permanent resident
+                          {oi.immigrantOrPermanentResidentCountry && <span className="text-gray-700"> - {oi.immigrantOrPermanentResidentCountry}</span>}
+                        </p>
+                      )}
+                      {oi.indigenousGroupMember && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 40a:</span> Indigenous group member
+                          {oi.indigenousGroupName && <span className="text-gray-700"> - {oi.indigenousGroupName}</span>}
+                        </p>
+                      )}
+                      {oi.personWithDisability && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 40b:</span> Person with disability
+                          {oi.pwdIdNumber && <span className="text-gray-700"> - ID: {oi.pwdIdNumber}</span>}
+                        </p>
+                      )}
+                      {oi.soloParent && (
+                        <p className="text-gray-900">
+                          <span className="text-[#22A555] font-bold">✓ 40c:</span> Solo parent
+                          {oi.soloParentIdNumber && <span className="text-gray-700"> - ID: {oi.soloParentIdNumber}</span>}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
             <div>
               <span className="font-medium text-gray-700">References:</span>
               <p className="text-gray-900">
@@ -343,19 +448,8 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
         )}
 
         <div className="space-y-3">
-          <Button
-            variant="success"
-            size="lg"
-            icon={CheckCircle}
-            onClick={onSubmit}
-            disabled={!isComplete()}
-            className="w-full"
-          >
-            {isComplete() ? 'Submit Personal Data Sheet' : 'Complete Required Sections First'}
-          </Button>
-
           {/* Signature inclusion option for PDF export */}
-          {pdsData.otherInformation?.declaration?.signatureData && (
+          {(pdsData.otherInformation?.declaration?.signatureData || pdsData.otherInformation?.declaration?.signatureUrl) && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -385,6 +479,17 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             className="w-full"
           >
             {isDownloading ? 'Generating PDF...' : 'Download PDS as PDF'}
+          </Button>
+
+          <Button
+            variant="success"
+            size="lg"
+            icon={CheckCircle}
+            onClick={onSubmit}
+            disabled={!isComplete()}
+            className="w-full"
+          >
+            {isComplete() ? 'Submit Personal Data Sheet' : 'Complete Required Sections First'}
           </Button>
         </div>
       </div>

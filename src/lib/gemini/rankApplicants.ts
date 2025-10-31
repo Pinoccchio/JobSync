@@ -296,3 +296,4 @@ export function compareApplicants(
     analysis: `Applicant 1: ${score1.totalScore.toFixed(2)} vs Applicant 2: ${score2.totalScore.toFixed(2)}. Difference: ${Math.abs(diff).toFixed(2)} points.`
   };
 }
+

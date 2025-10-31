@@ -1,8 +1,11 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
+import Image from 'next/image';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, ConfirmModal } from '@/components/ui';
+import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { RankingDetailsModal } from '@/components/hr/RankingDetailsModal';
+import { PDSViewerModal } from '@/components/hr/PDSViewerModal';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +24,10 @@ import {
   Loader2,
   FileText,
   Eye,
+  Bell,
+  AlertCircle,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
 
 interface Application {
@@ -33,6 +40,7 @@ interface Application {
   status: string;
   appliedDate: string;
   pdsUrl: string;
+  pdsId: string | null;
   _raw: any;
 }
 
@@ -42,7 +50,6 @@ export default function RankedRecordsPage() {
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<string>('all');
   const [jobs, setJobs] = useState<any[]>([]);
   const [isRanking, setIsRanking] = useState(false);
@@ -51,6 +58,21 @@ export default function RankedRecordsPage() {
   const [selectedJobRequirements, setSelectedJobRequirements] = useState<any>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [jobToRank, setJobToRank] = useState<{ id: string; title: string } | null>(null);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [showDenyConfirm, setShowDenyConfirm] = useState(false);
+  const [applicantToApprove, setApplicantToApprove] = useState<Application | null>(null);
+  const [applicantToDeny, setApplicantToDeny] = useState<Application | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [pdsViewerState, setPdsViewerState] = useState<{
+    isOpen: boolean;
+    url: string;
+    applicantName: string;
+  } | null>(null);
+  const [pdsDataModal, setPdsDataModal] = useState<{
+    isOpen: boolean;
+    data: any;
+    applicantName: string;
+  } | null>(null);
 
   // Fetch applications
   const fetchApplications = useCallback(async () => {
@@ -71,6 +93,7 @@ export default function RankedRecordsPage() {
             status: app.status,
             appliedDate: new Date(app.created_at).toLocaleDateString(),
             pdsUrl: app.pds_file_url,
+            pdsId: app.pds_id,
             _raw: app,
           }))
         );
@@ -101,13 +124,25 @@ export default function RankedRecordsPage() {
     fetchApplications();
   }, [fetchApplications]);
 
-  // Approve application
-  const handleApprove = async (id: string, applicantName: string) => {
-    if (!confirm(`Approve application from ${applicantName}?`)) return;
+  // Show approve confirmation modal
+  const handleApprove = (row: Application) => {
+    setApplicantToApprove(row);
+    setShowApproveConfirm(true);
+  };
+
+  // Show deny confirmation modal
+  const handleDeny = (row: Application) => {
+    setApplicantToDeny(row);
+    setShowDenyConfirm(true);
+  };
+
+  // Perform approve action
+  const handleApproveConfirm = async () => {
+    if (!applicantToApprove) return;
 
     try {
-      setProcessingId(id);
-      const response = await fetch(`/api/applications/${id}`, {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${applicantToApprove.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'approved' }),
@@ -116,7 +151,9 @@ export default function RankedRecordsPage() {
       const result = await response.json();
 
       if (result.success) {
-        showToast(`Application approved! Notification sent to ${applicantName}`, 'success');
+        showToast(`Application approved! Notification sent to ${applicantToApprove.applicantName}`, 'success');
+        setShowApproveConfirm(false);
+        setApplicantToApprove(null);
         fetchApplications();
       } else {
         showToast(getErrorMessage(result.error), 'error');
@@ -125,17 +162,17 @@ export default function RankedRecordsPage() {
       console.error('Error approving application:', error);
       showToast('Failed to approve application', 'error');
     } finally {
-      setProcessingId(null);
+      setSubmitting(false);
     }
   };
 
-  // Deny application
-  const handleDeny = async (id: string, applicantName: string) => {
-    if (!confirm(`Deny application from ${applicantName}?`)) return;
+  // Perform deny action
+  const handleDenyConfirm = async () => {
+    if (!applicantToDeny) return;
 
     try {
-      setProcessingId(id);
-      const response = await fetch(`/api/applications/${id}`, {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${applicantToDeny.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'denied' }),
@@ -144,7 +181,9 @@ export default function RankedRecordsPage() {
       const result = await response.json();
 
       if (result.success) {
-        showToast(`Application denied. Notification sent to ${applicantName}`, 'success');
+        showToast(`Application denied. Notification sent to ${applicantToDeny.applicantName}`, 'success');
+        setShowDenyConfirm(false);
+        setApplicantToDeny(null);
         fetchApplications();
       } else {
         showToast(getErrorMessage(result.error), 'error');
@@ -153,43 +192,91 @@ export default function RankedRecordsPage() {
       console.error('Error denying application:', error);
       showToast('Failed to deny application', 'error');
     } finally {
-      setProcessingId(null);
+      setSubmitting(false);
     }
   };
 
-  // Download PDS
-  const handleDownloadPDS = async (pdsUrl: string, applicantName: string) => {
+  // Download PDS as PDF
+  const handleDownloadPDFDirectly = async (application: Application) => {
     try {
-      if (!pdsUrl) {
-        showToast('PDS file not available', 'error');
+      const pdsId = application.pdsId || application._raw?.pds_id;
+
+      if (!pdsId) {
+        showToast('No PDS data available for this applicant', 'warning');
         return;
       }
 
-      // Extract bucket and path from the URL
-      const url = new URL(pdsUrl);
-      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
-
-      if (!pathMatch) {
-        // Direct download if it's already a signed URL
-        window.open(pdsUrl, '_blank');
-        return;
-      }
-
-      const bucket = pathMatch[1];
-      const path = pathMatch[2];
-
-      // Get fresh signed URL
-      const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
-      const result = await response.json();
-
-      if (result.success) {
-        window.open(result.data.signedUrl, '_blank');
-      } else {
-        showToast(getErrorMessage(result.error), 'error');
-      }
+      // Open download endpoint in new tab
+      const downloadUrl = `/api/pds/${pdsId}/download`;
+      window.open(downloadUrl, '_blank');
     } catch (error) {
-      console.error('Error downloading PDS:', error);
+      console.error('Error downloading PDS PDF:', error);
       showToast('Failed to download PDS', 'error');
+    }
+  };
+
+  // View PDS in modal
+  const handleDownloadPDS = async (application: Application) => {
+    try {
+      const pdsId = application.pdsId || application._raw?.pds_id;
+      const pdsUrl = application.pdsUrl;
+      const applicantName = application.applicantName;
+
+      // Priority 1: Check for web-based PDS (pds_id)
+      if (pdsId) {
+        const response = await fetch(`/api/pds/${pdsId}`);
+        const result = await response.json();
+
+        if (result.success) {
+          setPdsDataModal({
+            isOpen: true,
+            data: result.data,
+            applicantName,
+          });
+          return;
+        } else {
+          showToast(getErrorMessage(result.error), 'error');
+          return;
+        }
+      }
+
+      // Priority 2: Check for uploaded PDF file (pds_file_url)
+      if (pdsUrl) {
+        // Extract bucket and path from the URL
+        const url = new URL(pdsUrl);
+        const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
+
+        if (!pathMatch) {
+          // Open modal with the URL directly if it's already a signed URL
+          setPdsViewerState({ isOpen: true, url: pdsUrl, applicantName });
+          return;
+        }
+
+        const bucket = pathMatch[1];
+        const path = pathMatch[2];
+
+        // Get fresh signed URL
+        const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
+        const result = await response.json();
+
+        if (result.success) {
+          setPdsViewerState({
+            isOpen: true,
+            url: result.data.signedUrl,
+            applicantName,
+          });
+          return;
+        } else {
+          showToast(getErrorMessage(result.error), 'error');
+          return;
+        }
+      }
+
+      // No PDS available
+      showToast('No PDS data available for this applicant', 'warning');
+    } catch (error) {
+      console.error('Error loading PDS:', error);
+      showToast('Failed to load PDS', 'error');
     }
   };
 
@@ -487,35 +574,44 @@ export default function RankedRecordsPage() {
       header: 'Actions',
       accessor: 'actions' as const,
       render: (_: any, row: Application) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="secondary"
             size="sm"
-            icon={FileText}
-            onClick={() => handleDownloadPDS(row.pdsUrl, row.applicantName)}
-            title="View PDS"
+            icon={Eye}
+            onClick={() => handleDownloadPDS(row)}
+            title="View PDS in modal"
           >
             View PDS
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={() => handleDownloadPDFDirectly(row)}
+            title="Download PDS as PDF"
+          >
+            PDF
           </Button>
           {row.status === 'pending' && (
             <>
               <Button
                 variant="success"
                 size="sm"
-                icon={processingId === row.id ? Loader2 : CheckCircle}
-                onClick={() => handleApprove(row.id, row.applicantName)}
-                disabled={processingId !== null}
+                icon={CheckCircle}
+                onClick={() => handleApprove(row)}
+                disabled={submitting}
               >
-                {processingId === row.id ? 'Approving...' : 'Approve'}
+                Approve
               </Button>
               <Button
                 variant="danger"
                 size="sm"
-                icon={processingId === row.id ? Loader2 : XCircle}
-                onClick={() => handleDeny(row.id, row.applicantName)}
-                disabled={processingId !== null}
+                icon={XCircle}
+                onClick={() => handleDeny(row)}
+                disabled={submitting}
               >
-                {processingId === row.id ? 'Denying...' : 'Deny'}
+                Deny
               </Button>
             </>
           )}
@@ -682,6 +778,236 @@ export default function RankedRecordsPage() {
         cancelText="Cancel"
         variant="primary"
         isLoading={isRanking}
+      />
+
+      {/* Custom Approve Confirmation Modal */}
+      {showApproveConfirm && applicantToApprove && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+            {/* Green Gradient Header */}
+            <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Approve Application</h3>
+                    <p className="text-sm text-white/90">Applicant will be notified</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowApproveConfirm(false);
+                    setApplicantToApprove(null);
+                  }}
+                  className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                  disabled={submitting}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Success Info Message */}
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-green-800 mb-1">Approve Application</p>
+                    <p className="text-sm text-green-700">
+                      This applicant will be notified via email about their application approval.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Applicant Info */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Applicant Details:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <span className="font-medium text-gray-900">{applicantToApprove.applicantName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700">{applicantToApprove.jobTitle}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">Rank: #{applicantToApprove.rank}</span>
+                      <span className="text-sm text-gray-400">•</span>
+                      <span className="text-sm font-semibold text-green-600">Score: {applicantToApprove.matchScore?.toFixed(1) || 'N/A'}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notification Preview */}
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <div className="flex items-start gap-2 mb-2">
+                  <Bell className="w-4 h-4 text-blue-600 mt-0.5" />
+                  <p className="text-sm font-semibold text-blue-900">Notification Preview:</p>
+                </div>
+                <p className="text-sm text-blue-800 italic">
+                  "Your application for {applicantToApprove.jobTitle} has been approved! Congratulations, we will contact you soon with the next steps."
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowApproveConfirm(false);
+                    setApplicantToApprove(null);
+                  }}
+                  className="flex-1"
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="success"
+                  icon={CheckCircle2}
+                  loading={submitting}
+                  onClick={handleApproveConfirm}
+                  className="flex-1"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Approving...' : 'Approve'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Deny Confirmation Modal */}
+      {showDenyConfirm && applicantToDeny && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+            {/* Red Gradient Header */}
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Deny Application</h3>
+                    <p className="text-sm text-white/90">Applicant will be notified</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDenyConfirm(false);
+                    setApplicantToDeny(null);
+                  }}
+                  className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                  disabled={submitting}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Warning Message */}
+              <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-red-800 mb-1">Deny Application</p>
+                    <p className="text-sm text-red-700">
+                      This applicant will be notified that their application has been denied. This action can be reversed later if needed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Applicant Info */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Applicant Details:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <span className="font-medium text-gray-900">{applicantToDeny.applicantName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700">{applicantToDeny.jobTitle}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">Rank: #{applicantToDeny.rank}</span>
+                      <span className="text-sm text-gray-400">•</span>
+                      <span className="text-sm font-semibold text-orange-600">Score: {applicantToDeny.matchScore?.toFixed(1) || 'N/A'}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notification Preview */}
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                <div className="flex items-start gap-2 mb-2">
+                  <Bell className="w-4 h-4 text-amber-600 mt-0.5" />
+                  <p className="text-sm font-semibold text-amber-900">Notification Preview:</p>
+                </div>
+                <p className="text-sm text-amber-800 italic">
+                  "Thank you for applying to {applicantToDeny.jobTitle}. Unfortunately, your application has not been approved at this time. We encourage you to apply for other positions."
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowDenyConfirm(false);
+                    setApplicantToDeny(null);
+                  }}
+                  className="flex-1"
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  icon={AlertCircle}
+                  loading={submitting}
+                  onClick={handleDenyConfirm}
+                  className="flex-1"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Denying...' : 'Deny'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDS Viewer Modal (for PDF files) */}
+      <PDSViewerModal
+        isOpen={pdsViewerState?.isOpen || false}
+        onClose={() => setPdsViewerState(null)}
+        pdsUrl={pdsViewerState?.url || ''}
+        applicantName={pdsViewerState?.applicantName || ''}
+      />
+
+      {/* PDS Data Modal (for web-based PDS) */}
+      <PDSViewModal
+        isOpen={pdsDataModal?.isOpen || false}
+        onClose={() => setPdsDataModal(null)}
+        pdsData={pdsDataModal?.data}
+        applicantName={pdsDataModal?.applicantName || ''}
       />
     </AdminLayout>
   );

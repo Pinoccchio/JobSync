@@ -107,7 +107,7 @@ export const WorkExperienceForm: React.FC<WorkExperienceFormProps> = ({
             </div>
 
             {/* Salary & Salary Grade */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Controller
                 name={`items.${index}.monthlySalary`}
                 control={control}
@@ -132,19 +132,6 @@ export const WorkExperienceForm: React.FC<WorkExperienceFormProps> = ({
                     value={field.value || ''}
                     onChange={field.onChange}
                     placeholder="e.g., SG-15"
-                  />
-                )}
-              />
-              <Controller
-                name={`items.${index}.stepIncrement`}
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Step Increment"
-                    name={`items.${index}.stepIncrement`}
-                    value={field.value || ''}
-                    onChange={field.onChange}
-                    placeholder="e.g., Step 1"
                   />
                 )}
               />

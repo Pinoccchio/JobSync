@@ -79,7 +79,6 @@ export const familyBackgroundSchema = z.object({
     surname: z.string().optional(),
     firstName: z.string().optional(),
     middleName: z.string().optional(),
-    nameExtension: z.string().optional(),
     occupation: z.string().optional(),
     employerBusinessName: z.string().optional(),
     businessAddress: z.string().optional(),
@@ -97,7 +96,6 @@ export const familyBackgroundSchema = z.object({
     surname: z.string().min(1, 'Father\'s surname is required'),
     firstName: z.string().min(1, 'Father\'s first name is required'),
     middleName: z.string().min(1, 'Father\'s middle name is required'),
-    nameExtension: z.string().optional(),
   }),
 
   mother: z.object({
@@ -137,7 +135,6 @@ export const workExperienceSchema = z.object({
   departmentAgencyOfficeCompany: z.string().min(1, 'Department/Agency/Company is required'),
   monthlySalary: z.number().optional(),
   salaryGrade: z.string().optional(),
-  stepIncrement: z.string().optional(),
   statusOfAppointment: z.string().optional(),
   governmentService: z.boolean(),
   periodOfService: z.object({

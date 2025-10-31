@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
+import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +29,11 @@ export default function ScannedRecordsPage() {
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pdsDataModal, setPdsDataModal] = useState<{
+    isOpen: boolean;
+    data: any;
+    applicantName: string;
+  } | null>(null);
 
   // Fetch applications
   const fetchScannedRecords = useCallback(async () => {
@@ -68,36 +74,61 @@ export default function ScannedRecordsPage() {
     fetchScannedRecords();
   }, [fetchScannedRecords]);
 
-  // Download PDS
-  const handleViewPDS = async (pdsUrl: string, applicantName: string) => {
+  // View PDS
+  const handleViewPDS = async (application: Application) => {
     try {
-      if (!pdsUrl) {
-        showToast('PDS file not available', 'error');
-        return;
+      const pdsId = application._raw?.pds_id;
+      const pdsUrl = application.pdsUrl;
+      const applicantName = application.applicantName;
+
+      // Priority 1: Check for web-based PDS (pds_id)
+      if (pdsId) {
+        const response = await fetch(`/api/pds/${pdsId}`);
+        const result = await response.json();
+
+        if (result.success) {
+          setPdsDataModal({
+            isOpen: true,
+            data: result.data,
+            applicantName,
+          });
+          return;
+        } else {
+          showToast(getErrorMessage(result.error), 'error');
+          return;
+        }
       }
 
-      // Extract bucket and path from the URL
-      const url = new URL(pdsUrl);
-      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
+      // Priority 2: Check for uploaded PDF file (pds_file_url)
+      if (pdsUrl) {
+        // Extract bucket and path from the URL
+        const url = new URL(pdsUrl);
+        const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
 
-      if (!pathMatch) {
-        // Direct download if it's already a signed URL
-        window.open(pdsUrl, '_blank');
-        return;
+        if (!pathMatch) {
+          // Direct download if it's already a signed URL
+          window.open(pdsUrl, '_blank');
+          return;
+        }
+
+        const bucket = pathMatch[1];
+        const path = pathMatch[2];
+
+        // Get fresh signed URL
+        const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
+        const result = await response.json();
+
+        if (result.success) {
+          window.open(result.data.signedUrl, '_blank');
+          return;
+        } else {
+          showToast(getErrorMessage(result.error), 'error');
+          return;
+        }
       }
 
-      const bucket = pathMatch[1];
-      const path = pathMatch[2];
-
-      // Get fresh signed URL
-      const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
-      const result = await response.json();
-
-      if (result.success) {
-        window.open(result.data.signedUrl, '_blank');
-      } else {
-        showToast(getErrorMessage(result.error), 'error');
-      }
+      // No PDS available
+      showToast('No PDS data available for this applicant', 'warning');
     } catch (error) {
       console.error('Error viewing PDS:', error);
       showToast('Failed to view PDS', 'error');
@@ -172,7 +203,7 @@ export default function ScannedRecordsPage() {
             variant="secondary"
             size="sm"
             icon={FileText}
-            onClick={() => handleViewPDS(row.pdsUrl, row.applicantName)}
+            onClick={() => handleViewPDS(row)}
             title="View PDS"
           >
             View PDS
@@ -267,6 +298,14 @@ export default function ScannedRecordsPage() {
           </Card>
         </div>
       </Container>
+
+      {/* PDS Data Modal (for web-based PDS) */}
+      <PDSViewModal
+        isOpen={pdsDataModal?.isOpen || false}
+        onClose={() => setPdsDataModal(null)}
+        pdsData={pdsDataModal?.data}
+        applicantName={pdsDataModal?.applicantName || ''}
+      />
     </AdminLayout>
   );
 }

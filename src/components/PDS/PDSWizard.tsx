@@ -64,7 +64,7 @@ const WIZARD_STEPS: PDSWizardStep[] = [
   {
     id: 'other-information',
     title: 'Other Info',
-    description: 'Skills & references',
+    description: 'Skills & questions',
     isComplete: false,
   },
   {
@@ -423,6 +423,31 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
       idNumber: 'P1234567A',
       dateIssued: '2020-06-15',
     },
+    // Questions 34-40 (part of Section VIII in CS Form 212, Revised 2025)
+    relatedThirdDegree: false,
+    relatedThirdDegreeDetails: undefined,
+    relatedFourthDegree: false,
+    relatedFourthDegreeDetails: undefined,
+    guiltyAdministrativeOffense: true,
+    guiltyAdministrativeOffenseDetails: 'Minor infraction related to late submission of quarterly report in 2019, resolved with written warning.',
+    criminallyCharged: false,
+    criminallyChargedDetails: undefined,
+    convicted: false,
+    convictedDetails: undefined,
+    separatedFromService: true,
+    separatedFromServiceDetails: 'End of contract employment at Department of Information and Communications Technology (DICT) - Regional Office XI in December 2021.',
+    candidateNationalLocal: false,
+    candidateNationalLocalDetails: undefined,
+    resignedForCandidacy: false,
+    resignedForCandidacyDetails: undefined,
+    immigrantOrPermanentResident: false,
+    immigrantOrPermanentResidentCountry: undefined,
+    indigenousGroupMember: true,
+    indigenousGroupName: 'Ata-Manobo',
+    personWithDisability: false,
+    pwdIdNumber: undefined,
+    soloParent: true,
+    soloParentIdNumber: 'SP-2022-045789',
     declaration: {
       agreed: true,
       signatureData: undefined,
@@ -462,6 +487,8 @@ export const PDSWizard: React.FC = () => {
         return Array.isArray(data) && data.length > 0 && !!data[0]?.title;
       case 'other-information':
         return !!(data?.declaration?.agreed);
+      case 'questions':
+        return data !== undefined; // Questions are mostly boolean, just check if data exists
       default:
         return false;
     }
