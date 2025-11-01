@@ -131,8 +131,8 @@ export default function AuthenticatedJobsPage() {
 
   const handleApplicationSuccess = () => {
     // Refresh applications list after successful application
+    // Toast is already shown by ApplicationModal, just refresh data
     fetchUserApplications();
-    showToast('Application submitted successfully!', 'success');
   };
 
   // Helper functions for application status

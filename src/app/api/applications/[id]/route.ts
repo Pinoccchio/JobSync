@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { extractFilePathFromStorageUrl, deleteFileFromStorage } from '@/lib/utils/storage';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * Application Management API - Individual Application Operations
@@ -288,36 +287,7 @@ export async function DELETE(
       );
     }
 
-    // 4. Get existing application (with PDS file URL for cleanup)
-    const { data: existingApplication, error: fetchError } = await supabase
-      .from('applications')
-      .select('id, pds_file_url, pds_file_name')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
-        return NextResponse.json(
-          { success: false, error: 'Application not found' },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json(
-        { success: false, error: fetchError.message },
-        { status: 500 }
-      );
-    }
-
-    // 5. Delete PDS file from storage (if exists)
-    if (existingApplication.pds_file_url) {
-      const filePath = extractFilePathFromStorageUrl(existingApplication.pds_file_url, 'pds-files');
-      if (filePath) {
-        const adminClient = createAdminClient();
-        await deleteFileFromStorage(adminClient, 'pds-files', filePath);
-      }
-    }
-
-    // 6. Delete application from database
+    // 4. Delete application from database
     const { error: deleteError } = await supabase
       .from('applications')
       .delete()

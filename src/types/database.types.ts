@@ -234,8 +234,7 @@ export type Database = {
           job_id: string
           match_score: number | null
           notification_sent: boolean | null
-          pds_file_name: string
-          pds_file_url: string
+          pds_id: string | null
           rank: number | null
           ranking_reasoning: string | null
           reviewed_at: string | null
@@ -256,8 +255,7 @@ export type Database = {
           job_id: string
           match_score?: number | null
           notification_sent?: boolean | null
-          pds_file_name: string
-          pds_file_url: string
+          pds_id?: string | null
           rank?: number | null
           ranking_reasoning?: string | null
           reviewed_at?: string | null
@@ -278,8 +276,7 @@ export type Database = {
           job_id?: string
           match_score?: number | null
           notification_sent?: boolean | null
-          pds_file_name?: string
-          pds_file_url?: string
+          pds_id?: string | null
           rank?: number | null
           ranking_reasoning?: string | null
           reviewed_at?: string | null

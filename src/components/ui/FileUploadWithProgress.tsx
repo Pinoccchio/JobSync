@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, File, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 
 interface FileUploadWithProgressProps {
-  bucket: 'pds-files' | 'id-images' | 'announcements' | 'profiles';
+  bucket: 'id-images' | 'announcements' | 'profiles';
   folder?: string;
   accept?: string;
   onUploadComplete?: (data: {
@@ -39,8 +39,6 @@ export const FileUploadWithProgress: React.FC<FileUploadWithProgressProps> = ({
   // Get default label based on bucket
   const getDefaultLabel = () => {
     switch (bucket) {
-      case 'pds-files':
-        return 'Drag and drop your PDS file here';
       case 'id-images':
         return 'Drag and drop your ID image here';
       case 'announcements':
@@ -56,8 +54,6 @@ export const FileUploadWithProgress: React.FC<FileUploadWithProgressProps> = ({
   const getMaxSize = () => {
     if (maxSizeDisplay) return maxSizeDisplay;
     switch (bucket) {
-      case 'pds-files':
-        return '10MB';
       case 'id-images':
         return '5MB';
       case 'announcements':

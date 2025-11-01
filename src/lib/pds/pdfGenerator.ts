@@ -9,7 +9,7 @@ import { PDSData } from '@/types/pds.types';
  * @param includeSignature - Whether to include the digital signature image (default: false)
  * @param returnDoc - Whether to return the document instead of auto-downloading (default: false)
  */
-export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: boolean = false, returnDoc: boolean = false): jsPDF | void {
+export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: boolean = false, returnDoc: boolean = false): Promise<jsPDF | void> {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 15;
@@ -603,26 +603,58 @@ export function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: bool
     const labelY = signatureStartY + 5;        // Y position for labels (consistent for both sides)
 
     // Left side - Signature
-    if (includeSignature && pdsData.otherInformation.declaration.signatureData) {
+    if (includeSignature && (pdsData.otherInformation.declaration.signatureData || pdsData.otherInformation.declaration.signatureUrl)) {
       try {
-        // Position signature image above where the underline would be
-        const imageY = signatureStartY - 10;
-        const imageWidth = 50;
-        const imageHeight = 12;
+        let signatureImageData = pdsData.otherInformation.declaration.signatureData;
 
-        // Embed the actual signature image
-        doc.addImage(
-          pdsData.otherInformation.declaration.signatureData,
-          'PNG',
-          14,
-          imageY,
-          imageWidth,
-          imageHeight
-        );
+        // If no Base64 data but we have a storage URL, fetch it
+        if (!signatureImageData && pdsData.otherInformation.declaration.signatureUrl) {
+          try {
+            // Fetch signature from storage via API
+            const response = await fetch('/api/pds/signature');
+            const result = await response.json();
 
-        // Draw a subtle line under the signature image for consistency
-        doc.setLineWidth(0.3);
-        doc.line(14, underlineY, 14 + imageWidth, underlineY);
+            if (result.success && result.data.signatureUrl) {
+              // Fetch the actual image from signed URL
+              const imageResponse = await fetch(result.data.signatureUrl);
+              const imageBlob = await imageResponse.blob();
+
+              // Convert Blob to Base64
+              signatureImageData = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(imageBlob);
+              });
+            }
+          } catch (fetchError) {
+            console.error('Failed to fetch signature from storage:', fetchError);
+          }
+        }
+
+        // If we have signature data (either from Base64 or fetched from storage), embed it
+        if (signatureImageData) {
+          // Position signature image above where the underline would be
+          const imageY = signatureStartY - 10;
+          const imageWidth = 50;
+          const imageHeight = 12;
+
+          // Embed the actual signature image
+          doc.addImage(
+            signatureImageData,
+            'PNG',
+            14,
+            imageY,
+            imageWidth,
+            imageHeight
+          );
+
+          // Draw a subtle line under the signature image for consistency
+          doc.setLineWidth(0.3);
+          doc.line(14, underlineY, 14 + imageWidth, underlineY);
+        } else {
+          // Fallback if signature couldn't be loaded
+          doc.text('______________________________', 14, underlineY);
+        }
 
       } catch (error) {
         console.error('Failed to embed signature image:', error);

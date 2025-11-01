@@ -64,21 +64,54 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Update PDS record with signature URL
-    const { error: updateError } = await supabase
+    // Check if PDS record exists, create if not
+    const { data: existingPDS, error: checkError } = await supabase
       .from('applicant_pds')
-      .update({
-        signature_url: filePath,
-        signature_uploaded_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
 
-    if (updateError) {
-      console.error('Database update error:', updateError);
-      // File was uploaded but DB update failed - this is okay, we'll retry
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking PDS record:', checkError);
       return NextResponse.json({
-        error: `Signature uploaded but failed to update record: ${updateError.message}`
+        error: 'Failed to check PDS record'
       }, { status: 500 });
+    }
+
+    // If PDS doesn't exist, create a basic record
+    if (!existingPDS) {
+      const { error: insertError } = await supabase
+        .from('applicant_pds')
+        .insert({
+          user_id: user.id,
+          signature_url: filePath,
+          signature_uploaded_at: new Date().toISOString(),
+          completion_percentage: 0,
+          is_completed: false,
+        });
+
+      if (insertError) {
+        console.error('Error creating PDS record:', insertError);
+        return NextResponse.json({
+          error: `Signature uploaded but failed to create PDS record: ${insertError.message}`
+        }, { status: 500 });
+      }
+    } else {
+      // Update existing PDS record with signature URL
+      const { error: updateError } = await supabase
+        .from('applicant_pds')
+        .update({
+          signature_url: filePath,
+          signature_uploaded_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Database update error:', updateError);
+        return NextResponse.json({
+          error: `Signature uploaded but failed to update record: ${updateError.message}`
+        }, { status: 500 });
+      }
     }
 
     // Generate signed URL for immediate display

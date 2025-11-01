@@ -6,7 +6,7 @@ import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
-import { FileText, Loader2, Calendar, User, Briefcase } from 'lucide-react';
+import { FileText, Loader2, Calendar, User, Briefcase, CheckCircle, XCircle } from 'lucide-react';
 
 interface Application {
   id: string;
@@ -20,6 +20,8 @@ interface Application {
   pdsUrl: string;
   ocrProcessed: boolean;
   aiProcessed: boolean;
+  signatureUrl: string | null;
+  signatureUploadedAt: string | null;
   _raw: any;
 }
 
@@ -50,12 +52,12 @@ export default function ScannedRecordsPage() {
             applicantName: `${app.applicant_profiles?.first_name || ''} ${app.applicant_profiles?.surname || ''}`.trim() || 'Unknown',
             email: app.applicant_profiles?.profiles?.email || user?.email || 'N/A',
             jobTitle: app.jobs?.title || 'Unknown Position',
-            fileName: app.pds_file_name || 'No file',
             uploadedDate: new Date(app.created_at).toLocaleDateString(),
             status: app.status,
-            pdsUrl: app.pds_file_url,
             ocrProcessed: app.applicant_profiles?.ocr_processed || false,
             aiProcessed: app.applicant_profiles?.ai_processed || false,
+            signatureUrl: app.applicant_pds?.signature_url || null,
+            signatureUploadedAt: app.applicant_pds?.signature_uploaded_at || null,
             _raw: app,
           }))
         );
@@ -78,10 +80,9 @@ export default function ScannedRecordsPage() {
   const handleViewPDS = async (application: Application) => {
     try {
       const pdsId = application._raw?.pds_id;
-      const pdsUrl = application.pdsUrl;
       const applicantName = application.applicantName;
 
-      // Priority 1: Check for web-based PDS (pds_id)
+      // Check for web-based PDS (pds_id)
       if (pdsId) {
         const response = await fetch(`/api/pds/${pdsId}`);
         const result = await response.json();
@@ -92,34 +93,6 @@ export default function ScannedRecordsPage() {
             data: result.data,
             applicantName,
           });
-          return;
-        } else {
-          showToast(getErrorMessage(result.error), 'error');
-          return;
-        }
-      }
-
-      // Priority 2: Check for uploaded PDF file (pds_file_url)
-      if (pdsUrl) {
-        // Extract bucket and path from the URL
-        const url = new URL(pdsUrl);
-        const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
-
-        if (!pathMatch) {
-          // Direct download if it's already a signed URL
-          window.open(pdsUrl, '_blank');
-          return;
-        }
-
-        const bucket = pathMatch[1];
-        const path = pathMatch[2];
-
-        // Get fresh signed URL
-        const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
-        const result = await response.json();
-
-        if (result.success) {
-          window.open(result.data.signedUrl, '_blank');
           return;
         } else {
           showToast(getErrorMessage(result.error), 'error');
@@ -192,6 +165,32 @@ export default function ScannedRecordsPage() {
         >
           {value.charAt(0).toUpperCase() + value.slice(1)}
         </Badge>
+      )
+    },
+    {
+      header: 'Signature',
+      accessor: 'signatureUrl' as const,
+      render: (_: any, row: Application) => (
+        <div className="flex items-center gap-2">
+          {row.signatureUrl ? (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-green-700">Signed</span>
+                {row.signatureUploadedAt && (
+                  <span className="text-[10px] text-gray-500">
+                    {new Date(row.signatureUploadedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <XCircle className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500">No Signature</span>
+            </div>
+          )}
+        </div>
       )
     },
     {

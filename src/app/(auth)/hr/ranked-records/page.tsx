@@ -28,6 +28,7 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Application {
@@ -41,6 +42,8 @@ interface Application {
   appliedDate: string;
   pdsUrl: string;
   pdsId: string | null;
+  signatureUrl: string | null;
+  signatureUploadedAt: string | null;
   _raw: any;
 }
 
@@ -73,6 +76,7 @@ export default function RankedRecordsPage() {
     data: any;
     applicantName: string;
   } | null>(null);
+  const [processingOCR, setProcessingOCR] = useState<string | null>(null); // Track which application is processing
 
   // Fetch applications
   const fetchApplications = useCallback(async () => {
@@ -94,6 +98,8 @@ export default function RankedRecordsPage() {
             appliedDate: new Date(app.created_at).toLocaleDateString(),
             pdsUrl: app.pds_file_url,
             pdsId: app.pds_id,
+            signatureUrl: app.applicant_pds?.signature_url || null,
+            signatureUploadedAt: app.applicant_pds?.signature_uploaded_at || null,
             _raw: app,
           }))
         );
@@ -196,30 +202,12 @@ export default function RankedRecordsPage() {
     }
   };
 
-  // Download PDS as PDF
-  const handleDownloadPDFDirectly = async (application: Application) => {
-    try {
-      const pdsId = application.pdsId || application._raw?.pds_id;
-
-      if (!pdsId) {
-        showToast('No PDS data available for this applicant', 'warning');
-        return;
-      }
-
-      // Open download endpoint in new tab
-      const downloadUrl = `/api/pds/${pdsId}/download`;
-      window.open(downloadUrl, '_blank');
-    } catch (error) {
-      console.error('Error downloading PDS PDF:', error);
-      showToast('Failed to download PDS', 'error');
-    }
-  };
-
   // View PDS in modal
   const handleDownloadPDS = async (application: Application) => {
     try {
       const pdsId = application.pdsId || application._raw?.pds_id;
       const pdsUrl = application.pdsUrl;
+      const applicantId = application._raw?.applicant_id;
       const applicantName = application.applicantName;
 
       // Priority 1: Check for web-based PDS (pds_id)
@@ -240,34 +228,46 @@ export default function RankedRecordsPage() {
         }
       }
 
-      // Priority 2: Check for uploaded PDF file (pds_file_url)
-      if (pdsUrl) {
-        // Extract bucket and path from the URL
-        const url = new URL(pdsUrl);
-        const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
-
-        if (!pathMatch) {
-          // Open modal with the URL directly if it's already a signed URL
-          setPdsViewerState({ isOpen: true, url: pdsUrl, applicantName });
-          return;
-        }
-
-        const bucket = pathMatch[1];
-        const path = pathMatch[2];
-
-        // Get fresh signed URL
-        const response = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
+      // Priority 2: Check for uploaded PDF - Show OCR-extracted data
+      if (pdsUrl && applicantId) {
+        // Fetch OCR-extracted data from applicant_profiles
+        const response = await fetch(`/api/applicants/${applicantId}/profile`);
         const result = await response.json();
 
-        if (result.success) {
-          setPdsViewerState({
+        if (result.success && result.data) {
+          // Show OCR-extracted data in structured view (same as web PDS)
+          setPdsDataModal({
             isOpen: true,
-            url: result.data.signedUrl,
+            data: result.data,
             applicantName,
           });
           return;
         } else {
-          showToast(getErrorMessage(result.error), 'error');
+          // Fallback: Show PDF if OCR data not available
+          showToast('OCR data not available. Showing original PDF...', 'info');
+
+          // Get fresh signed URL for PDF
+          const url = new URL(pdsUrl);
+          const pathMatch = url.pathname.match(/\/storage\/v1\/object\/sign\/([^\/]+)\/(.+)\?/);
+
+          if (pathMatch) {
+            const bucket = pathMatch[1];
+            const path = pathMatch[2];
+
+            const storageResponse = await fetch(`/api/storage?bucket=${bucket}&path=${encodeURIComponent(path)}`);
+            const storageResult = await storageResponse.json();
+
+            if (storageResult.success) {
+              setPdsViewerState({
+                isOpen: true,
+                url: storageResult.data.signedUrl,
+                applicantName,
+              });
+              return;
+            }
+          }
+
+          showToast(getErrorMessage(result.error || 'Failed to load PDS'), 'error');
           return;
         }
       }
@@ -277,6 +277,36 @@ export default function RankedRecordsPage() {
     } catch (error) {
       console.error('Error loading PDS:', error);
       showToast('Failed to load PDS', 'error');
+    }
+  };
+
+  // Manually trigger OCR processing for uploaded PDFs
+  const handleProcessOCR = async (application: Application) => {
+    try {
+      setProcessingOCR(application.id);
+      showToast('Starting OCR processing... This may take 1-2 minutes.', 'info');
+
+      const response = await fetch(`/api/applications/${application.id}/process-ocr`, {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(
+          `OCR processing completed! Extracted data with ${result.data.confidence}% confidence.`,
+          'success'
+        );
+        // Refresh applications to show updated data
+        await fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error processing OCR:', error);
+      showToast('Failed to process OCR', 'error');
+    } finally {
+      setProcessingOCR(null);
     }
   };
 
@@ -555,6 +585,32 @@ export default function RankedRecordsPage() {
       accessor: 'appliedDate' as const,
     },
     {
+      header: 'Signature',
+      accessor: 'signatureUrl' as const,
+      render: (_: any, row: Application) => (
+        <div className="flex items-center gap-2">
+          {row.signatureUrl ? (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-green-700">Signed</span>
+                {row.signatureUploadedAt && (
+                  <span className="text-[10px] text-gray-500">
+                    {new Date(row.signatureUploadedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <XCircle className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500">No Signature</span>
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
       header: 'Details',
       accessor: 'details' as const,
       render: (_: any, row: Application) => (
@@ -584,15 +640,22 @@ export default function RankedRecordsPage() {
           >
             View PDS
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={Download}
-            onClick={() => handleDownloadPDFDirectly(row)}
-            title="Download PDS as PDF"
-          >
-            PDF
-          </Button>
+
+          {/* Show "Process OCR" button if uploaded PDF needs OCR processing */}
+          {row.pdsUrl && !row.pdsId && row._raw?.applicant_profiles?.ocr_processed === false && (
+            <Button
+              variant="warning"
+              size="sm"
+              icon={RefreshCw}
+              onClick={() => handleProcessOCR(row)}
+              disabled={processingOCR === row.id}
+              loading={processingOCR === row.id}
+              title="Process uploaded PDF with OCR to extract data"
+            >
+              {processingOCR === row.id ? 'Processing...' : 'Process OCR'}
+            </Button>
+          )}
+
           {row.status === 'pending' && (
             <>
               <Button

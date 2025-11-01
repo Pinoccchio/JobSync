@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/server';
  *
  * Endpoints:
  * - GET /api/applications - List applications (filtered by user/job/status)
- * - POST /api/applications - Submit application with PDS file
+ * - POST /api/applications - Submit application with web-based PDS
  *
  * Database Schema:
- * - applications table: id, job_id, applicant_id, applicant_profile_id, pds_file_url, pds_file_name, status, rank, match_score, created_at
+ * - applications table: id, job_id, applicant_id, applicant_profile_id, pds_id, status, rank, match_score, created_at
  * - applicant_profiles table: user_id, education, work_experience, eligibilities, skills, etc.
  */
 
@@ -57,8 +57,6 @@ export async function GET(request: NextRequest) {
         applicant_id,
         applicant_profile_id,
         pds_id,
-        pds_file_url,
-        pds_file_name,
         status,
         rank,
         match_score,
@@ -100,9 +98,15 @@ export async function GET(request: NextRequest) {
           skills,
           total_years_experience,
           highest_educational_attainment,
+          ocr_processed,
           profiles:user_id (
             email
           )
+        ),
+        applicant_pds:pds_id (
+          id,
+          signature_url,
+          signature_uploaded_at
         )
       `)
       .order('created_at', { ascending: false });
@@ -197,7 +201,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Validate required fields
-    const { job_id, pds_id, pds_file_url, pds_file_name } = body;
+    const { job_id, pds_id } = body;
 
     if (!job_id) {
       return NextResponse.json(
@@ -206,13 +210,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Must provide either pds_id (web-based) OR pds_file_url (upload)
-    if (!pds_id && (!pds_file_url || !pds_file_name)) {
+    if (!pds_id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Must provide either pds_id (web-based PDS) or pds_file_url/pds_file_name (uploaded PDF)',
-        },
+        { success: false, error: 'Missing required field: pds_id - Please complete your PDS first' },
         { status: 400 }
       );
     }
@@ -291,21 +291,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 8. Create application
-    const insertData: any = {
+    const insertData = {
       job_id,
       applicant_id: user.id,
       applicant_profile_id: applicantProfileId,
+      pds_id,
       status: 'pending',
       notification_sent: false,
     };
-
-    // Add PDS reference (either pds_id for web-based or file URL for upload)
-    if (pds_id) {
-      insertData.pds_id = pds_id;
-    } else {
-      insertData.pds_file_url = pds_file_url;
-      insertData.pds_file_name = pds_file_name;
-    }
 
     const { data: application, error: applicationError } = await supabase
       .from('applications')
@@ -315,8 +308,6 @@ export async function POST(request: NextRequest) {
         job_id,
         applicant_id,
         pds_id,
-        pds_file_url,
-        pds_file_name,
         status,
         created_at,
         jobs:job_id (
@@ -335,24 +326,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. TODO: Trigger OCR processing (Phase 10)
+    // 9. Ranking will be triggered manually by HR via "Rank Applicants" button
+    // No automatic ranking on submission - HR has full control
 
-    // 10. Trigger AI ranking in background (don't wait for completion)
-    try {
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/jobs/${job_id}/rank`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      }).catch(error => {
-        console.error('Background ranking trigger failed:', error);
-        // Don't fail the application submission if ranking fails
-      });
-      console.log(`New application submitted for "${job.title}". Triggered background ranking.`);
-    } catch (error) {
-      console.error('Error triggering background ranking:', error);
-      // Don't fail the application submission if ranking trigger fails
-    }
-
-    // 11. TODO: Send notification to applicant (Phase 5)
+    // 10. TODO: Send notification to applicant (Phase 5)
 
     return NextResponse.json({
       success: true,

@@ -98,6 +98,10 @@ export async function POST(request: NextRequest) {
       ? Math.max(0, Math.min(100, Math.round(body.completionPercentage)))
       : 0;
 
+    // Extract signature data from otherInformation.declaration if exists
+    const signatureUrl = body.otherInformation?.declaration?.signatureUrl || null;
+    const signatureUploadedAt = body.otherInformation?.declaration?.signatureUploadedAt || null;
+
     // Create new PDS
     const { data: pds, error: insertError } = await supabase
       .from('applicant_pds')
@@ -114,6 +118,8 @@ export async function POST(request: NextRequest) {
         completion_percentage: validatedPercentage,
         is_completed: body.isCompleted || false,
         last_saved_section: body.lastSavedSection || null,
+        signature_url: signatureUrl,
+        signature_uploaded_at: signatureUploadedAt,
       })
       .select()
       .single();
@@ -168,6 +174,14 @@ export async function PUT(request: NextRequest) {
     if (body.voluntaryWork !== undefined) updateData.voluntary_work = body.voluntaryWork;
     if (body.trainings !== undefined) updateData.trainings = body.trainings;
     if (body.otherInformation !== undefined) updateData.other_information = body.otherInformation;
+
+    // Extract and save signature data from otherInformation.declaration if exists
+    if (body.otherInformation?.declaration?.signatureUrl !== undefined) {
+      updateData.signature_url = body.otherInformation.declaration.signatureUrl;
+    }
+    if (body.otherInformation?.declaration?.signatureUploadedAt !== undefined) {
+      updateData.signature_uploaded_at = body.otherInformation.declaration.signatureUploadedAt;
+    }
 
     // VALIDATION: Ensure completion_percentage is always 0-100 (database constraint)
     if (body.completionPercentage !== undefined) {

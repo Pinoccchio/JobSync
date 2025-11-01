@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 10. Get file URL
-    // For private buckets, we'll return the path and generate signed URL on demand
+    // For private buckets, store the path (generate signed URLs on-demand when needed)
     // For public buckets, return the public URL
     let fileUrl = '';
 
@@ -145,20 +145,10 @@ export async function POST(request: NextRequest) {
 
       fileUrl = publicUrlData.publicUrl;
     } else {
-      // Private buckets - generate signed URL (1 hour expiry)
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(filePath, 3600); // 1 hour
-
-      if (signedUrlError) {
-        console.error('Signed URL error:', signedUrlError);
-        return NextResponse.json(
-          { success: false, error: 'Failed to generate file URL' },
-          { status: 500 }
-        );
-      }
-
-      fileUrl = signedUrlData.signedUrl;
+      // Private buckets - store the path, not signed URL
+      // Signed URLs expire after 1 hour, which breaks OCR processing for older applications
+      // We'll generate signed URLs on-demand when needed for viewing/downloading
+      fileUrl = filePath;
     }
 
     return NextResponse.json({

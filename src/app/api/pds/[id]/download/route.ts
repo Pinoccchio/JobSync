@@ -68,7 +68,7 @@ export async function GET(
     const transformedPDSData = transformPDSFromDatabase(pdsData);
 
     // Generate PDF using pdfGenerator (returnDoc = true to get the jsPDF object)
-    const doc = generatePDSPDF(transformedPDSData, includeSignature, true);
+    const doc = await generatePDSPDF(transformedPDSData, includeSignature, true);
 
     if (!doc) {
       return NextResponse.json(

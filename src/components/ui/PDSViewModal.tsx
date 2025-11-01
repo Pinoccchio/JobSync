@@ -15,7 +15,9 @@ import {
   MapPin,
   Phone,
   Mail,
-  Download
+  Download,
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
 
 interface PDSViewModalProps {
@@ -95,7 +97,15 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
               <User className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{applicantName}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-gray-900">{applicantName}</h2>
+                {pdsData.signature_url && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full border border-green-300">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Digitally Signed
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-600">Civil Service Form 212 - Revised 2025</p>
             </div>
           </div>
@@ -189,6 +199,61 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
             <InfoRow label="Permanent Address" value={formatPermanentAddress(personalInfo.permanentAddress, personalInfo.residentialAddress)} className="col-span-2" />
           </div>
         </section>
+
+        {/* Digital Signature - Prominent Display */}
+        {pdsData.signature_url && (
+          <section className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-lg shadow-md">
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-md">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Digital Signature</h3>
+                  <p className="text-xs text-green-700">This PDS has been digitally signed by the applicant</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-6 border-2 border-green-200 shadow-inner">
+                <div className="flex flex-col items-center">
+                  {loadingSignature ? (
+                    <div className="flex items-center gap-3 text-gray-600 py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+                      <span className="text-sm font-medium">Loading signature...</span>
+                    </div>
+                  ) : signatureUrl ? (
+                    <div className="text-center">
+                      <img
+                        src={signatureUrl}
+                        alt="Digital Signature"
+                        className="max-h-[200px] max-w-[400px] object-contain border-2 border-gray-300 rounded-lg bg-white p-4 shadow-sm"
+                      />
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        {pdsData.signature_uploaded_at && (
+                          <p className="text-sm text-gray-700 font-medium">
+                            <Calendar className="w-4 h-4 inline mr-1 text-green-600" />
+                            Signed on: {new Date(pdsData.signature_uploaded_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-red-600 font-medium">Unable to load signature</p>
+                      <p className="text-xs text-gray-500 mt-1">The signature file may be temporarily unavailable</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Family Background */}
         <section>
@@ -690,50 +755,6 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
                 {otherInformation.soloParent && otherInformation.soloParentIdNumber && (
                   <p className="text-sm text-gray-600 pl-4">ID Number: {otherInformation.soloParentIdNumber}</p>
                 )}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Signature */}
-        {pdsData.signature_url && (
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <FileText className="w-5 h-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Signature & Declaration</h3>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-500">
-              <div className="flex items-start gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Applicant's Signature</p>
-                  {loadingSignature ? (
-                    <div className="flex items-center gap-2 text-gray-500 py-4">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                      <span className="text-sm">Loading signature...</span>
-                    </div>
-                  ) : signatureUrl ? (
-                    <img
-                      src={signatureUrl}
-                      alt="Signature"
-                      className="border-2 border-gray-300 rounded bg-white p-2"
-                      style={{ maxWidth: '300px', height: 'auto' }}
-                    />
-                  ) : (
-                    <div className="text-sm text-gray-500 py-2">
-                      Unable to load signature
-                    </div>
-                  )}
-                  {pdsData.signature_uploaded_at && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Signed on: {new Date(pdsData.signature_uploaded_at).toLocaleDateString()}
-                    </p>
-                  )}
-                  {otherInformation.declaration?.dateAccomplished && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Date Accomplished: {new Date(otherInformation.declaration.dateAccomplished).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
               </div>
             </div>
           </section>

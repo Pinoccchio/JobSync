@@ -28,10 +28,10 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
     );
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     try {
       setIsDownloading(true);
-      generatePDSPDF(pdsData, includeSignature);
+      await generatePDSPDF(pdsData, includeSignature);
       // Success - PDF downloaded
     } catch (error) {
       console.error('PDF generation failed:', error);

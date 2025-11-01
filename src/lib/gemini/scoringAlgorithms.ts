@@ -97,9 +97,10 @@ export function algorithm1_WeightedSum(
 
   // Eligibility Score: Boolean match with partial credit
   const jobEligibilities = job.eligibilities.map(e => e.toLowerCase());
-  const applicantEligibilities = applicant.eligibilities.map(e =>
-    e.eligibilityTitle.toLowerCase()
-  );
+  // Web PDS format only
+  const applicantEligibilities = applicant.eligibilities
+    .filter(e => e && e.eligibilityTitle) // Filter out null/undefined entries
+    .map(e => e.eligibilityTitle.toLowerCase());
 
   let eligibilityScore = 50; // Default for no requirements
 
@@ -184,9 +185,9 @@ export function algorithm2_SkillExperienceComposite(
 
   // Eligibility scoring
   const jobEligibilities = job.eligibilities.map(e => e.toLowerCase());
-  const applicantEligibilities = applicant.eligibilities.map(e =>
-    e.eligibilityTitle.toLowerCase()
-  );
+  const applicantEligibilities = applicant.eligibilities
+    .filter(e => e && e.eligibilityTitle)
+    .map(e => e.eligibilityTitle.toLowerCase());
 
   let eligibilityScore = 50;
   if (jobEligibilities.length > 0 && !jobEligibilities.includes('none required')) {
@@ -231,9 +232,9 @@ export function algorithm3_EligibilityEducationTiebreaker(
 
   // Priority 1: Professional License (highest weight)
   const jobEligibilities = job.eligibilities.map(e => e.toLowerCase());
-  const applicantEligibilities = applicant.eligibilities.map(e =>
-    e.eligibilityTitle.toLowerCase()
-  );
+  const applicantEligibilities = applicant.eligibilities
+    .filter(e => e && e.eligibilityTitle)
+    .map(e => e.eligibilityTitle.toLowerCase());
 
   let eligibilityScore = 0;
   if (jobEligibilities.length > 0 && !jobEligibilities.includes('none required')) {
