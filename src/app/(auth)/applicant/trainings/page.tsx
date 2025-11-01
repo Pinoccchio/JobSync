@@ -7,7 +7,7 @@ import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { AdminLayout } from '@/components/layout';
-import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, LayoutGrid, List, Filter, Loader2, Award, Star, TrendingUp, User } from 'lucide-react';
+import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, LayoutGrid, List, Filter, Loader2, Award, Star, TrendingUp, User, Laptop, Briefcase, BarChart3, Palette, Wrench, BookOpen, Code, Lightbulb } from 'lucide-react';
 import { FileUploadWithProgress } from '@/components/ui';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 
@@ -263,6 +263,27 @@ export default function TrainingsPage() {
     return icons[index % icons.length];
   };
 
+  // Map icon string to lucide-react icon component
+  const getIconComponent = (iconString: string | null | undefined) => {
+    const iconMap: { [key: string]: any } = {
+      'laptop': Laptop,
+      'briefcase': Briefcase,
+      'chart': BarChart3,
+      'palette': Palette,
+      'wrench': Wrench,
+      'book': BookOpen,
+      'code': Code,
+      'lightbulb': Lightbulb,
+      'graduation': GraduationCap,
+      'award': Award,
+    };
+
+    if (!iconString) return GraduationCap;
+
+    const key = iconString.toLowerCase().trim();
+    return iconMap[key] || GraduationCap;
+  };
+
   // Calculate stats
   const stats = {
     totalPrograms: programs.length,
@@ -476,7 +497,11 @@ export default function TrainingsPage() {
                         {/* Header with Badges */}
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start gap-4 flex-1 min-w-0">
-                            <div className="text-5xl flex-shrink-0">{program.icon || getIcon(index)}</div>
+                            <div className="w-12 h-12 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                              {React.createElement(getIconComponent(program.icon), {
+                                className: "w-6 h-6 text-[#22A555]"
+                              })}
+                            </div>
                             <div className="flex-1 min-w-0">
                               <h2 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-2 line-clamp-2">
                                 {program.title}
@@ -635,8 +660,12 @@ export default function TrainingsPage() {
                       header: 'Program',
                       accessor: 'title' as const,
                       render: (value: string, row: TrainingProgram) => (
-                        <div className="flex items-center gap-2">
-                          <div className="text-2xl">{row.icon || '📚'}</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                            {React.createElement(getIconComponent(row.icon), {
+                              className: "w-5 h-5 text-[#22A555]"
+                            })}
+                          </div>
                           <div>
                             <p className="font-medium text-gray-900">{value}</p>
                             <p className="text-xs text-gray-500">{row.description.slice(0, 60)}...</p>
