@@ -118,3 +118,32 @@ export function getCreatorTooltip(
 
   return `Created by ${creator.full_name} (${creator.role}) on ${formatFullDateTime(createdAt)}`;
 }
+
+/**
+ * Format a date-only string (YYYY-MM-DD) for display without timezone conversion
+ * IMPORTANT: This function keeps dates as-is without any timezone conversion.
+ * Use this for date-only fields (birthdate, graduation date, etc.) to prevent
+ * timezone bugs where dates shift by one day.
+ *
+ * @param dateString - Date string in YYYY-MM-DD format
+ * @returns The date string as-is, or 'N/A' if invalid
+ *
+ * @example
+ * formatDateOnly('2025-11-01') // Returns: '2025-11-01'
+ * formatDateOnly('') // Returns: 'N/A'
+ * formatDateOnly(undefined) // Returns: 'N/A'
+ */
+export function formatDateOnly(dateString: string | undefined | null): string {
+  // Return N/A for empty/null/undefined values
+  if (!dateString || dateString.trim() === '') {
+    return 'N/A';
+  }
+
+  // If already in YYYY-MM-DD format, return as-is (no timezone conversion!)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
+
+  // Fallback: return the original string for other formats
+  return dateString;
+}

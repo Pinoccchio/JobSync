@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
+import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -470,100 +470,58 @@ Employment Type: ${formData.employment_type}
         const isHidden = row.status === 'Hidden';
         const isArchived = row.status === 'Archived';
 
-        return (
-          <div className="flex gap-2">
-            {/* Edit - Available for Active and Hidden jobs */}
-            {!isArchived && (
-              <Button
-                variant="warning"
-                size="sm"
-                icon={Edit}
-                onClick={() => handleEdit(row)}
-                title="Edit job details"
-              >
-                Edit
-              </Button>
-            )}
+        const menuItems: DropdownMenuItem[] = [
+          {
+            label: 'Edit Job',
+            icon: Edit,
+            onClick: () => handleEdit(row),
+            variant: 'warning',
+            hidden: isArchived,
+          },
+          {
+            label: 'Hide from Applicants',
+            icon: EyeOff,
+            onClick: () => {
+              setJobToHide(row);
+              setShowHideConfirm(true);
+            },
+            variant: 'warning',
+            hidden: !isActive,
+          },
+          {
+            label: isArchived ? 'Restore to Active' : 'Unhide Job',
+            icon: Eye,
+            onClick: () => {
+              setJobToUnhide(row);
+              setShowUnhideConfirm(true);
+            },
+            variant: 'success',
+            hidden: isActive,
+          },
+          {
+            label: 'Archive Job',
+            icon: Archive,
+            onClick: () => {
+              setJobToArchive(row);
+              setShowArchiveConfirm(true);
+            },
+            variant: 'danger',
+            hidden: isArchived,
+          },
+          {
+            label: 'Permanently Delete',
+            icon: Trash2,
+            onClick: () => {
+              setJobToDelete(row);
+              fetchApplicationCount(row.id);
+              setShowDeleteConfirm(true);
+            },
+            variant: 'danger',
+            hidden: !isArchived,
+          },
+        ];
 
-            {/* Hide/Unhide Toggle */}
-            {isActive && (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={EyeOff}
-                onClick={() => {
-                  setJobToHide(row);
-                  setShowHideConfirm(true);
-                }}
-                title="Hide job from applicants"
-              >
-                Hide
-              </Button>
-            )}
-
-            {isHidden && (
-              <Button
-                variant="success"
-                size="sm"
-                icon={Eye}
-                onClick={() => {
-                  setJobToUnhide(row);
-                  setShowUnhideConfirm(true);
-                }}
-                title="Restore job to active"
-              >
-                Unhide
-              </Button>
-            )}
-
-            {/* Archive - Available for Active and Hidden */}
-            {!isArchived && (
-              <Button
-                variant="danger"
-                size="sm"
-                icon={Archive}
-                onClick={() => {
-                  setJobToArchive(row);
-                  setShowArchiveConfirm(true);
-                }}
-                title="Archive this job"
-              >
-                Archive
-              </Button>
-            )}
-
-            {/* Restore and Permanent Delete - Available for Archived jobs only */}
-            {isArchived && (
-              <>
-                <Button
-                  variant="success"
-                  size="sm"
-                  icon={CheckCircle2}
-                  onClick={() => {
-                    setJobToUnhide(row);
-                    setShowUnhideConfirm(true);
-                  }}
-                  title="Restore job to active"
-                >
-                  Restore
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  icon={Trash2}
-                  onClick={() => {
-                    setJobToDelete(row);
-                    fetchApplicationCount(row.id);
-                    setShowDeleteConfirm(true);
-                  }}
-                  title="Permanently delete this job"
-                >
-                  Delete
-                </Button>
-              </>
-            )}
-          </div>
-        );
+        return <DropdownMenu items={menuItems} />;
       }
     },
   ];

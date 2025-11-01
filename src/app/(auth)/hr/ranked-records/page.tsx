@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import Image from 'next/image';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, ConfirmModal } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem } from '@/components/ui';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { RankingDetailsModal } from '@/components/hr/RankingDetailsModal';
 import { PDSViewerModal } from '@/components/hr/PDSViewerModal';
@@ -28,7 +28,8 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
-  RefreshCw,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 
 interface Application {
@@ -76,7 +77,6 @@ export default function RankedRecordsPage() {
     data: any;
     applicantName: string;
   } | null>(null);
-  const [processingOCR, setProcessingOCR] = useState<string | null>(null); // Track which application is processing
 
   // Fetch applications
   const fetchApplications = useCallback(async () => {
@@ -277,36 +277,6 @@ export default function RankedRecordsPage() {
     } catch (error) {
       console.error('Error loading PDS:', error);
       showToast('Failed to load PDS', 'error');
-    }
-  };
-
-  // Manually trigger OCR processing for uploaded PDFs
-  const handleProcessOCR = async (application: Application) => {
-    try {
-      setProcessingOCR(application.id);
-      showToast('Starting OCR processing... This may take 1-2 minutes.', 'info');
-
-      const response = await fetch(`/api/applications/${application.id}/process-ocr`, {
-        method: 'POST',
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        showToast(
-          `OCR processing completed! Extracted data with ${result.data.confidence}% confidence.`,
-          'success'
-        );
-        // Refresh applications to show updated data
-        await fetchApplications();
-      } else {
-        showToast(getErrorMessage(result.error), 'error');
-      }
-    } catch (error) {
-      console.error('Error processing OCR:', error);
-      showToast('Failed to process OCR', 'error');
-    } finally {
-      setProcessingOCR(null);
     }
   };
 
@@ -611,75 +581,43 @@ export default function RankedRecordsPage() {
       )
     },
     {
-      header: 'Details',
-      accessor: 'details' as const,
-      render: (_: any, row: Application) => (
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={Eye}
-          onClick={() => handleViewDetails(row)}
-          disabled={!row.rank || !row.matchScore}
-          title={row.rank && row.matchScore ? "View detailed ranking breakdown" : "This applicant has not been ranked yet"}
-        >
-          View Details
-        </Button>
-      ),
-    },
-    {
       header: 'Actions',
       accessor: 'actions' as const,
-      render: (_: any, row: Application) => (
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={Eye}
-            onClick={() => handleDownloadPDS(row)}
-            title="View PDS in modal"
-          >
-            View PDS
-          </Button>
+      render: (_: any, row: Application) => {
+        const menuItems: DropdownMenuItem[] = [
+          {
+            label: 'View Ranking Details',
+            icon: FileText,
+            onClick: () => handleViewDetails(row),
+            variant: 'default',
+            disabled: !row.rank || !row.matchScore,
+          },
+          {
+            label: 'View PDS',
+            icon: Eye,
+            onClick: () => handleDownloadPDS(row),
+            variant: 'default',
+          },
+          {
+            label: 'Approve',
+            icon: CheckCircle,
+            onClick: () => handleApprove(row),
+            variant: 'success',
+            disabled: submitting,
+            hidden: row.status !== 'pending',
+          },
+          {
+            label: 'Deny',
+            icon: XCircle,
+            onClick: () => handleDeny(row),
+            variant: 'danger',
+            disabled: submitting,
+            hidden: row.status !== 'pending',
+          },
+        ];
 
-          {/* Show "Process OCR" button if uploaded PDF needs OCR processing */}
-          {row.pdsUrl && !row.pdsId && row._raw?.applicant_profiles?.ocr_processed === false && (
-            <Button
-              variant="warning"
-              size="sm"
-              icon={RefreshCw}
-              onClick={() => handleProcessOCR(row)}
-              disabled={processingOCR === row.id}
-              loading={processingOCR === row.id}
-              title="Process uploaded PDF with OCR to extract data"
-            >
-              {processingOCR === row.id ? 'Processing...' : 'Process OCR'}
-            </Button>
-          )}
-
-          {row.status === 'pending' && (
-            <>
-              <Button
-                variant="success"
-                size="sm"
-                icon={CheckCircle}
-                onClick={() => handleApprove(row)}
-                disabled={submitting}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon={XCircle}
-                onClick={() => handleDeny(row)}
-                disabled={submitting}
-              >
-                Deny
-              </Button>
-            </>
-          )}
-        </div>
-      ),
+        return <DropdownMenu items={menuItems} />;
+      },
     },
   ];
 
@@ -827,21 +765,110 @@ export default function RankedRecordsPage() {
         jobRequirements={selectedJobRequirements}
       />
 
-      {/* Confirmation Modal for Ranking */}
-      <ConfirmModal
-        isOpen={isConfirmModalOpen}
-        onClose={() => {
-          setIsConfirmModalOpen(false);
-          setJobToRank(null);
-        }}
-        onConfirm={performRanking}
-        title="Rank Applicants with Gemini AI?"
-        message={`Rank all pending applicants for "${jobToRank?.title || ''}" using Gemini AI?\n\nThis will score applicants based on education, experience, skills, and eligibilities.`}
-        confirmText="Rank Applicants"
-        cancelText="Cancel"
-        variant="primary"
-        isLoading={isRanking}
-      />
+      {/* Custom Rank Applicants Confirmation Modal */}
+      {isConfirmModalOpen && jobToRank && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
+            {/* Blue Gradient Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Rank Applicants with Gemini AI</h3>
+                    <p className="text-sm text-white/90">AI-powered intelligent ranking</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsConfirmModalOpen(false);
+                    setJobToRank(null);
+                  }}
+                  className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                  disabled={isRanking}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* AI Info Message */}
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-blue-800 mb-1">AI Ranking Process</p>
+                    <p className="text-sm text-blue-700">
+                      Gemini AI will analyze and rank all pending applicants using advanced algorithms.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Job Info */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Job Position:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium text-gray-900">{jobToRank.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700">
+                      All pending applicants will be ranked
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* What Will Happen */}
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <div className="flex items-start gap-2 mb-2">
+                  <Award className="w-4 h-4 text-blue-600 mt-0.5" />
+                  <p className="text-sm font-semibold text-blue-900">What Happens Next:</p>
+                </div>
+                <ul className="text-sm text-blue-800 space-y-1 ml-6 list-disc">
+                  <li>Analyzes education, experience, skills, and eligibilities</li>
+                  <li>Calculates match scores (0-100%) for each applicant</li>
+                  <li>Ranks applicants from best to least match</li>
+                  <li>Uses 3 AI algorithms with ensemble method</li>
+                  <li>Provides detailed reasoning for each score</li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsConfirmModalOpen(false);
+                    setJobToRank(null);
+                  }}
+                  className="flex-1"
+                  disabled={isRanking}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={Award}
+                  loading={isRanking}
+                  onClick={performRanking}
+                  className="flex-1"
+                  disabled={isRanking}
+                >
+                  {isRanking ? 'Ranking with AI...' : 'Rank Applicants'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Custom Approve Confirmation Modal */}
       {showApproveConfirm && applicantToApprove && (

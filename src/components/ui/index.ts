@@ -18,3 +18,4 @@ export { EventBadge } from './EventBadge';
 export { StatusIndicator } from './StatusIndicator';
 export { EventIcon } from './EventIcon';
 export { EventFilter, EventFilterGroup } from './EventFilter';
+export { DropdownMenu, type DropdownMenuItem } from './DropdownMenu';

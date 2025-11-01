@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PDSData } from '@/types/pds.types';
+import { formatDateOnly } from '@/lib/utils/dateFormatters';
 
 /**
  * Generate a PDF document from PDS data
@@ -49,7 +50,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
 
     const personalInfoData = [
       ['Full Name:', `${pi.surname}, ${pi.firstName} ${pi.middleName || ''} ${pi.nameExtension || ''}`.trim()],
-      ['Date of Birth:', pi.dateOfBirth || 'N/A'],
+      ['Date of Birth:', formatDateOnly(pi.dateOfBirth)],
       ['Place of Birth:', pi.placeOfBirth || 'N/A'],
       ['Sex:', pi.sexAtBirth || 'N/A'],
       ['Civil Status:', pi.civilStatus === 'Others' && pi.civilStatusOthers ? `${pi.civilStatus} (${pi.civilStatusOthers})` : pi.civilStatus || 'N/A'],
@@ -160,7 +161,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
 
       const childrenData = fb.children.map((child) => [
         child.fullName || 'N/A',
-        child.dateOfBirth || 'N/A',
+        formatDateOnly(child.dateOfBirth),
       ]);
 
       autoTable(doc, {
@@ -216,7 +217,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
       edu.level || 'N/A',
       edu.nameOfSchool || 'N/A',
       edu.basicEducationDegreeCourse || 'N/A',
-      `${edu.periodOfAttendance?.from || ''} - ${edu.periodOfAttendance?.to || ''}`,
+      `${formatDateOnly(edu.periodOfAttendance?.from)} - ${formatDateOnly(edu.periodOfAttendance?.to)}`,
       edu.yearGraduated || edu.highestLevelUnitsEarned || 'N/A',
       edu.scholarshipAcademicHonors || 'None',
     ]);
@@ -253,10 +254,10 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
     const eligibilityData = pdsData.eligibility.map((elig) => [
       elig.careerService || 'N/A',
       elig.rating?.toString() || 'N/A',
-      elig.dateOfExaminationConferment || 'N/A',
+      formatDateOnly(elig.dateOfExaminationConferment),
       elig.placeOfExaminationConferment || 'N/A',
       elig.licenseNumber || 'N/A',
-      elig.licenseValidity || 'N/A',
+      formatDateOnly(elig.licenseValidity),
     ]);
 
     autoTable(doc, {
@@ -291,7 +292,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
     const workData = pdsData.workExperience.map((work) => [
       work.positionTitle || 'N/A',
       work.departmentAgencyOfficeCompany || 'N/A',
-      `${work.periodOfService?.from || ''} - ${work.periodOfService?.to || ''}`,
+      `${formatDateOnly(work.periodOfService?.from)} - ${formatDateOnly(work.periodOfService?.to)}`,
       work.monthlySalary || 'N/A',
       work.salaryGrade || 'N/A',
       work.statusOfAppointment || 'N/A',
@@ -332,7 +333,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
       vol.organizationName || 'N/A',
       vol.organizationAddress || 'N/A',
       vol.positionNatureOfWork || 'N/A',
-      `${vol.periodOfInvolvement?.from || ''} - ${vol.periodOfInvolvement?.to || ''}`,
+      `${formatDateOnly(vol.periodOfInvolvement?.from)} - ${formatDateOnly(vol.periodOfInvolvement?.to)}`,
       vol.numberOfHours ? `${vol.numberOfHours}h` : 'N/A',
     ]);
 
@@ -367,7 +368,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
     const trainingData = pdsData.trainings.map((training) => [
       training.title || 'N/A',
       training.conductedSponsoredBy || 'N/A',
-      `${training.periodOfAttendance?.from || ''} - ${training.periodOfAttendance?.to || ''}`,
+      `${formatDateOnly(training.periodOfAttendance?.from)} - ${formatDateOnly(training.periodOfAttendance?.to)}`,
       `${training.numberOfHours || 0}h`,
       training.typeOfLD || 'N/A',
     ]);
@@ -434,7 +435,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
       const govIdData = [
         ['Type:', oi.governmentIssuedId.type || 'N/A'],
         ['ID Number:', oi.governmentIssuedId.idNumber || 'N/A'],
-        ['Date Issued:', oi.governmentIssuedId.dateIssued || 'N/A'],
+        ['Date Issued:', formatDateOnly(oi.governmentIssuedId.dateIssued)],
       ];
 
       autoTable(doc, {
@@ -514,7 +515,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
           '35b. Have you been criminally charged before any court?',
           oi.criminallyCharged ? 'YES' : 'NO',
           oi.criminallyCharged
-            ? `${oi.criminallyChargedDetails || 'N/A'}${oi.criminallyChargedDateFiled ? ' | Date: ' + oi.criminallyChargedDateFiled : ''}${oi.criminallyChargedStatus ? ' | Status: ' + oi.criminallyChargedStatus : ''}`
+            ? `${oi.criminallyChargedDetails || 'N/A'}${oi.criminallyChargedDateFiled ? ' | Date: ' + formatDateOnly(oi.criminallyChargedDateFiled) : ''}${oi.criminallyChargedStatus ? ' | Status: ' + oi.criminallyChargedStatus : ''}`
             : 'N/A'
         ],
         [
@@ -671,7 +672,7 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
 
     // Right side - Date (ALWAYS same structure for consistency)
     doc.text('______________________________', pageWidth - 70, underlineY);
-    doc.text(`Date: ${pdsData.otherInformation.declaration.dateAccomplished}`, pageWidth - 70, labelY);
+    doc.text(`Date: ${formatDateOnly(pdsData.otherInformation.declaration.dateAccomplished)}`, pageWidth - 70, labelY);
 
     // Move position down after signature section
     yPosition = labelY + 5;

@@ -498,12 +498,13 @@ export const PDSWizard: React.FC = () => {
   const { saveStatus, saveError, triggerSave, lastSavedAt } = useAutoSavePDS(pdsData, {
     debounceMs: 2000,
     onSaveSuccess: (data) => {
-      // If data was created (POST), update state with the returned id
-      if (data && data.id && !pdsData.id) {
+      // Always update state with returned data to ensure id is set
+      // This prevents POST/PUT conflicts when navigating between pages
+      if (data && data.id) {
         setPdsData((prev) => ({
           ...prev,
           id: data.id,
-          userId: data.user_id,
+          userId: data.user_id || prev.userId,
         }));
       }
     },
