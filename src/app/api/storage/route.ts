@@ -109,7 +109,16 @@ export async function POST(request: NextRequest) {
     const uniqueFileName = `${timestamp}-${randomString}-${sanitizedFileName}`;
 
     // 7. Create file path (with optional folder)
-    const filePath = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
+    // For private buckets (id-images, pds-files), always organize by user ID for RLS policies
+    let filePath: string;
+    if (bucket === 'id-images' || bucket === 'pds-files') {
+      // Private buckets: enforce user ID folder structure for RLS
+      const userFolder = user.id;
+      filePath = `${userFolder}/${uniqueFileName}`;
+    } else {
+      // Public buckets: use optional folder or root
+      filePath = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
+    }
 
     // 8. Convert File to ArrayBuffer for upload
     const arrayBuffer = await file.arrayBuffer();

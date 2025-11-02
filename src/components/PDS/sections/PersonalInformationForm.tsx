@@ -6,6 +6,7 @@ import { PersonalInformation } from '@/types/pds.types';
 import { personalInformationSchema } from '@/lib/pds/validation';
 import { FormField } from '../FormField';
 import { Input } from '@/components/ui/Input';
+import { formatPhilippinePhone } from '@/lib/utils/phoneFormatter';
 
 interface PersonalInformationFormProps {
   data?: PersonalInformation;
@@ -715,7 +716,10 @@ export const PersonalInformationForm: React.FC<PersonalInformationFormProps> = (
                 name="mobileNo"
                 type="tel"
                 value={field.value || ''}
-                onChange={field.onChange}
+                onChange={(e) => {
+                  const formatted = formatPhilippinePhone(e.target.value);
+                  field.onChange(formatted);
+                }}
                 onBlur={field.onBlur}
                 error={errors.mobileNo?.message}
                 placeholder="+63 9XX XXX XXXX"

@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { CheckCircle, Circle, Clock, Star, Calendar, CheckCircle2, XCircle, Briefcase, AlertCircle, Archive, Eye, Info } from 'lucide-react';
+import { CheckCircle, Circle, Clock, Eye, UserCheck, Play, CheckCircle2, XCircle, Award, AlertCircle, Archive, Info, Ban } from 'lucide-react';
 
 interface StatusHistoryItem {
   from: string | null;
@@ -18,9 +18,9 @@ const STATUS_CONFIG = {
   pending: {
     label: 'Pending Review',
     icon: Clock,
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    borderColor: 'border-yellow-600',
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100',
+    borderColor: 'border-orange-600',
   },
   under_review: {
     label: 'Under Review',
@@ -28,20 +28,6 @@ const STATUS_CONFIG = {
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
     borderColor: 'border-blue-600',
-  },
-  shortlisted: {
-    label: 'Shortlisted',
-    icon: Star,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
-    borderColor: 'border-orange-600',
-  },
-  interviewed: {
-    label: 'Interviewed',
-    icon: Calendar,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-    borderColor: 'border-purple-600',
   },
   approved: {
     label: 'Approved',
@@ -57,19 +43,47 @@ const STATUS_CONFIG = {
     bgColor: 'bg-red-100',
     borderColor: 'border-red-600',
   },
-  hired: {
-    label: 'Hired',
-    icon: Briefcase,
+  enrolled: {
+    label: 'Enrolled',
+    icon: UserCheck,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100',
+    borderColor: 'border-purple-600',
+  },
+  in_progress: {
+    label: 'In Progress',
+    icon: Play,
     color: 'text-teal-600',
     bgColor: 'bg-teal-100',
     borderColor: 'border-teal-600',
   },
-  withdrawn: {
-    label: 'Withdrawn',
-    icon: AlertCircle,
+  completed: {
+    label: 'Completed',
+    icon: CheckCircle,
     color: 'text-gray-600',
     bgColor: 'bg-gray-100',
     borderColor: 'border-gray-600',
+  },
+  certified: {
+    label: 'Certified',
+    icon: Award,
+    color: 'text-yellow-600',
+    bgColor: 'bg-yellow-100',
+    borderColor: 'border-yellow-600',
+  },
+  withdrawn: {
+    label: 'Withdrawn',
+    icon: AlertCircle,
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-100',
+    borderColor: 'border-slate-600',
+  },
+  failed: {
+    label: 'Failed',
+    icon: Ban,
+    color: 'text-rose-700',
+    bgColor: 'bg-rose-100',
+    borderColor: 'border-rose-700',
   },
   archived: {
     label: 'Archived',
@@ -122,8 +136,8 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
     <div className="relative">
       {/* Timeline Header */}
       <div className="flex items-center gap-2 mb-4">
-        <CheckCircle className="w-5 h-5 text-blue-600" />
-        <h4 className="text-sm font-semibold text-gray-900">Status History</h4>
+        <CheckCircle className="w-5 h-5 text-teal-600" />
+        <h4 className="text-sm font-semibold text-gray-900">Training Application Status History</h4>
         <span className="text-xs text-gray-500">({timelineSteps.length} changes)</span>
       </div>
 
@@ -139,18 +153,18 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
                   <div
                     className={`relative w-10 h-10 rounded-full border-2 ${
                       step.isCurrent
-                        ? `${step.bgColor} ${step.borderColor} shadow-lg scale-110`
-                        : `bg-white ${step.borderColor} opacity-80`
+                        ? `${step.bgColor} ${step.borderColor} shadow-lg`
+                        : 'bg-white border-gray-300'
                     } flex items-center justify-center transition-all`}
                   >
                     <step.icon
-                      className={`w-5 h-5 ${step.color}`}
+                      className={`w-5 h-5 ${step.isCurrent ? step.color : 'text-gray-400'}`}
                     />
                     {/* Current indicator pulse */}
                     {step.isCurrent && (
                       <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500"></span>
                       </span>
                     )}
                   </div>
@@ -159,7 +173,9 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
                 {/* Label */}
                 <div className="mt-2 text-center">
                   <p
-                    className={`text-xs font-semibold ${step.color}`}
+                    className={`text-xs font-semibold ${
+                      step.isCurrent ? step.color : 'text-gray-600'
+                    }`}
                   >
                     {step.label}
                   </p>
@@ -179,22 +195,16 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
               </div>
 
               {/* Connecting Line */}
-              {!step.isLast && (() => {
-                const nextStep = timelineSteps[index + 1];
-                const lineColor = nextStep ? nextStep.borderColor.replace('border-', 'bg-') : 'bg-gray-300';
-                const arrowColor = nextStep ? nextStep.borderColor.replace('border-', 'border-l-') : 'border-l-gray-300';
-
-                return (
-                  <div className="flex items-center" style={{ width: '80px', marginTop: '20px' }}>
-                    <div className={`h-0.5 w-full ${lineColor} relative opacity-60`}>
-                      {/* Arrow */}
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                        <div className={`w-0 h-0 border-t-4 border-t-transparent ${arrowColor} border-b-4 border-b-transparent opacity-100`}></div>
-                      </div>
+              {!step.isLast && (
+                <div className="flex items-center" style={{ width: '80px', marginTop: '20px' }}>
+                  <div className="h-0.5 w-full bg-gray-300 relative">
+                    {/* Arrow */}
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                      <div className="w-0 h-0 border-t-4 border-t-transparent border-l-8 border-l-gray-300 border-b-4 border-b-transparent"></div>
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -202,11 +212,11 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
 
       {/* Legend/Info */}
       <div className="mt-4 pt-4 border-t border-gray-200">
-        <div className="flex items-start gap-2 text-xs text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
-          <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600" />
+        <div className="flex items-start gap-2 text-xs text-gray-600 bg-teal-50 p-3 rounded-lg border border-teal-200">
+          <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-teal-600" />
           <div>
-            <p className="font-medium text-blue-900">Timeline shows all status changes chronologically</p>
-            <p className="text-blue-700 mt-1">
+            <p className="font-medium text-teal-900">Timeline shows all status changes chronologically</p>
+            <p className="text-teal-700 mt-1">
               Current status: <span className="font-semibold">{STATUS_CONFIG[currentStatus as keyof typeof STATUS_CONFIG]?.label || currentStatus}</span>
             </p>
           </div>

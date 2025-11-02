@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createInitialStatusHistory } from '@/lib/utils/statusHistory';
 
 /**
  * Application Management API Routes
@@ -239,17 +240,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Check for duplicate application
+    // 6. Check for duplicate application (exclude withdrawn applications)
     const { data: existingApplication, error: duplicateError } = await supabase
       .from('applications')
-      .select('id')
+      .select('id, status')
       .eq('job_id', job_id)
       .eq('applicant_id', user.id)
-      .single();
+      .neq('status', 'withdrawn')  // Allow reapplication after withdrawal
+      .maybeSingle();  // Returns null if no active application exists
 
     if (existingApplication) {
       return NextResponse.json(
-        { success: false, error: 'You have already applied to this job' },
+        { success: false, error: 'You already have an active application for this job' },
         { status: 400 }
       );
     }
@@ -292,6 +294,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 8. Create application
+    const currentTimestamp = new Date().toISOString();
     const insertData = {
       job_id,
       applicant_id: user.id,
@@ -299,6 +302,8 @@ export async function POST(request: NextRequest) {
       pds_id,
       status: 'pending',
       notification_sent: false,
+      // Initialize status_history with the initial "null → pending" transition
+      status_history: createInitialStatusHistory('pending', currentTimestamp, user.id),
     };
 
     const { data: application, error: applicationError } = await supabase

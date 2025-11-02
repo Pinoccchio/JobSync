@@ -1,13 +1,15 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, Card, Container, Badge, RefreshButton, Modal, Input, Textarea, EnhancedTable } from '@/components/ui';
+import { Button, Card, Container, Badge, RefreshButton, Modal, ModernModal, Input, Textarea } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatPhilippinePhone } from '@/lib/utils/phoneFormatter';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { AdminLayout } from '@/components/layout';
-import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, LayoutGrid, List, Filter, Loader2, Award, Star, TrendingUp, User, Laptop, Briefcase, BarChart3, Palette, Wrench, BookOpen, Code, Lightbulb } from 'lucide-react';
+import { StatusTimeline } from '@/components/peso/StatusTimeline';
+import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, Filter, Loader2, Award, Star, TrendingUp, User, Laptop, Briefcase, BarChart3, Palette, Wrench, BookOpen, Code, Lightbulb, Eye, XCircle, UserCheck, Play, Ban, AlertCircle, Archive, Download, FileText, History, X } from 'lucide-react';
 import { FileUploadWithProgress } from '@/components/ui';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 
@@ -34,10 +36,32 @@ interface TrainingProgram {
   } | null;
 }
 
+interface StatusHistoryItem {
+  from: string | null;
+  to: string;
+  changed_at: string;
+  changed_by?: string;
+}
+
 interface UserApplication {
   id: string;
   program_id: string;
-  status: 'pending' | 'approved' | 'denied';
+  full_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  highest_education: string;
+  status: 'pending' | 'under_review' | 'approved' | 'denied' | 'enrolled' | 'in_progress' | 'completed' | 'certified' | 'withdrawn' | 'failed' | 'archived';
+  status_history?: StatusHistoryItem[];
+  submitted_at: string;
+  denial_reason?: string;
+  next_steps?: string;
+  certificate_url?: string;
+  training_programs?: {
+    id: string;
+    title: string;
+    duration: string;
+  };
 }
 
 export default function TrainingsPage() {
@@ -50,9 +74,15 @@ export default function TrainingsPage() {
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<TrainingProgram | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [filterDuration, setFilterDuration] = useState<string>('all');
   const [filterAvailability, setFilterAvailability] = useState<string>('all');
+  const [viewDetailsModalOpen, setViewDetailsModalOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<UserApplication | null>(null);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [statusHistoryModalOpen, setStatusHistoryModalOpen] = useState(false);
+  const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<UserApplication | null>(null);
+  const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -114,13 +144,30 @@ export default function TrainingsPage() {
   // Handle apply button click
   const handleApplyClick = (program: TrainingProgram) => {
     setSelectedProgram(program);
+
+    // Pre-fill form with user data
+    // 1. Get data from AuthContext (always available)
+    const fullName = user?.fullName || '';
+    const email = user?.email || '';
+
+    // 2. Get data from most recent application (if exists)
+    const mostRecentApp = userApplications.length > 0
+      ? userApplications.sort((a, b) =>
+          new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+        )[0]
+      : null;
+
+    const phone = mostRecentApp?.phone || '';
+    const address = mostRecentApp?.address || '';
+    const highestEducation = mostRecentApp?.highest_education || '';
+
     setFormData({
-      full_name: '',
-      email: '',
-      phone: '',
-      address: '',
-      highest_education: '',
-      id_image_url: '',
+      full_name: fullName,
+      email: email,
+      phone: phone,
+      address: address,
+      highest_education: highestEducation,
+      id_image_url: '', // Don't pre-fill - user uploads new ID each time
       id_image_name: '',
     });
     setApplyModalOpen(true);
@@ -185,6 +232,85 @@ export default function TrainingsPage() {
   // Check if user has applied to a program
   const getUserApplication = (programId: string) => {
     return userApplications.find(app => app.program_id === programId);
+  };
+
+  // Get status badge configuration
+  const getStatusBadge = (status: string) => {
+    const config: Record<string, { variant: any; icon: any; label: string }> = {
+      pending: { variant: 'warning', icon: Clock, label: 'Pending Review' },
+      under_review: { variant: 'primary', icon: Eye, label: 'Under Review' },
+      approved: { variant: 'success', icon: CheckCircle2, label: 'Approved' },
+      denied: { variant: 'danger', icon: XCircle, label: 'Denied' },
+      enrolled: { variant: 'primary', icon: UserCheck, label: 'Enrolled' },
+      in_progress: { variant: 'teal', icon: Play, label: 'In Progress' },
+      completed: { variant: 'secondary', icon: CheckCircle2, label: 'Completed' },
+      certified: { variant: 'warning', icon: Award, label: 'Certified' },
+      withdrawn: { variant: 'secondary', icon: AlertCircle, label: 'Withdrawn' },
+      failed: { variant: 'danger', icon: Ban, label: 'Failed' },
+      archived: { variant: 'secondary', icon: Archive, label: 'Archived' },
+    };
+    return config[status] || { variant: 'secondary', icon: Clock, label: status };
+  };
+
+  // Handle view application details
+  const handleViewDetails = (application: UserApplication) => {
+    setSelectedApplication(application);
+    setViewDetailsModalOpen(true);
+  };
+
+  // Handle view status history
+  const handleViewStatusHistory = (application: UserApplication) => {
+    setSelectedApplicationForHistory(application);
+    setStatusHistoryModalOpen(true);
+  };
+
+  // Handle withdraw application
+  const handleWithdrawClick = (application: UserApplication) => {
+    setSelectedApplication(application);
+    setWithdrawModalOpen(true);
+  };
+
+  // Handle withdraw confirm
+  const handleWithdrawConfirm = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setWithdrawLoading(true);
+      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'withdrawn' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to withdraw application');
+      }
+
+      showToast('Application withdrawn successfully', 'success');
+      setWithdrawModalOpen(false);
+      setSelectedApplication(null);
+      fetchUserApplications(); // Refresh applications list
+    } catch (error: any) {
+      console.error('Error withdrawing application:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  // Handle Toggle Skills Expansion
+  const toggleSkillsExpansion = (programId: string) => {
+    setExpandedSkillsCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(programId)) {
+        newSet.delete(programId);
+      } else {
+        newSet.add(programId);
+      }
+      return newSet;
+    });
   };
 
   // Helper function to check if program is new (created within last 7 days)
@@ -288,42 +414,24 @@ export default function TrainingsPage() {
   const stats = {
     totalPrograms: programs.length,
     availableSlots: programs.reduce((sum, p) => sum + (p.capacity - p.enrolled_count), 0),
-    enrolledPrograms: userApplications.filter(app => app.status === 'approved').length,
-    pendingApplications: userApplications.filter(app => app.status === 'pending').length,
+    myApplications: userApplications.length,
+    activeTrainings: userApplications.filter(app =>
+      ['enrolled', 'in_progress', 'approved'].includes(app.status)
+    ).length,
+    completedCertified: userApplications.filter(app =>
+      ['completed', 'certified'].includes(app.status)
+    ).length,
+    pendingApplications: userApplications.filter(app =>
+      ['pending', 'under_review'].includes(app.status)
+    ).length,
   };
 
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="PESO Training Programs" pageDescription="Enhance your skills with our free training programs">
       <Container size="xl">
         <div className="space-y-6">
-          {/* Refresh Button & View Toggle */}
-          <div className="flex items-center justify-between">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-white rounded-lg border-2 border-gray-200 p-1">
-              <button
-                onClick={() => setViewMode('card')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
-                  viewMode === 'card'
-                    ? 'bg-[#22A555] text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                <span className="text-sm font-medium">Card View</span>
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
-                  viewMode === 'table'
-                    ? 'bg-[#22A555] text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                <span className="text-sm font-medium">Table View</span>
-              </button>
-            </div>
-
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
             <RefreshButton onRefresh={fetchTrainings} label="Refresh" showLastRefresh={true} />
           </div>
 
@@ -346,13 +454,13 @@ export default function TrainingsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Available Slots</p>
+                  <p className="text-sm text-gray-600 mb-1">My Applications</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {loading ? '...' : stats.availableSlots}
+                    {loading ? '...' : stats.myApplications}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Users className="w-6 h-6 text-white" />
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -360,13 +468,13 @@ export default function TrainingsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Enrolled</p>
+                  <p className="text-sm text-gray-600 mb-1">Active Trainings</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {loading ? '...' : stats.enrolledPrograms}
+                    {loading ? '...' : stats.activeTrainings}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
-                  <CheckCircle2 className="w-6 h-6 text-white" />
+                  <Play className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -448,10 +556,8 @@ export default function TrainingsPage() {
             </div>
           </div>
 
-        {/* Training Content - Card or Table View */}
-        {viewMode === 'card' ? (
-          /* Card View */
-          <div>
+        {/* Training Content - Card View */}
+        <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">
                 Training Programs ({filteredPrograms.length})
@@ -498,9 +604,10 @@ export default function TrainingsPage() {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start gap-4 flex-1 min-w-0">
                             <div className="w-12 h-12 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                              {React.createElement(getIconComponent(program.icon), {
-                                className: "w-6 h-6 text-[#22A555]"
-                              })}
+                              {(() => {
+                                const IconComponent = getIconComponent(program.icon);
+                                return <IconComponent className="w-6 h-6 text-[#22A555]" />;
+                              })()}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h2 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-2 line-clamp-2">
@@ -540,16 +647,32 @@ export default function TrainingsPage() {
                   {/* Skills Tags */}
                   {program.skills_covered && program.skills_covered.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {program.skills_covered.slice(0, 5).map((skill, idx) => (
-                        <Badge key={idx} size="sm" variant="default">
-                          {skill}
-                        </Badge>
-                      ))}
-                      {program.skills_covered.length > 5 && (
-                        <Badge size="sm" variant="default">
-                          +{program.skills_covered.length - 5} more
-                        </Badge>
-                      )}
+                      {(() => {
+                        const isExpanded = expandedSkillsCards.has(program.id);
+                        const totalCount = program.skills_covered.length;
+                        const showAll = isExpanded || totalCount <= 5;
+
+                        const skillsToShow = showAll ? program.skills_covered : program.skills_covered.slice(0, 5);
+
+                        return (
+                          <>
+                            {skillsToShow.map((skill, idx) => (
+                              <Badge key={idx} size="sm" variant="default">
+                                {skill}
+                              </Badge>
+                            ))}
+                            {totalCount > 5 && (
+                              <button
+                                onClick={() => toggleSkillsExpansion(program.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
+                                title={isExpanded ? "Click to show less" : "Click to view all skills"}
+                              >
+                                {isExpanded ? 'Show less' : `+${totalCount - skillsToShow.length} more`}
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -612,12 +735,27 @@ export default function TrainingsPage() {
 
                   {/* Apply Button */}
                   {userApp ? (
-                    <Badge
-                      variant={userApp.status === 'approved' ? 'success' : userApp.status === 'denied' ? 'danger' : 'warning'}
-                      className="w-full justify-center py-3 text-sm"
-                    >
-                      Application {userApp.status.charAt(0).toUpperCase() + userApp.status.slice(1)}
-                    </Badge>
+                    <div className="w-full space-y-3">
+                      <Badge
+                        variant={getStatusBadge(userApp.status).variant}
+                        className="w-full justify-center py-3 text-sm"
+                      >
+                        {(() => {
+                          const StatusIcon = getStatusBadge(userApp.status).icon;
+                          return <StatusIcon className="w-4 h-4 mr-1" />;
+                        })()}
+                        {getStatusBadge(userApp.status).label}
+                      </Badge>
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        size="sm"
+                        icon={History}
+                        onClick={() => handleViewStatusHistory(userApp)}
+                      >
+                        View Status History
+                      </Button>
+                    </div>
                   ) : (
                     <Button
                       variant="success"
@@ -636,158 +774,7 @@ export default function TrainingsPage() {
                   })}
                 </div>
               )}
-            </div>
-          ) : (
-            /* Table View */
-            <Card title={`TRAINING PROGRAMS (${filteredPrograms.length})`} headerColor="bg-[#D4F4DD]">
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
-                  <span className="ml-3 text-gray-600">Loading programs...</span>
-                </div>
-              ) : filteredPrograms.length === 0 ? (
-                <div className="text-center py-12">
-                  <GraduationCap className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-gray-600 font-medium">No programs found</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {programs.length === 0 ? 'No training programs available' : 'Try adjusting your filters'}
-                  </p>
-                </div>
-              ) : (
-                <EnhancedTable
-                  columns={[
-                    {
-                      header: 'Program',
-                      accessor: 'title' as const,
-                      render: (value: string, row: TrainingProgram) => (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            {React.createElement(getIconComponent(row.icon), {
-                              className: "w-5 h-5 text-[#22A555]"
-                            })}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{value}</p>
-                            <p className="text-xs text-gray-500">{row.description.slice(0, 60)}...</p>
-                          </div>
-                        </div>
-                      )
-                    },
-                    {
-                      header: 'Duration',
-                      accessor: 'duration' as const,
-                      render: (value: string) => (
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-700">{value}</span>
-                        </div>
-                      )
-                    },
-                    {
-                      header: 'Start Date',
-                      accessor: 'start_date' as const,
-                      render: (value: string) => (
-                        <span className="text-sm text-gray-700">
-                          {new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                      )
-                    },
-                    {
-                      header: 'Created By',
-                      accessor: 'profiles' as const,
-                      render: (_: any, row: TrainingProgram) => (
-                        <div
-                          className="flex items-start gap-2"
-                          title={getCreatorTooltip(row.profiles || null, row.created_at)}
-                        >
-                          <User className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {row.profiles?.full_name || 'Unknown'}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {row.profiles?.role || 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    },
-                    {
-                      header: 'Location',
-                      accessor: 'location' as const,
-                      render: (value: string | null) => (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-700">{value || 'TBA'}</span>
-                        </div>
-                      )
-                    },
-                    {
-                      header: 'Slots',
-                      accessor: 'capacity' as const,
-                      render: (value: number, row: TrainingProgram) => {
-                        const available = value - row.enrolled_count;
-                        const percent = (available / value) * 100;
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-700">
-                              {available}/{value}
-                            </span>
-                            <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  percent > 50 ? 'bg-green-500' : percent > 20 ? 'bg-orange-500' : 'bg-red-500'
-                                }`}
-                                style={{ width: `${percent}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      }
-                    },
-                    {
-                      header: 'Status',
-                      accessor: 'status' as const,
-                      render: (value: string, row: TrainingProgram) => {
-                        const userApp = getUserApplication(row.id);
-                        if (userApp) {
-                          return (
-                            <Badge variant={userApp.status === 'approved' ? 'success' : userApp.status === 'denied' ? 'danger' : 'warning'}>
-                              {userApp.status.charAt(0).toUpperCase() + userApp.status.slice(1)}
-                            </Badge>
-                          );
-                        }
-                        return <Badge variant="info">Open</Badge>;
-                      }
-                    },
-                    {
-                      header: 'Actions',
-                      accessor: 'actions' as const,
-                      render: (_: any, row: TrainingProgram) => {
-                        const userApp = getUserApplication(row.id);
-                        const available = row.capacity - row.enrolled_count;
-                        return (
-                          <Button
-                            variant="success"
-                            size="sm"
-                            onClick={() => handleApplyClick(row)}
-                            disabled={userApp !== undefined || available === 0}
-                          >
-                            {userApp ? 'Applied' : available === 0 ? 'Full' : 'Apply'}
-                          </Button>
-                        );
-                      }
-                    },
-                  ]}
-                  data={filteredPrograms}
-                  searchable
-                  paginated
-                  pageSize={10}
-                  searchPlaceholder="Search by program name..."
-                />
-              )}
-            </Card>
-          )}
+        </div>
 
           {/* Info Card */}
           <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
@@ -808,13 +795,16 @@ export default function TrainingsPage() {
         </div>
 
         {/* Application Modal */}
-        <Modal
+        <ModernModal
           isOpen={applyModalOpen}
           onClose={() => {
             setApplyModalOpen(false);
             setSelectedProgram(null);
           }}
           title={`Apply for ${selectedProgram?.title || 'Training'}`}
+          subtitle="Complete your training application"
+          colorVariant="green"
+          icon={CheckCircle2}
           size="lg"
         >
           {selectedProgram && (
@@ -878,8 +868,11 @@ export default function TrainingsPage() {
                     <Input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="09123456789"
+                      onChange={(e) => {
+                        const formatted = formatPhilippinePhone(e.target.value);
+                        setFormData({ ...formData, phone: formatted });
+                      }}
+                      placeholder="+639123456789"
                       required
                     />
                   </div>
@@ -953,7 +946,272 @@ export default function TrainingsPage() {
               </div>
             </form>
           )}
-        </Modal>
+        </ModernModal>
+
+        {/* View Application Details Modal */}
+        <ModernModal
+          isOpen={viewDetailsModalOpen}
+          onClose={() => {
+            setViewDetailsModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Application Details"
+          subtitle="View your training application"
+          colorVariant="blue"
+          icon={FileText}
+          size="lg"
+        >
+          {selectedApplication && (
+            <div className="space-y-6">
+              {/* Application Info */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {selectedApplication.training_programs?.title || 'Training Program'}
+                  </h3>
+                  <Badge variant={getStatusBadge(selectedApplication.status).variant}>
+                    {getStatusBadge(selectedApplication.status).label}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500 mb-1">Full Name</p>
+                    <p className="font-medium text-gray-900">{selectedApplication.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Email</p>
+                    <p className="font-medium text-gray-900">{selectedApplication.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Phone</p>
+                    <p className="font-medium text-gray-900">{selectedApplication.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Submitted</p>
+                    <p className="font-medium text-gray-900">
+                      {new Date(selectedApplication.submitted_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {selectedApplication.training_programs?.duration && (
+                    <div>
+                      <p className="text-gray-500 mb-1">Duration</p>
+                      <p className="font-medium text-gray-900">
+                        {selectedApplication.training_programs.duration}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status History Timeline */}
+              {selectedApplication.status_history && selectedApplication.status_history.length > 0 && (
+                <div>
+                  <StatusTimeline
+                    statusHistory={selectedApplication.status_history}
+                    currentStatus={selectedApplication.status}
+                  />
+                </div>
+              )}
+
+              {/* Status-specific information */}
+              {selectedApplication.denial_reason && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-red-900 mb-2">Denial Reason:</p>
+                  <p className="text-sm text-red-700">{selectedApplication.denial_reason}</p>
+                </div>
+              )}
+
+              {selectedApplication.next_steps && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-blue-900 mb-2">Next Steps:</p>
+                  <p className="text-sm text-blue-700">{selectedApplication.next_steps}</p>
+                </div>
+              )}
+
+              {selectedApplication.certificate_url && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-green-900 mb-2">Certificate Available</p>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    icon={Download}
+                    onClick={() => window.open(selectedApplication.certificate_url, '_blank')}
+                  >
+                    Download Certificate
+                  </Button>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setViewDetailsModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </ModernModal>
+
+        {/* Withdraw Application Modal */}
+        <ModernModal
+          isOpen={withdrawModalOpen}
+          onClose={() => {
+            setWithdrawModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Withdraw Application"
+          subtitle="Confirm withdrawal"
+          colorVariant="orange"
+          useLogoIcon={true}
+          size="md"
+        >
+          {selectedApplication && (
+            <div className="space-y-4">
+              {/* Warning */}
+              <div className="bg-orange-50 border-l-4 border-orange-600 p-4 rounded">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-orange-800 mb-1">Are you sure?</p>
+                    <p className="text-sm text-orange-700">
+                      Withdrawing this application cannot be undone. You may reapply later if slots are still available.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Application Info Card */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Application Details:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-gray-400" />
+                    <span className="font-medium text-gray-900">
+                      {selectedApplication.training_programs?.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700">
+                      Applied: {formatShortDate(selectedApplication.submitted_at)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setWithdrawModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                  className="flex-1"
+                  disabled={withdrawLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  icon={XCircle}
+                  loading={withdrawLoading}
+                  onClick={handleWithdrawConfirm}
+                  className="flex-1"
+                  disabled={withdrawLoading}
+                >
+                  {withdrawLoading ? 'Withdrawing...' : 'Confirm Withdrawal'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </ModernModal>
+
+        {/* Status History Modal */}
+        <ModernModal
+          isOpen={statusHistoryModalOpen}
+          onClose={() => {
+            setStatusHistoryModalOpen(false);
+            setSelectedApplicationForHistory(null);
+          }}
+          title="Status History"
+          subtitle="Track your application progress"
+          colorVariant="blue"
+          icon={History}
+          size="lg"
+        >
+          {selectedApplicationForHistory && (
+            <div className="space-y-6">
+              {/* Application Info Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {selectedApplicationForHistory.training_programs?.title || 'Training Program'}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <p className="text-xs text-gray-500">Applied Date</p>
+                          <p className="font-medium text-gray-900">
+                            {formatShortDate(selectedApplicationForHistory.submitted_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <p className="text-xs text-gray-500">Current Status</p>
+                          <p className="font-medium text-gray-900">
+                            {getStatusBadge(selectedApplicationForHistory.status).label}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Timeline */}
+              <div>
+                {selectedApplicationForHistory.status_history && selectedApplicationForHistory.status_history.length > 0 ? (
+                  <StatusTimeline
+                    statusHistory={selectedApplicationForHistory.status_history}
+                    currentStatus={selectedApplicationForHistory.status}
+                  />
+                ) : (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                    <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-gray-600 font-medium">No status history available</p>
+                    <p className="text-sm text-gray-500 mt-1">Status changes will appear here</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button
+                  variant="secondary"
+                  icon={X}
+                  onClick={() => {
+                    setStatusHistoryModalOpen(false);
+                    setSelectedApplicationForHistory(null);
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </ModernModal>
       </Container>
     </AdminLayout>
   );

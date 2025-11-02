@@ -122,20 +122,75 @@ export async function PATCH(
       );
     }
 
-    // 3. Only PESO and ADMIN can update application status
-    if (profile.role !== 'PESO' && profile.role !== 'ADMIN') {
+    // 3. Validate status
+    const { status, next_steps, denial_reason } = body;
+
+    // 4. Authorization checks based on role
+    if (profile.role === 'APPLICANT') {
+      // Applicants can only withdraw their own applications
+
+      // Get the application to check ownership
+      const { data: application, error: appError } = await supabase
+        .from('training_applications')
+        .select('applicant_id, status')
+        .eq('id', id)
+        .single();
+
+      if (appError || !application) {
+        return NextResponse.json(
+          { success: false, error: 'Application not found' },
+          { status: 404 }
+        );
+      }
+
+      // Check if applicant owns this application
+      if (application.applicant_id !== user.id) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden - You can only withdraw your own applications' },
+          { status: 403 }
+        );
+      }
+
+      // Applicants can only withdraw
+      if (status !== 'withdrawn') {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden - Applicants can only withdraw applications' },
+          { status: 403 }
+        );
+      }
+
+      // Can only withdraw if status is pending, under_review, or approved
+      if (!['pending', 'under_review', 'approved'].includes(application.status)) {
+        return NextResponse.json(
+          { success: false, error: `Cannot withdraw application with status: ${application.status}` },
+          { status: 400 }
+        );
+      }
+    } else if (profile.role !== 'PESO' && profile.role !== 'ADMIN') {
+      // Only PESO, ADMIN, and APPLICANT (for withdrawal) can update applications
       return NextResponse.json(
         { success: false, error: 'Forbidden - Only PESO and Admin can update training applications' },
         { status: 403 }
       );
     }
 
-    // 4. Validate status
-    const { status } = body;
+    const validStatuses = [
+      'pending',
+      'under_review',
+      'approved',
+      'denied',
+      'enrolled',
+      'in_progress',
+      'completed',
+      'certified',
+      'withdrawn',
+      'failed',
+      'archived'
+    ];
 
-    if (!status || !['pending', 'approved', 'denied'].includes(status)) {
+    if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid status. Must be: pending, approved, or denied' },
+        { success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
         { status: 400 }
       );
     }
@@ -149,6 +204,7 @@ export async function PATCH(
         program_id,
         full_name,
         status,
+        status_history,
         training_programs:program_id (
           title,
           capacity,
@@ -182,15 +238,39 @@ export async function PATCH(
       }
     }
 
-    // 7. Update application status
+    // 7. Build status history entry
+    const currentHistory = existingApplication.status_history || [];
+    const newHistoryEntry = {
+      from: existingApplication.status,
+      to: status,
+      changed_at: new Date().toISOString(),
+      changed_by: user.id,
+    };
+    const updatedHistory = [...currentHistory, newHistoryEntry];
+
+    // 8. Build update object
+    const updateData: any = {
+      status,
+      status_history: updatedHistory,
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add optional fields
+    if (next_steps) updateData.next_steps = next_steps;
+    if (denial_reason) updateData.denial_reason = denial_reason;
+
+    // Add timestamp fields based on status
+    if (status === 'enrolled') updateData.enrollment_confirmed_at = new Date().toISOString();
+    if (status === 'in_progress') updateData.training_started_at = new Date().toISOString();
+    if (status === 'completed') updateData.training_completed_at = new Date().toISOString();
+    if (status === 'certified') updateData.certificate_issued_at = new Date().toISOString();
+
+    // 9. Update application status
     const { data: updatedApplication, error: updateError } = await supabase
       .from('training_applications')
-      .update({
-        status,
-        reviewed_by: user.id,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select(`
         *,
@@ -208,17 +288,39 @@ export async function PATCH(
 
     // 8. If approved, increment enrolled_count
     if (status === 'approved' && existingApplication.status !== 'approved') {
+      // Fetch current enrolled_count
+      const { data: program } = await supabase
+        .from('training_programs')
+        .select('enrolled_count')
+        .eq('id', existingApplication.program_id)
+        .single();
+
+      // Increment the count
       await supabase
         .from('training_programs')
-        .update({ enrolled_count: supabase.rpc('increment_enrolled_count') })
+        .update({
+          enrolled_count: (program?.enrolled_count || 0) + 1,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', existingApplication.program_id);
     }
 
     // 9. If denied (from approved), decrement enrolled_count
     if (status === 'denied' && existingApplication.status === 'approved') {
+      // Fetch current enrolled_count
+      const { data: program } = await supabase
+        .from('training_programs')
+        .select('enrolled_count')
+        .eq('id', existingApplication.program_id)
+        .single();
+
+      // Decrement the count (prevent negative values)
       await supabase
         .from('training_programs')
-        .update({ enrolled_count: supabase.rpc('decrement_enrolled_count') })
+        .update({
+          enrolled_count: Math.max((program?.enrolled_count || 0) - 1, 0),
+          updated_at: new Date().toISOString()
+        })
         .eq('id', existingApplication.program_id);
     }
 

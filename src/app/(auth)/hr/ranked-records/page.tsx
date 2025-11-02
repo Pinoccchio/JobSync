@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import Image from 'next/image';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem, StatusFilter, QuickFilters } from '@/components/ui';
+import { ApplicationStatusBadge } from '@/components/ApplicationStatusBadge';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { RankingDetailsModal } from '@/components/hr/RankingDetailsModal';
 import { PDSViewerModal } from '@/components/hr/PDSViewerModal';
@@ -889,57 +890,14 @@ export default function RankedRecordsPage() {
     {
       header: 'Status',
       accessor: 'status' as const,
-      render: (value: string) => {
-        let variant: 'success' | 'danger' | 'warning' | 'info' | 'default' | 'pending' = 'default';
-        let displayText = value.charAt(0).toUpperCase() + value.slice(1);
-
-        switch (value) {
-          case 'pending':
-            variant = 'pending';
-            displayText = 'Pending Review';
-            break;
-          case 'under_review':
-            variant = 'info';
-            displayText = 'Under Review';
-            break;
-          case 'shortlisted':
-            variant = 'warning';
-            displayText = 'Shortlisted';
-            break;
-          case 'interviewed':
-            variant = 'info';
-            displayText = 'Interviewed';
-            break;
-          case 'approved':
-            variant = 'success';
-            displayText = 'Approved';
-            break;
-          case 'denied':
-            variant = 'danger';
-            displayText = 'Denied';
-            break;
-          case 'hired':
-            variant = 'success';
-            displayText = 'Hired 🎉';
-            break;
-          case 'archived':
-            variant = 'default';
-            displayText = 'Archived';
-            break;
-          case 'withdrawn':
-            variant = 'default';
-            displayText = 'Withdrawn';
-            break;
-          default:
-            displayText = value.charAt(0).toUpperCase() + value.slice(1);
-        }
-
-        return (
-          <Badge variant={variant}>
-            {displayText}
-          </Badge>
-        );
-      },
+      render: (value: string, row: Application) => (
+        <ApplicationStatusBadge
+          status={value as any}
+          createdAt={row.appliedDate}
+          matchScore={row.matchScore}
+          showDate={false}
+        />
+      ),
     },
     {
       header: 'Applied',
@@ -1194,6 +1152,11 @@ export default function RankedRecordsPage() {
 
           case 'archived':
             // Only view actions for archived applications
+            break;
+
+          case 'withdrawn':
+            // Withdrawn by applicant - no status changes allowed by HR
+            // This respects the applicant's decision to withdraw
             break;
 
           default:

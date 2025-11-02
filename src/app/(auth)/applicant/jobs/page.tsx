@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, Card, ApplicationModal, Container, Badge, RefreshButton, EnhancedTable } from '@/components/ui';
+import { Button, Card, ApplicationModal, Container, Badge, RefreshButton } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { ApplicationStatusBadge, AppliedBadge } from '@/components/ApplicationStatusBadge';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
@@ -9,7 +9,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, LayoutGrid, List, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye, History, X } from 'lucide-react';
+import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye, History, X } from 'lucide-react';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 
 interface Job {
@@ -71,7 +71,6 @@ export default function AuthenticatedJobsPage() {
   const [userApplications, setUserApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingApplications, setLoadingApplications] = useState(true);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card'); // Default to card view
   const [searchQuery, setSearchQuery] = useState('');
 
   // Status History Modal state
@@ -197,7 +196,9 @@ export default function AuthenticatedJobsPage() {
   };
 
   const hasAppliedToJob = (jobId: string): boolean => {
-    return !!getApplicationForJob(jobId);
+    const application = getApplicationForJob(jobId);
+    // Don't count withdrawn applications as "applied"
+    return !!application && application.status !== 'withdrawn';
   };
 
   // Combine jobs with application status
@@ -280,146 +281,12 @@ export default function AuthenticatedJobsPage() {
   const employmentTypes = Array.from(new Set(jobs.map(j => j.employment_type).filter(Boolean)));
   const locations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean)));
 
-  // Table columns
-  const columns = [
-    {
-      header: 'Position',
-      accessor: 'title' as const,
-      render: (value: string, row: JobWithApplication) => (
-        <div className="flex items-center gap-2">
-          <Briefcase className="w-4 h-4 text-[#22A555]" />
-          <div>
-            <p className="font-medium text-gray-900">{value}</p>
-            <p className="text-xs text-gray-500">Municipality of Asuncion</p>
-          </div>
-        </div>
-      )
-    },
-    {
-      header: 'Posted By',
-      accessor: 'profiles' as const,
-      render: (_: any, row: JobWithApplication) => (
-        <div
-          className="flex items-start gap-2"
-          title={getCreatorTooltip(row.profiles || null, row.created_at)}
-        >
-          <User className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
-              {row.profiles?.full_name || 'Unknown'}
-            </p>
-            <p className="text-xs text-gray-500">
-              {formatShortDate(row.created_at)}
-            </p>
-          </div>
-        </div>
-      )
-    },
-    {
-      header: 'Description',
-      accessor: 'description' as const,
-      render: (value: string) => (
-        <span className="text-sm text-gray-600 line-clamp-2">{value}</span>
-      )
-    },
-    {
-      header: 'Location',
-      accessor: 'location' as const,
-      render: (value: string | null, row: JobWithApplication) => (
-        <div className="flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-gray-400" />
-          <div>
-            <span className="text-sm text-gray-700">{value || 'Not specified'}</span>
-            {row.remote && <span className="ml-2 text-xs text-blue-600">• Remote</span>}
-          </div>
-        </div>
-      )
-    },
-    {
-      header: 'Type',
-      accessor: 'employment_type' as const,
-      render: (value: string | null) => (
-        <Badge variant="info" icon={Clock}>{value || 'Not specified'}</Badge>
-      )
-    },
-    {
-      header: 'Application Status',
-      accessor: 'userApplication' as const,
-      render: (_: any, row: JobWithApplication) => {
-        if (!row.hasApplied || !row.userApplication) {
-          return <span className="text-sm text-gray-400">Not applied</span>;
-        }
-        return (
-          <ApplicationStatusBadge
-            status={row.userApplication.status}
-            createdAt={row.userApplication.created_at}
-            showDate={true}
-          />
-        );
-      }
-    },
-    {
-      header: 'Actions',
-      accessor: 'actions' as const,
-      render: (_: any, row: JobWithApplication) => {
-        if (row.hasApplied && row.userApplication) {
-          return (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={Eye}
-              disabled
-              title={`Applied on ${new Date(row.userApplication.created_at).toLocaleDateString()}`}
-            >
-              Applied
-            </Button>
-          );
-        }
-        return (
-          <Button
-            variant="success"
-            size="sm"
-            onClick={() => handleApplyClick(row)}
-          >
-            Apply Now
-          </Button>
-        );
-      }
-    },
-  ];
-
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="Job Opportunities" pageDescription="Browse and apply for available positions">
       <Container size="xl">
         <div className="space-y-6">
-          {/* Refresh Button & View Toggle */}
-          <div className="flex items-center justify-between">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-white rounded-lg border-2 border-gray-200 p-1">
-              <button
-                onClick={() => setViewMode('card')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
-                  viewMode === 'card'
-                    ? 'bg-[#22A555] text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                <span className="text-sm font-medium">Card View</span>
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
-                  viewMode === 'table'
-                    ? 'bg-[#22A555] text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                <span className="text-sm font-medium">Table View</span>
-              </button>
-            </div>
-
+          {/* Refresh Button */}
+          <div className="flex items-center justify-end">
             <RefreshButton
               onRefresh={() => {
                 fetchJobs();
@@ -598,10 +465,8 @@ export default function AuthenticatedJobsPage() {
             </div>
           </div>
 
-          {/* Jobs Content - Card or Table View */}
-          {viewMode === 'card' ? (
-            /* Card View */
-            <div>
+          {/* Jobs Content - Card View */}
+          <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">
                   Available Positions ({filteredJobs.length})
@@ -796,6 +661,32 @@ export default function AuthenticatedJobsPage() {
                               View Status History
                             </Button>
                           </div>
+                        ) : job.userApplication?.status === 'withdrawn' ? (
+                          <div className="space-y-3">
+                            <ApplicationStatusBadge
+                              status="withdrawn"
+                              createdAt={job.userApplication.created_at}
+                              className="w-full justify-center py-2"
+                            />
+                            <Button
+                              variant="success"
+                              className="w-full shadow-md hover:shadow-lg transition-shadow"
+                              size="lg"
+                              icon={CheckCircle2}
+                              onClick={() => handleApplyClick(job)}
+                            >
+                              Reapply Now
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              className="w-full"
+                              size="sm"
+                              icon={History}
+                              onClick={() => handleViewStatusHistory(job.userApplication!)}
+                            >
+                              View Status History
+                            </Button>
+                          </div>
                         ) : (
                           <Button
                             variant="success"
@@ -812,35 +703,7 @@ export default function AuthenticatedJobsPage() {
                   ))}
                 </div>
               )}
-            </div>
-          ) : (
-            /* Table View */
-            <Card title={`AVAILABLE POSITIONS (${filteredJobs.length})`} headerColor="bg-[#D4F4DD]">
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
-                  <span className="ml-3 text-gray-600">Loading jobs...</span>
-                </div>
-              ) : filteredJobs.length === 0 ? (
-                <div className="text-center py-12">
-                  <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-gray-600 font-medium">No jobs found</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {jobs.length === 0 ? 'No active job postings at the moment' : 'Try adjusting your filters'}
-                  </p>
-                </div>
-              ) : (
-                <EnhancedTable
-                  columns={columns}
-                  data={filteredJobs}
-                  searchable
-                  paginated
-                  pageSize={10}
-                  searchPlaceholder="Search by position or description..."
-                />
-              )}
-            </Card>
-          )}
+          </div>
         </div>
       </Container>
 

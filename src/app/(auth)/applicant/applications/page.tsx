@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, EnhancedTable, Container, Badge, RefreshButton, Button } from '@/components/ui';
+import { Card, EnhancedTable, Container, Badge, RefreshButton, Button, ModernModal } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { FileText, CheckCircle, XCircle, Clock, Info, Loader2, Star, Calendar, Briefcase, AlertCircle, Eye, ArrowRight, History, X } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
@@ -183,60 +183,60 @@ export default function MyApplicationsPage() {
       sortable: true,
       render: (value: string) => {
         let variant: 'success' | 'danger' | 'pending' | 'info' | 'warning' | 'default' = 'default';
-        let icon = Clock;
+        let IconComponent = Clock;
         let displayText = value;
 
         switch (value) {
           case 'pending':
             variant = 'pending';
-            icon = Clock;
+            IconComponent = Clock;
             displayText = 'Pending Review';
             break;
           case 'under_review':
             variant = 'info';
-            icon = Eye;
+            IconComponent = Eye;
             displayText = 'Under Review';
             break;
           case 'shortlisted':
             variant = 'warning';
-            icon = Star;
+            IconComponent = Star;
             displayText = 'Shortlisted 🎉';
             break;
           case 'interviewed':
             variant = 'info';
-            icon = Calendar;
+            IconComponent = Calendar;
             displayText = 'Interview Scheduled';
             break;
           case 'approved':
             variant = 'success';
-            icon = CheckCircle;
+            IconComponent = CheckCircle;
             displayText = 'Approved ✅';
             break;
           case 'denied':
             variant = 'danger';
-            icon = XCircle;
+            IconComponent = XCircle;
             displayText = 'Not Approved';
             break;
           case 'hired':
             variant = 'success';
-            icon = Briefcase;
+            IconComponent = Briefcase;
             displayText = 'Hired 🎉';
             break;
           case 'archived':
             variant = 'default';
-            icon = FileText;
+            IconComponent = FileText;
             displayText = 'Archived';
             break;
           case 'withdrawn':
             variant = 'default';
-            icon = AlertCircle;
+            IconComponent = AlertCircle;
             displayText = 'Withdrawn';
             break;
           default:
             displayText = value.charAt(0).toUpperCase() + value.slice(1);
         }
 
-        return <Badge variant={variant} icon={icon}>{displayText}</Badge>;
+        return <Badge variant={variant} icon={IconComponent}>{displayText}</Badge>;
       }
     },
     {
@@ -357,7 +357,19 @@ export default function MyApplicationsPage() {
 
           case 'withdrawn':
             return (
-              <p className="text-xs text-gray-500 italic">You withdrew this application</p>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-gray-500 italic">You withdrew this application</p>
+                <Link href={`/applicant/jobs?highlight=${row.job_id}`}>
+                  <Button
+                    variant="info"
+                    size="sm"
+                    icon={ArrowRight}
+                    className="w-full text-xs"
+                  >
+                    Reapply to This Job
+                  </Button>
+                </Link>
+              </div>
             );
 
           case 'archived':
@@ -510,92 +522,94 @@ export default function MyApplicationsPage() {
       </Container>
 
       {/* Withdraw Confirmation Modal */}
-      {showWithdrawModal && applicationToWithdraw && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-            {/* Red Gradient Header */}
-            <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg">
-                    <AlertCircle className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white">Withdraw Application</h3>
-                    <p className="text-sm text-white/90">This action cannot be undone</p>
-                  </div>
+      <ModernModal
+        isOpen={showWithdrawModal}
+        onClose={() => {
+          setShowWithdrawModal(false);
+          setApplicationToWithdraw(null);
+        }}
+        title="Withdraw Application"
+        subtitle="This action cannot be undone"
+        colorVariant="orange"
+        icon={AlertCircle}
+        size="md"
+      >
+        {applicationToWithdraw && (
+          <div className="space-y-4">
+            {/* Warning Message */}
+            <div className="bg-orange-50 border-l-4 border-orange-600 p-4 rounded">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-orange-800 mb-1">Confirm Withdrawal</p>
+                  <p className="text-sm text-orange-700">
+                    Are you sure you want to withdraw your application? This action is permanent and cannot be reversed.
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-4">
-              {/* Warning Message */}
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-red-800 mb-1">Confirm Withdrawal</p>
-                    <p className="text-sm text-red-700">
-                      Are you sure you want to withdraw your application? This action is permanent and cannot be reversed.
-                    </p>
-                  </div>
+            {/* Application Info */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Application Details:</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-gray-400" />
+                  <span className="font-medium text-gray-900">{applicationToWithdraw.position}</span>
                 </div>
-              </div>
-
-              {/* Application Info */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p className="text-sm text-gray-600 mb-2">Application Details:</p>
-                <div className="space-y-1">
-                  <p className="font-medium text-gray-900">{applicationToWithdraw.position}</p>
-                  <p className="text-sm text-gray-600">
-                    Applied on: {new Date(applicationToWithdraw.dateApplied).toLocaleDateString('en-US', {
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700">
+                    Applied: {new Date(applicationToWithdraw.dateApplied).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
                     })}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Current Status: <span className="font-semibold">{applicationToWithdraw.status === 'pending' ? 'Pending Review' : 'Under Review'}</span>
-                  </p>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700">
+                    Status: <span className="font-semibold">{applicationToWithdraw.status === 'pending' ? 'Pending Review' : 'Under Review'}</span>
+                  </span>
                 </div>
               </div>
+            </div>
 
-              {/* Info Note */}
-              <div className="bg-blue-50 border border-blue-200 p-3 rounded">
-                <p className="text-xs text-blue-800">
-                  <strong>Note:</strong> You can reapply for this position anytime after withdrawing.
-                </p>
-              </div>
+            {/* Info Note */}
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> After withdrawing, you can reapply by clicking the "Reapply to This Job" button in your applications list, or by visiting the Jobs page.
+              </p>
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setShowWithdrawModal(false);
-                    setApplicationToWithdraw(null);
-                  }}
-                  className="flex-1"
-                  disabled={withdrawing}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="danger"
-                  icon={AlertCircle}
-                  loading={withdrawing}
-                  onClick={handleWithdrawConfirm}
-                  className="flex-1"
-                  disabled={withdrawing}
-                >
-                  {withdrawing ? 'Withdrawing...' : 'Withdraw Application'}
-                </Button>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowWithdrawModal(false);
+                  setApplicationToWithdraw(null);
+                }}
+                className="flex-1"
+                disabled={withdrawing}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                icon={AlertCircle}
+                loading={withdrawing}
+                onClick={handleWithdrawConfirm}
+                className="flex-1"
+                disabled={withdrawing}
+              >
+                {withdrawing ? 'Withdrawing...' : 'Withdraw Application'}
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ModernModal>
 
       {/* Status History Modal */}
       {showStatusHistoryModal && selectedApplicationForHistory && (

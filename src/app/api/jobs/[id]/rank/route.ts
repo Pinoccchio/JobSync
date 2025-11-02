@@ -74,19 +74,37 @@ export async function POST(
     }
 
     // 3. Prepare applicant data for ranking
-    const applicantsData = applications.map(app => {
-      const profile = app.applicant_profiles as any;
-      return {
-        applicationId: app.id,
-        applicantId: app.applicant_id,
-        applicantProfileId: app.applicant_profile_id,
-        applicantName: `${profile.first_name} ${profile.surname}`,
-        highestEducationalAttainment: profile.highest_educational_attainment || 'Not specified',
-        eligibilities: profile.eligibilities || [],
-        skills: profile.skills || [],
-        totalYearsExperience: profile.total_years_experience || 0
-      };
-    });
+    // Filter out applications without applicant profiles first
+    const applicantsData = applications
+      .filter(app => {
+        // Skip applications without applicant profiles
+        if (!app.applicant_profiles || !app.applicant_profile_id) {
+          console.warn(`Skipping application ${app.id}: missing applicant profile (profile_id: ${app.applicant_profile_id})`);
+          return false;
+        }
+        return true;
+      })
+      .map(app => {
+        const profile = app.applicant_profiles as any;
+        return {
+          applicationId: app.id,
+          applicantId: app.applicant_id,
+          applicantProfileId: app.applicant_profile_id,
+          applicantName: `${profile.first_name} ${profile.surname}`,
+          highestEducationalAttainment: profile.highest_educational_attainment || 'Not specified',
+          eligibilities: profile.eligibilities || [],
+          skills: profile.skills || [],
+          totalYearsExperience: profile.total_years_experience || 0
+        };
+      });
+
+    // Check if we have any eligible applications to rank after filtering
+    if (applicantsData.length === 0) {
+      return NextResponse.json(
+        { message: 'No eligible applications to rank (missing profile data). Please ensure applicants have completed their profiles.' },
+        { status: 200 }
+      );
+    }
 
     // 4. Rank applicants using Gemini AI-powered algorithms
     console.log(`Ranking ${applicantsData.length} applicants for job: ${job.title}`);

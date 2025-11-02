@@ -248,6 +248,18 @@ export async function PATCH(
     if (status === 'withdrawn') {
       updateData.withdrawn_at = new Date().toISOString();
       updateData.withdrawn_by = user.id;
+
+      // Clear ranking data when application is withdrawn
+      // Withdrawn applications should not display ranks or scores
+      updateData.rank = null;
+      updateData.match_score = null;
+      updateData.education_score = null;
+      updateData.experience_score = null;
+      updateData.skills_score = null;
+      updateData.eligibility_score = null;
+      updateData.algorithm_used = null;
+      updateData.ranking_reasoning = null;
+      updateData.algorithm_details = null;
     }
 
     // Add optional fields from request body

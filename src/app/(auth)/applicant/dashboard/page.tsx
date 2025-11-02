@@ -264,60 +264,60 @@ export default function ApplicantDashboard() {
       accessor: 'status' as const,
       render: (value: string) => {
         let variant: 'success' | 'danger' | 'pending' | 'info' | 'warning' | 'default' = 'default';
-        let icon = Clock;
+        let IconComponent = Clock;
         let displayText = value;
 
         switch (value) {
           case 'pending':
             variant = 'pending';
-            icon = Clock;
+            IconComponent = Clock;
             displayText = 'Pending Review';
             break;
           case 'under_review':
             variant = 'info';
-            icon = Eye;
+            IconComponent = Eye;
             displayText = 'Under Review';
             break;
           case 'shortlisted':
             variant = 'warning';
-            icon = Star;
+            IconComponent = Star;
             displayText = 'Shortlisted';
             break;
           case 'interviewed':
             variant = 'info';
-            icon = Calendar;
+            IconComponent = Calendar;
             displayText = 'Interviewed';
             break;
           case 'approved':
             variant = 'success';
-            icon = CheckCircle2;
+            IconComponent = CheckCircle2;
             displayText = 'Approved';
             break;
           case 'denied':
             variant = 'danger';
-            icon = XCircle;
+            IconComponent = XCircle;
             displayText = 'Not Approved';
             break;
           case 'hired':
             variant = 'success';
-            icon = Briefcase;
+            IconComponent = Briefcase;
             displayText = 'Hired';
             break;
           case 'archived':
             variant = 'default';
-            icon = Archive;
+            IconComponent = Archive;
             displayText = 'Archived';
             break;
           case 'withdrawn':
             variant = 'default';
-            icon = AlertCircle;
+            IconComponent = AlertCircle;
             displayText = 'Withdrawn';
             break;
           default:
             displayText = value.charAt(0).toUpperCase() + value.slice(1);
         }
 
-        return <Badge variant={variant} icon={icon}>{displayText}</Badge>;
+        return <Badge variant={variant} icon={IconComponent}>{displayText}</Badge>;
       }
     },
     {

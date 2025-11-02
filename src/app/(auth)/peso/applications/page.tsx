@@ -1,18 +1,26 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, Modal } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, Modal, Input, Textarea } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
+import { StatusTimeline } from '@/components/peso/StatusTimeline';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2 } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2 } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
   title: string;
   duration: string;
   start_date: string;
+}
+
+interface StatusHistoryItem {
+  from: string | null;
+  to: string;
+  changed_at: string;
+  changed_by?: string;
 }
 
 interface TrainingApplication {
@@ -26,10 +34,11 @@ interface TrainingApplication {
   highest_education: string;
   id_image_url: string;
   id_image_name: string;
-  status: 'pending' | 'approved' | 'denied';
+  status: 'pending' | 'under_review' | 'approved' | 'denied' | 'enrolled' | 'in_progress' | 'completed' | 'certified' | 'withdrawn' | 'failed' | 'archived';
   submitted_at: string;
   reviewed_by?: string;
   reviewed_at?: string;
+  status_history?: StatusHistoryItem[];
   training_programs?: TrainingProgram;
 }
 
@@ -41,10 +50,18 @@ export default function PESOApplicationsPage() {
   const [loading, setLoading] = useState(true);
   const [programFilter, setProgramFilter] = useState<string>('all');
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [denyModalOpen, setDenyModalOpen] = useState(false);
+  const [underReviewModalOpen, setUnderReviewModalOpen] = useState(false);
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+  const [startTrainingModalOpen, setStartTrainingModalOpen] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [certifyModalOpen, setCertifyModalOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<TrainingApplication | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [nextSteps, setNextSteps] = useState('');
+  const [denialReason, setDenialReason] = useState('');
 
   // Fetch training applications function
   const fetchApplications = useCallback(async () => {
@@ -84,7 +101,43 @@ export default function PESOApplicationsPage() {
     setViewModalOpen(true);
   };
 
-  // Handle approve application
+  // Handle view status history
+  const handleViewHistory = (application: TrainingApplication) => {
+    setSelectedApplication(application);
+    setHistoryModalOpen(true);
+  };
+
+  // Handle mark as under review
+  const handleUnderReview = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'under_review' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to mark as under review');
+      }
+
+      showToast(result.message || 'Application marked as under review', 'success');
+      setUnderReviewModalOpen(false);
+      setSelectedApplication(null);
+      fetchApplications();
+    } catch (error: any) {
+      console.error('Error updating application:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle approve application with next steps
   const handleApprove = async () => {
     if (!selectedApplication) return;
 
@@ -93,7 +146,10 @@ export default function PESOApplicationsPage() {
       const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'approved' }),
+        body: JSON.stringify({
+          status: 'approved',
+          next_steps: nextSteps || undefined
+        }),
       });
 
       const result = await response.json();
@@ -105,6 +161,7 @@ export default function PESOApplicationsPage() {
       showToast(result.message || 'Application approved successfully', 'success');
       setApproveModalOpen(false);
       setSelectedApplication(null);
+      setNextSteps('');
       fetchApplications();
     } catch (error: any) {
       console.error('Error approving application:', error);
@@ -114,7 +171,7 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  // Handle deny application
+  // Handle deny application with reason
   const handleDeny = async () => {
     if (!selectedApplication) return;
 
@@ -123,7 +180,10 @@ export default function PESOApplicationsPage() {
       const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'denied' }),
+        body: JSON.stringify({
+          status: 'denied',
+          denial_reason: denialReason || undefined
+        }),
       });
 
       const result = await response.json();
@@ -135,9 +195,130 @@ export default function PESOApplicationsPage() {
       showToast(result.message || 'Application denied successfully', 'success');
       setDenyModalOpen(false);
       setSelectedApplication(null);
+      setDenialReason('');
       fetchApplications();
     } catch (error: any) {
       console.error('Error denying application:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle enroll applicant
+  const handleEnroll = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'enrolled' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to enroll applicant');
+      }
+
+      showToast(result.message || 'Applicant enrolled successfully', 'success');
+      setEnrollModalOpen(false);
+      setSelectedApplication(null);
+      fetchApplications();
+    } catch (error: any) {
+      console.error('Error enrolling applicant:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle start training
+  const handleStartTraining = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to start training');
+      }
+
+      showToast(result.message || 'Training started successfully', 'success');
+      setStartTrainingModalOpen(false);
+      setSelectedApplication(null);
+      fetchApplications();
+    } catch (error: any) {
+      console.error('Error starting training:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle mark as completed
+  const handleComplete = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to mark as completed');
+      }
+
+      showToast(result.message || 'Training marked as completed', 'success');
+      setCompleteModalOpen(false);
+      setSelectedApplication(null);
+      fetchApplications();
+    } catch (error: any) {
+      console.error('Error completing training:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle issue certificate
+  const handleCertify = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'certified' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to issue certificate');
+      }
+
+      showToast(result.message || 'Certificate issued successfully', 'success');
+      setCertifyModalOpen(false);
+      setSelectedApplication(null);
+      fetchApplications();
+    } catch (error: any) {
+      console.error('Error issuing certificate:', error);
       showToast(getErrorMessage(error), 'error');
     } finally {
       setActionLoading(false);
@@ -154,6 +335,24 @@ export default function PESOApplicationsPage() {
     if (programFilter === 'all') return true;
     return a.training_programs?.title === programFilter;
   });
+
+  // Get badge variant and icon for status
+  const getStatusBadge = (status: string) => {
+    const config: Record<string, { variant: any; icon: any; label: string }> = {
+      pending: { variant: 'warning', icon: Clock, label: 'Pending' },
+      under_review: { variant: 'primary', icon: Eye, label: 'Under Review' },
+      approved: { variant: 'success', icon: CheckCircle2, label: 'Approved' },
+      denied: { variant: 'danger', icon: XCircle, label: 'Denied' },
+      enrolled: { variant: 'primary', icon: UserCheck, label: 'Enrolled' },
+      in_progress: { variant: 'teal', icon: Play, label: 'In Progress' },
+      completed: { variant: 'secondary', icon: CheckCircle, label: 'Completed' },
+      certified: { variant: 'warning', icon: Award, label: 'Certified' },
+      withdrawn: { variant: 'secondary', icon: XCircle, label: 'Withdrawn' },
+      failed: { variant: 'danger', icon: XCircle, label: 'Failed' },
+      archived: { variant: 'secondary', icon: XCircle, label: 'Archived' },
+    };
+    return config[status] || { variant: 'secondary', icon: Clock, label: status };
+  };
 
   const columns = [
     {
@@ -210,17 +409,39 @@ export default function PESOApplicationsPage() {
       header: 'Status',
       accessor: 'status' as const,
       render: (value: string) => {
-        const variant = value === 'approved' ? 'success' : value === 'denied' ? 'danger' : 'warning';
-        const icon = value === 'approved' ? CheckCircle : value === 'denied' ? XCircle : Clock;
-        const label = value.charAt(0).toUpperCase() + value.slice(1);
-        return <Badge variant={variant} icon={icon}>{label}</Badge>;
+        const statusConfig = getStatusBadge(value);
+        return (
+          <Badge
+            variant={statusConfig.variant}
+            icon={statusConfig.icon}
+          >
+            {statusConfig.label}
+          </Badge>
+        );
       }
+    },
+    {
+      header: 'History',
+      accessor: 'status_history' as const,
+      render: (_: any, row: TrainingApplication) => (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={History}
+          onClick={() => handleViewHistory(row)}
+          disabled={!row.status_history || row.status_history.length === 0}
+        >
+          {row.status_history && row.status_history.length > 0
+            ? `${row.status_history.length} changes`
+            : 'No history'}
+        </Button>
+      )
     },
     {
       header: 'Actions',
       accessor: 'id' as const,
       render: (_: any, row: TrainingApplication) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="secondary"
             size="sm"
@@ -229,12 +450,25 @@ export default function PESOApplicationsPage() {
           >
             View
           </Button>
+
+          {/* Pending: Under Review, Approve, Deny */}
           {row.status === 'pending' && (
             <>
               <Button
+                variant="primary"
+                size="sm"
+                icon={Eye}
+                onClick={() => {
+                  setSelectedApplication(row);
+                  setUnderReviewModalOpen(true);
+                }}
+              >
+                Under Review
+              </Button>
+              <Button
                 variant="success"
                 size="sm"
-                icon={CheckCircle}
+                icon={CheckCircle2}
                 onClick={() => {
                   setSelectedApplication(row);
                   setApproveModalOpen(true);
@@ -254,6 +488,94 @@ export default function PESOApplicationsPage() {
                 Deny
               </Button>
             </>
+          )}
+
+          {/* Under Review: Approve, Deny */}
+          {row.status === 'under_review' && (
+            <>
+              <Button
+                variant="success"
+                size="sm"
+                icon={CheckCircle2}
+                onClick={() => {
+                  setSelectedApplication(row);
+                  setApproveModalOpen(true);
+                }}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon={XCircle}
+                onClick={() => {
+                  setSelectedApplication(row);
+                  setDenyModalOpen(true);
+                }}
+              >
+                Deny
+              </Button>
+            </>
+          )}
+
+          {/* Approved: Enroll */}
+          {row.status === 'approved' && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={UserCheck}
+              onClick={() => {
+                setSelectedApplication(row);
+                setEnrollModalOpen(true);
+              }}
+            >
+              Enroll
+            </Button>
+          )}
+
+          {/* Enrolled: Start Training */}
+          {row.status === 'enrolled' && (
+            <Button
+              variant="teal"
+              size="sm"
+              icon={Play}
+              onClick={() => {
+                setSelectedApplication(row);
+                setStartTrainingModalOpen(true);
+              }}
+            >
+              Start Training
+            </Button>
+          )}
+
+          {/* In Progress: Mark as Completed */}
+          {row.status === 'in_progress' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={CheckCircle}
+              onClick={() => {
+                setSelectedApplication(row);
+                setCompleteModalOpen(true);
+              }}
+            >
+              Complete
+            </Button>
+          )}
+
+          {/* Completed: Issue Certificate */}
+          {row.status === 'completed' && (
+            <Button
+              variant="warning"
+              size="sm"
+              icon={Award}
+              onClick={() => {
+                setSelectedApplication(row);
+                setCertifyModalOpen(true);
+              }}
+            >
+              Issue Certificate
+            </Button>
           )}
         </div>
       )
@@ -506,6 +828,7 @@ export default function PESOApplicationsPage() {
           onClose={() => {
             setApproveModalOpen(false);
             setSelectedApplication(null);
+            setNextSteps('');
           }}
           title="Approve Application"
           size="md"
@@ -514,12 +837,24 @@ export default function PESOApplicationsPage() {
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-gray-700">
-                  Are you sure you want to <span className="font-semibold text-green-700">approve</span> the application from{' '}
+                  Approving application from{' '}
                   <span className="font-semibold">{selectedApplication.full_name}</span> for{' '}
-                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
+                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  The applicant will receive an in-app notification about the approval. They will see it in their notification bell icon.
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Next Steps (Optional)
+                </label>
+                <Textarea
+                  value={nextSteps}
+                  onChange={(e) => setNextSteps(e.target.value)}
+                  placeholder="e.g., Please wait for enrollment confirmation email with training schedule and requirements..."
+                  rows={3}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This message will be included in the applicant's notification
                 </p>
               </div>
 
@@ -529,6 +864,7 @@ export default function PESOApplicationsPage() {
                   onClick={() => {
                     setApproveModalOpen(false);
                     setSelectedApplication(null);
+                    setNextSteps('');
                   }}
                   disabled={actionLoading}
                 >
@@ -536,7 +872,7 @@ export default function PESOApplicationsPage() {
                 </Button>
                 <Button
                   variant="success"
-                  icon={CheckCircle}
+                  icon={CheckCircle2}
                   onClick={handleApprove}
                   loading={actionLoading}
                 >
@@ -553,6 +889,7 @@ export default function PESOApplicationsPage() {
           onClose={() => {
             setDenyModalOpen(false);
             setSelectedApplication(null);
+            setDenialReason('');
           }}
           title="Deny Application"
           size="md"
@@ -561,12 +898,24 @@ export default function PESOApplicationsPage() {
             <div className="space-y-4">
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <p className="text-gray-700">
-                  Are you sure you want to <span className="font-semibold text-red-700">deny</span> the application from{' '}
+                  Denying application from{' '}
                   <span className="font-semibold">{selectedApplication.full_name}</span> for{' '}
-                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
+                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  The applicant will receive an in-app notification about the denial. They will see it in their notification bell icon.
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for Denial (Optional)
+                </label>
+                <Textarea
+                  value={denialReason}
+                  onChange={(e) => setDenialReason(e.target.value)}
+                  placeholder="e.g., Does not meet minimum educational requirements for this program..."
+                  rows={3}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This message will be included in the applicant's notification
                 </p>
               </div>
 
@@ -576,6 +925,7 @@ export default function PESOApplicationsPage() {
                   onClick={() => {
                     setDenyModalOpen(false);
                     setSelectedApplication(null);
+                    setDenialReason('');
                   }}
                   disabled={actionLoading}
                 >
@@ -590,6 +940,278 @@ export default function PESOApplicationsPage() {
                   Deny Application
                 </Button>
               </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Mark as Under Review Modal */}
+        <Modal
+          isOpen={underReviewModalOpen}
+          onClose={() => {
+            setUnderReviewModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Mark as Under Review"
+          size="md"
+        >
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-gray-700">
+                  Mark application from{' '}
+                  <span className="font-semibold">{selectedApplication.full_name}</span> as{' '}
+                  <span className="font-semibold text-blue-700">Under Review</span>?
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  This indicates that the PESO office is currently reviewing the application.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setUnderReviewModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={Eye}
+                  onClick={handleUnderReview}
+                  loading={actionLoading}
+                >
+                  Mark as Under Review
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Enroll Applicant Modal */}
+        <Modal
+          isOpen={enrollModalOpen}
+          onClose={() => {
+            setEnrollModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Enroll Applicant"
+          size="md"
+        >
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <p className="text-gray-700">
+                  Confirm enrollment of{' '}
+                  <span className="font-semibold">{selectedApplication.full_name}</span> in{' '}
+                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  The applicant will be officially enrolled in the training program.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setEnrollModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={UserCheck}
+                  onClick={handleEnroll}
+                  loading={actionLoading}
+                >
+                  Confirm Enrollment
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Start Training Modal */}
+        <Modal
+          isOpen={startTrainingModalOpen}
+          onClose={() => {
+            setStartTrainingModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Start Training"
+          size="md"
+        >
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                <p className="text-gray-700">
+                  Mark training as started for{' '}
+                  <span className="font-semibold">{selectedApplication.full_name}</span>?
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  This indicates the applicant has begun the training program.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setStartTrainingModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="teal"
+                  icon={Play}
+                  onClick={handleStartTraining}
+                  loading={actionLoading}
+                >
+                  Start Training
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Mark as Completed Modal */}
+        <Modal
+          isOpen={completeModalOpen}
+          onClose={() => {
+            setCompleteModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Mark Training as Completed"
+          size="md"
+        >
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-gray-700">
+                  Mark training as completed for{' '}
+                  <span className="font-semibold">{selectedApplication.full_name}</span>?
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  This indicates the applicant has successfully finished the training program.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setCompleteModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={CheckCircle}
+                  onClick={handleComplete}
+                  loading={actionLoading}
+                >
+                  Mark as Completed
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Issue Certificate Modal */}
+        <Modal
+          isOpen={certifyModalOpen}
+          onClose={() => {
+            setCertifyModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Issue Training Certificate"
+          size="md"
+        >
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-gray-700">
+                  Issue training certificate to{' '}
+                  <span className="font-semibold">{selectedApplication.full_name}</span> for{' '}
+                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  The applicant will be marked as certified and can download their certificate.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setCertifyModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="warning"
+                  icon={Award}
+                  onClick={handleCertify}
+                  loading={actionLoading}
+                >
+                  Issue Certificate
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Status History Modal */}
+        <Modal
+          isOpen={historyModalOpen}
+          onClose={() => {
+            setHistoryModalOpen(false);
+            setSelectedApplication(null);
+          }}
+          title="Application Status History"
+          size="xl"
+        >
+          {selectedApplication && (
+            <div className="space-y-6">
+              {/* Applicant Info Header */}
+              <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white p-4 rounded-lg -mt-6 -mx-6 mb-6">
+                <h3 className="text-lg font-bold">{selectedApplication.full_name}</h3>
+                <p className="text-sm text-teal-100 mt-1">
+                  {selectedApplication.training_programs?.title || 'N/A'}
+                </p>
+              </div>
+
+              {/* Status Timeline */}
+              {selectedApplication.status_history && selectedApplication.status_history.length > 0 ? (
+                <StatusTimeline
+                  statusHistory={selectedApplication.status_history}
+                  currentStatus={selectedApplication.status}
+                />
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                  <History className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">No status history available</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    This application has not been processed yet.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </Modal>

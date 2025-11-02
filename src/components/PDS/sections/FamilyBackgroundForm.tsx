@@ -6,6 +6,7 @@ import { FamilyBackground } from '@/types/pds.types';
 import { familyBackgroundSchema } from '@/lib/pds/validation';
 import { FormField } from '../FormField';
 import { ArrayFieldSection } from '../ArrayFieldSection';
+import { formatPhilippinePhone } from '@/lib/utils/phoneFormatter';
 
 interface FamilyBackgroundFormProps {
   data?: FamilyBackground;
@@ -163,8 +164,11 @@ export const FamilyBackgroundForm: React.FC<FamilyBackgroundFormProps> = ({
                 name="spouse.telephoneNo"
                 type="tel"
                 value={field.value || ''}
-                onChange={field.onChange}
-                placeholder="Optional"
+                onChange={(e) => {
+                  const formatted = formatPhilippinePhone(e.target.value);
+                  field.onChange(formatted);
+                }}
+                placeholder="+63 9XX XXX XXXX"
               />
             )}
           />
