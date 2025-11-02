@@ -29,6 +29,7 @@ interface PDSViewModalProps {
 
 export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSViewModalProps) {
   const [includeSignature, setIncludeSignature] = useState(false);
+  const [useCurrentDate, setUseCurrentDate] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [loadingSignature, setLoadingSignature] = useState(false);
 
@@ -77,7 +78,7 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
 
   const handleDownloadPDF = () => {
     if (pdsData.id) {
-      window.open(`/api/pds/${pdsData.id}/download?includeSignature=${includeSignature}`, '_blank');
+      window.open(`/api/pds/${pdsData.id}/download?includeSignature=${includeSignature}&useCurrentDate=${useCurrentDate}`, '_blank');
     }
   };
 
@@ -131,6 +132,25 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
                 </label>
               </div>
             )}
+            {/* Date option checkbox */}
+            <div className="mb-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCurrentDate}
+                  onChange={(e) => setUseCurrentDate(e.target.checked)}
+                  className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-900">
+                    Use current date in PDF
+                  </span>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Check to use today's date. Leave unchecked to use original PDS creation date.
+                  </p>
+                </div>
+              </label>
+            </div>
             <Button
               variant="primary"
               size="sm"

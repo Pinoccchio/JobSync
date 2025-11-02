@@ -7,6 +7,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Trash2, Calendar, Image as ImageIcon, Send, Megaphone, Loader2, Plus, Edit, TrendingUp, Briefcase, GraduationCap, Bell, FileText, X, Archive, Eye, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AnnouncementPreviewModal } from '@/components/hr/AnnouncementPreviewModal';
 
 interface Announcement {
   id: string;
@@ -18,6 +19,11 @@ interface Announcement {
   created_by: string;
   published_at: string;
   created_at: string;
+  profiles?: {
+    id: string;
+    full_name: string;
+    role: string;
+  };
 }
 
 export default function AnnouncementsPage() {
@@ -39,9 +45,11 @@ export default function AnnouncementsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [announcementToArchive, setAnnouncementToArchive] = useState<Announcement | null>(null);
   const [announcementToRestore, setAnnouncementToRestore] = useState<Announcement | null>(null);
   const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
@@ -476,7 +484,12 @@ export default function AnnouncementsPage() {
           ) : filteredAnnouncements.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
               {filteredAnnouncements.map((item) => (
-                <Card key={item.id} variant="interactive" noPadding className="group hover:shadow-2xl transition-all duration-300 h-full flex flex-col min-h-[480px]">
+                <Card key={item.id} variant="interactive" noPadding className="group hover:shadow-2xl transition-all duration-300 h-full flex flex-col min-h-[480px] cursor-pointer"
+                  onClick={() => {
+                    setSelectedAnnouncement(item);
+                    setShowPreviewModal(true);
+                  }}
+                >
                   {/* Image Section */}
                   <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300 overflow-hidden group-hover:from-gray-300 group-hover:to-gray-400 transition-all">
                     {item.image_url ? (
@@ -529,7 +542,10 @@ export default function AnnouncementsPage() {
                             size="sm"
                             icon={Edit}
                             className="flex-1"
-                            onClick={() => handleEdit(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(item);
+                            }}
                           >
                             Edit
                           </Button>
@@ -538,7 +554,8 @@ export default function AnnouncementsPage() {
                             size="sm"
                             icon={Archive}
                             className="flex-1"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setAnnouncementToArchive(item);
                               setShowArchiveConfirm(true);
                             }}
@@ -554,7 +571,8 @@ export default function AnnouncementsPage() {
                             size="sm"
                             icon={Eye}
                             className="flex-1"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setAnnouncementToRestore(item);
                               setShowRestoreConfirm(true);
                             }}
@@ -566,7 +584,8 @@ export default function AnnouncementsPage() {
                             size="sm"
                             icon={Trash2}
                             className="flex-1"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setAnnouncementToDelete(item);
                               setShowDeleteConfirm(true);
                             }}
@@ -1164,6 +1183,39 @@ export default function AnnouncementsPage() {
           </div>
         </div>
       )}
+
+      {/* Announcement Preview Modal */}
+      <AnnouncementPreviewModal
+        isOpen={showPreviewModal}
+        onClose={() => {
+          setShowPreviewModal(false);
+          setSelectedAnnouncement(null);
+        }}
+        announcement={selectedAnnouncement}
+        onEdit={() => {
+          if (selectedAnnouncement) {
+            handleEdit(selectedAnnouncement);
+          }
+        }}
+        onArchive={() => {
+          if (selectedAnnouncement) {
+            setAnnouncementToArchive(selectedAnnouncement);
+            setShowArchiveConfirm(true);
+          }
+        }}
+        onRestore={() => {
+          if (selectedAnnouncement) {
+            setAnnouncementToRestore(selectedAnnouncement);
+            setShowRestoreConfirm(true);
+          }
+        }}
+        onDelete={() => {
+          if (selectedAnnouncement) {
+            setAnnouncementToDelete(selectedAnnouncement);
+            setShowDeleteConfirm(true);
+          }
+        }}
+      />
     </AdminLayout>
   );
 }

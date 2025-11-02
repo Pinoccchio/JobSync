@@ -1,12 +1,21 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, StatusFilter, QuickFilters } from '@/components/ui';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
+import { ApplicationDrawer } from '@/components/hr/ApplicationDrawer';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
-import { FileText, Loader2, Calendar, User, Briefcase, CheckCircle, XCircle } from 'lucide-react';
+import { FileText, Loader2, Calendar, User, Briefcase, CheckCircle, XCircle, TrendingUp, CheckCircle2, History, X, Clock } from 'lucide-react';
+import { StatusTimeline } from '@/components/hr/StatusTimeline';
+
+interface StatusHistoryItem {
+  from: string | null;
+  to: string;
+  changed_at: string;
+  changed_by?: string;
+}
 
 interface Application {
   id: string;
@@ -14,7 +23,6 @@ interface Application {
   applicantName: string;
   email: string;
   jobTitle: string;
-  fileName: string;
   uploadedDate: string;
   status: string;
   pdsUrl: string;
@@ -22,6 +30,7 @@ interface Application {
   aiProcessed: boolean;
   signatureUrl: string | null;
   signatureUploadedAt: string | null;
+  statusHistory?: StatusHistoryItem[];
   _raw: any;
 }
 
@@ -31,11 +40,20 @@ export default function ScannedRecordsPage() {
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [selectedJob, setSelectedJob] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [quickFilter, setQuickFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [showApplicationDrawer, setShowApplicationDrawer] = useState(false);
+  const [selectedApplicationForDrawer, setSelectedApplicationForDrawer] = useState<Application | null>(null);
   const [pdsDataModal, setPdsDataModal] = useState<{
     isOpen: boolean;
     data: any;
     applicantName: string;
   } | null>(null);
+  const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
+  const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<Application | null>(null);
 
   // Fetch applications
   const fetchScannedRecords = useCallback(async () => {
@@ -52,15 +70,31 @@ export default function ScannedRecordsPage() {
             applicantName: `${app.applicant_profiles?.first_name || ''} ${app.applicant_profiles?.surname || ''}`.trim() || 'Unknown',
             email: app.applicant_profiles?.profiles?.email || user?.email || 'N/A',
             jobTitle: app.jobs?.title || 'Unknown Position',
+            matchScore: app.match_score,
+            rank: app.rank,
+            appliedDate: new Date(app.created_at).toLocaleDateString(),
             uploadedDate: new Date(app.created_at).toLocaleDateString(),
             status: app.status,
             ocrProcessed: app.applicant_profiles?.ocr_processed || false,
             aiProcessed: app.applicant_profiles?.ai_processed || false,
             signatureUrl: app.applicant_pds?.signature_url || null,
             signatureUploadedAt: app.applicant_pds?.signature_uploaded_at || null,
+            statusHistory: app.status_history || [],
             _raw: app,
           }))
         );
+
+        // Extract unique jobs for filter
+        const uniqueJobs = Array.from(
+          new Set(result.data.map((app: any) => app.jobs?.id).filter(Boolean))
+        ).map((jobId) => {
+          const app = result.data.find((a: any) => a.jobs?.id === jobId);
+          return {
+            id: jobId,
+            title: app?.jobs?.title || 'Unknown',
+          };
+        });
+        setJobs(uniqueJobs);
       } else {
         showToast(getErrorMessage(result.error), 'error');
       }
@@ -119,11 +153,18 @@ export default function ScannedRecordsPage() {
     {
       header: 'Applicant Name',
       accessor: 'applicantName' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
+      render: (value: string, row: Application) => (
+        <button
+          onClick={() => {
+            setSelectedApplicationForDrawer(row);
+            setShowApplicationDrawer(true);
+          }}
+          className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer text-left"
+          title="Click to view application details"
+        >
           <User className="w-4 h-4 text-gray-400" />
-          <span className="font-medium text-gray-900">{value}</span>
-        </div>
+          <span className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{value}</span>
+        </button>
       )
     },
     {
@@ -133,16 +174,6 @@ export default function ScannedRecordsPage() {
         <div className="flex items-center gap-2">
           <Briefcase className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-700">{value}</span>
-        </div>
-      )
-    },
-    {
-      header: 'PDS File Name',
-      accessor: 'fileName' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700 truncate max-w-xs" title={value}>{value}</span>
         </div>
       )
     },
@@ -159,13 +190,57 @@ export default function ScannedRecordsPage() {
     {
       header: 'Status',
       accessor: 'status' as const,
-      render: (value: string) => (
-        <Badge
-          variant={value === 'approved' ? 'success' : value === 'denied' ? 'danger' : 'warning'}
-        >
-          {value.charAt(0).toUpperCase() + value.slice(1)}
-        </Badge>
-      )
+      render: (value: string) => {
+        let variant: 'success' | 'danger' | 'warning' | 'info' | 'default' | 'pending' = 'default';
+        let displayText = value.charAt(0).toUpperCase() + value.slice(1);
+
+        switch (value) {
+          case 'pending':
+            variant = 'pending';
+            displayText = 'Pending Review';
+            break;
+          case 'under_review':
+            variant = 'info';
+            displayText = 'Under Review';
+            break;
+          case 'shortlisted':
+            variant = 'warning';
+            displayText = 'Shortlisted';
+            break;
+          case 'interviewed':
+            variant = 'info';
+            displayText = 'Interviewed';
+            break;
+          case 'approved':
+            variant = 'success';
+            displayText = 'Approved';
+            break;
+          case 'denied':
+            variant = 'danger';
+            displayText = 'Denied';
+            break;
+          case 'hired':
+            variant = 'success';
+            displayText = 'Hired 🎉';
+            break;
+          case 'archived':
+            variant = 'default';
+            displayText = 'Archived';
+            break;
+          case 'withdrawn':
+            variant = 'default';
+            displayText = 'Withdrawn';
+            break;
+          default:
+            displayText = value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        return (
+          <Badge variant={variant}>
+            {displayText}
+          </Badge>
+        );
+      },
     },
     {
       header: 'Signature',
@@ -194,6 +269,27 @@ export default function ScannedRecordsPage() {
       )
     },
     {
+      header: 'Status History',
+      accessor: 'id' as const,
+      render: (_: any, row: Application) => {
+        const hasHistory = row.statusHistory && row.statusHistory.length > 0;
+        return (
+          <Button
+            variant={hasHistory ? "info" : "default"}
+            size="sm"
+            icon={History}
+            onClick={() => {
+              setSelectedApplicationForHistory(row);
+              setShowStatusHistoryModal(true);
+            }}
+            className="text-xs whitespace-nowrap"
+          >
+            {hasHistory ? `View History (${row.statusHistory.length})` : 'View Status'}
+          </Button>
+        );
+      }
+    },
+    {
       header: 'Actions',
       accessor: 'actions' as const,
       render: (_: any, row: Application) => (
@@ -212,21 +308,114 @@ export default function ScannedRecordsPage() {
     },
   ];
 
-  // Calculate stats
+  // Filter applications
+  const filteredApplications = applications.filter((app) => {
+    // Job filter
+    const matchesJob = selectedJob === 'all' || app._raw.job_id === selectedJob;
+
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
+
+    // Quick filter
+    let matchesQuickFilter = true;
+    if (quickFilter !== 'all') {
+      const quickFilterMap: Record<string, string[]> = {
+        needsAction: ['pending'],
+        inProgress: ['under_review', 'shortlisted', 'interviewed'],
+        approved: ['approved', 'hired'],
+        denied: ['denied'],
+      };
+      matchesQuickFilter = quickFilterMap[quickFilter]?.includes(app.status) || false;
+    }
+
+    // Date filter
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const uploadDate = new Date(app._raw.created_at);
+      const today = new Date();
+      const diffDays = Math.floor((today.getTime() - uploadDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      switch (dateFilter) {
+        case 'today':
+          matchesDate = diffDays === 0;
+          break;
+        case 'week':
+          matchesDate = diffDays <= 7;
+          break;
+        case 'month':
+          matchesDate = diffDays <= 30;
+          break;
+        default:
+          matchesDate = true;
+      }
+    }
+
+    return matchesJob && matchesStatus && matchesQuickFilter && matchesDate;
+  });
+
+  // Quick filter counts
+  const quickFilterCounts = {
+    needsAction: applications.filter((a) => a.status === 'pending').length,
+    inProgress: applications.filter((a) => ['under_review', 'shortlisted', 'interviewed'].includes(a.status)).length,
+    approved: applications.filter((a) => ['approved', 'hired'].includes(a.status)).length,
+    denied: applications.filter((a) => a.status === 'denied').length,
+  };
+
+  // Calculate stats - Time-based and completion metrics (non-redundant with Quick Filters)
   const totalPDS = applications.length;
-  const pendingCount = applications.filter((a) => a.status === 'pending').length;
-  const approvedToday = applications.filter((a) => {
-    const today = new Date().toDateString();
+
+  const today = new Date().toDateString();
+  const uploadedToday = applications.filter((a) => {
     const uploadDate = new Date(a._raw.created_at).toDateString();
-    return a.status === 'approved' && uploadDate === today;
+    return uploadDate === today;
   }).length;
+
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const uploadedThisWeek = applications.filter((a) => {
+    const uploadDate = new Date(a._raw.created_at);
+    return uploadDate >= oneWeekAgo;
+  }).length;
+
+  const withSignatures = applications.filter((a) => a.signatureUrl).length;
 
   return (
     <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Scanned PDS Records" pageDescription="Manage uploaded Personal Data Sheets">
       <Container size="xl">
         <div className="space-y-6">
-          {/* Refresh Button */}
-          <div className="flex justify-end">
+          {/* Header with Filters */}
+          <div className="flex justify-between items-center">
+            <div className="flex gap-3">
+              <select
+                value={selectedJob}
+                onChange={(e) => setSelectedJob(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555]"
+              >
+                <option value="all">All Positions</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title}
+                  </option>
+                ))}
+              </select>
+
+              <StatusFilter
+                value={statusFilter}
+                onChange={setStatusFilter}
+              />
+
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555]"
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+              </select>
+            </div>
+
             <RefreshButton
               onRefresh={fetchScannedRecords}
               label="Refresh Applications"
@@ -234,8 +423,8 @@ export default function ScannedRecordsPage() {
             />
           </div>
 
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Summary Stats - Time-based & Completion Metrics (Non-Redundant with Quick Filters) */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -251,11 +440,25 @@ export default function ScannedRecordsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Pending Review</p>
-                  <p className="text-3xl font-bold text-gray-900">{pendingCount}</p>
+                  <p className="text-sm text-gray-600 mb-1">Uploaded Today</p>
+                  <p className="text-3xl font-bold text-gray-900">{uploadedToday}</p>
+                  <p className="text-xs text-gray-500 mt-1">Today's activity</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Loader2 className="w-6 h-6 text-white" />
+                  <TrendingUp className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Uploaded This Week</p>
+                  <p className="text-3xl font-bold text-gray-900">{uploadedThisWeek}</p>
+                  <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Calendar className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -263,14 +466,27 @@ export default function ScannedRecordsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Approved Today</p>
-                  <p className="text-3xl font-bold text-gray-900">{approvedToday}</p>
+                  <p className="text-sm text-gray-600 mb-1">With Signatures</p>
+                  <p className="text-3xl font-bold text-gray-900">{withSignatures}</p>
+                  <p className="text-xs text-gray-500 mt-1">Completion rate: {totalPDS > 0 ? ((withSignatures / totalPDS) * 100).toFixed(1) : 0}%</p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
-                  <FileText className="w-6 h-6 text-white" />
+                  <CheckCircle2 className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex items-center justify-between">
+            <QuickFilters
+              activeFilter={quickFilter}
+              onChange={setQuickFilter}
+              counts={quickFilterCounts}
+            />
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-semibold text-gray-900">{filteredApplications.length}</span> of {applications.length} applications
+            </div>
           </div>
 
           {/* PDS Records Table */}
@@ -280,14 +496,14 @@ export default function ScannedRecordsPage() {
                 <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
                 <span className="ml-3 text-gray-600">Loading PDS records...</span>
               </div>
-            ) : applications.length === 0 ? (
+            ) : filteredApplications.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
-                No PDS files uploaded yet
+                {applications.length === 0 ? 'No PDS files uploaded yet' : 'No applications match the selected filters'}
               </div>
             ) : (
               <EnhancedTable
                 columns={columns}
-                data={applications}
+                data={filteredApplications}
                 searchable
                 paginated
                 pageSize={10}
@@ -305,6 +521,97 @@ export default function ScannedRecordsPage() {
         pdsData={pdsDataModal?.data}
         applicantName={pdsDataModal?.applicantName || ''}
       />
+
+      {/* Application Details Drawer */}
+      <ApplicationDrawer
+        isOpen={showApplicationDrawer}
+        onClose={() => {
+          setShowApplicationDrawer(false);
+          setSelectedApplicationForDrawer(null);
+        }}
+        application={selectedApplicationForDrawer}
+      />
+
+      {/* Status History Modal */}
+      {showStatusHistoryModal && selectedApplicationForHistory && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 flex items-center justify-between z-10 shadow-lg rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                  <History className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Application Status History</h3>
+                  <p className="text-sm text-blue-100">Track application progress</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowStatusHistoryModal(false);
+                  setSelectedApplicationForHistory(null);
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+              {/* Application Info */}
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Briefcase className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {selectedApplicationForHistory.applicantName}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {selectedApplicationForHistory.jobTitle}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Applied on: {selectedApplicationForHistory.uploadedDate}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Timeline */}
+              {selectedApplicationForHistory.statusHistory && selectedApplicationForHistory.statusHistory.length > 0 ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-6 overflow-visible">
+                  <StatusTimeline
+                    statusHistory={selectedApplicationForHistory.statusHistory}
+                    currentStatus={selectedApplicationForHistory.status}
+                  />
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                  <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                  <p className="text-gray-600 font-medium">No status changes yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Application is currently in <span className="font-semibold">{selectedApplicationForHistory.status}</span> status
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end rounded-b-xl">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowStatusHistoryModal(false);
+                  setSelectedApplicationForHistory(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

@@ -49,6 +49,7 @@ const APPLICANT_MENU_ITEMS = [
   { label: 'Dashboard', href: '/applicant/dashboard', icon: Home },
   { label: 'Jobs', href: '/applicant/jobs', icon: Briefcase },
   { label: 'Trainings', href: '/applicant/trainings', icon: GraduationCap },
+  { label: 'Announcements', href: '/applicant/announcements', icon: Megaphone },
   { label: 'My Applications', href: '/applicant/applications', icon: ClipboardList },
 ];
 

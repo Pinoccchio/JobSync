@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { Button, Card, ApplicationModal, Container, Badge, RefreshButton, EnhancedTable } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { ApplicationStatusBadge, AppliedBadge } from '@/components/ApplicationStatusBadge';
+import { StatusTimeline } from '@/components/hr/StatusTimeline';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, LayoutGrid, List, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye } from 'lucide-react';
+import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, LayoutGrid, List, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye, History, X } from 'lucide-react';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 
 interface Job {
@@ -33,15 +34,23 @@ interface Job {
   } | null;
 }
 
+interface StatusHistoryItem {
+  from: string | null;
+  to: string;
+  changed_at: string;
+  changed_by?: string;
+}
+
 interface Application {
   id: string;
   job_id: string;
   applicant_id: string;
-  status: 'pending' | 'approved' | 'denied';
+  status: 'pending' | 'under_review' | 'shortlisted' | 'interviewed' | 'approved' | 'denied' | 'hired' | 'archived' | 'withdrawn';
   rank: number | null;
   match_score: number | null;
   created_at: string;
   updated_at: string;
+  status_history?: StatusHistoryItem[];
 }
 
 interface JobWithApplication extends Job {
@@ -64,6 +73,14 @@ export default function AuthenticatedJobsPage() {
   const [loadingApplications, setLoadingApplications] = useState(true);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card'); // Default to card view
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Status History Modal state
+  const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
+  const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<Application | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Skills expansion state
+  const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
 
   // Fetch jobs function
   const fetchJobs = useCallback(async () => {
@@ -133,6 +150,45 @@ export default function AuthenticatedJobsPage() {
     // Refresh applications list after successful application
     // Toast is already shown by ApplicationModal, just refresh data
     fetchUserApplications();
+  };
+
+  // Handle View Status History
+  const handleViewStatusHistory = async (application: Application) => {
+    try {
+      setLoadingHistory(true);
+      setShowStatusHistoryModal(true);
+
+      // Fetch full application details including status_history
+      const response = await fetch(`/api/applications/${application.id}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setSelectedApplicationForHistory({
+          ...application,
+          status_history: result.data.status_history || []
+        });
+      } else {
+        setSelectedApplicationForHistory(application);
+      }
+    } catch (error) {
+      console.error('Error fetching application details:', error);
+      setSelectedApplicationForHistory(application);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Handle Toggle Skills Expansion
+  const toggleSkillsExpansion = (jobId: string) => {
+    setExpandedSkillsCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
   };
 
   // Helper functions for application status
@@ -297,7 +353,6 @@ export default function AuthenticatedJobsPage() {
           <ApplicationStatusBadge
             status={row.userApplication.status}
             createdAt={row.userApplication.created_at}
-            matchScore={row.userApplication.match_score}
             showDate={true}
           />
         );
@@ -365,7 +420,14 @@ export default function AuthenticatedJobsPage() {
               </button>
             </div>
 
-            <RefreshButton onRefresh={fetchJobs} label="Refresh" showLastRefresh={true} />
+            <RefreshButton
+              onRefresh={() => {
+                fetchJobs();
+                fetchUserApplications();
+              }}
+              label="Refresh"
+              showLastRefresh={true}
+            />
           </div>
 
           {/* Summary Stats */}
@@ -481,12 +543,18 @@ export default function AuthenticatedJobsPage() {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[140px]"
+                  className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[180px]"
                 >
                   <option value="all">Any Status</option>
-                  <option value="pending">Pending</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="under_review">Under Review</option>
+                  <option value="shortlisted">Shortlisted</option>
+                  <option value="interviewed">Interviewed</option>
                   <option value="approved">Approved</option>
-                  <option value="denied">Denied</option>
+                  <option value="denied">Not Approved</option>
+                  <option value="hired">Hired</option>
+                  <option value="archived">Archived</option>
+                  <option value="withdrawn">Withdrawn</option>
                 </select>
               )}
 
@@ -651,22 +719,42 @@ export default function AuthenticatedJobsPage() {
 
                         {/* Skills & Eligibilities */}
                         {((job.skills && job.skills.length > 0) || (job.eligibilities && job.eligibilities.length > 0)) && (
-                          <div className="flex flex-wrap gap-2">
-                            {job.skills && job.skills.slice(0, 3).map((skill, idx) => (
-                              <Badge key={`skill-${idx}`} size="sm" variant="default">
-                                {skill}
-                              </Badge>
-                            ))}
-                            {job.eligibilities && job.eligibilities.slice(0, 2).map((elig, idx) => (
-                              <Badge key={`elig-${idx}`} size="sm" variant="default">
-                                {elig}
-                              </Badge>
-                            ))}
-                            {((job.skills?.length || 0) + (job.eligibilities?.length || 0)) > 5 && (
-                              <Badge size="sm" variant="default">
-                                +{((job.skills?.length || 0) + (job.eligibilities?.length || 0)) - 5} more
-                              </Badge>
-                            )}
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                              {(() => {
+                                const isExpanded = expandedSkillsCards.has(job.id);
+                                const totalCount = (job.skills?.length || 0) + (job.eligibilities?.length || 0);
+                                const showAll = isExpanded || totalCount <= 5;
+
+                                const skillsToShow = showAll ? (job.skills || []) : (job.skills || []).slice(0, 3);
+                                const eligsToShow = showAll ? (job.eligibilities || []) : (job.eligibilities || []).slice(0, 2);
+                                const shownCount = skillsToShow.length + eligsToShow.length;
+
+                                return (
+                                  <>
+                                    {skillsToShow.map((skill, idx) => (
+                                      <Badge key={`skill-${idx}`} size="sm" variant="default">
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                    {eligsToShow.map((elig, idx) => (
+                                      <Badge key={`elig-${idx}`} size="sm" variant="default">
+                                        {elig}
+                                      </Badge>
+                                    ))}
+                                    {totalCount > 5 && (
+                                      <button
+                                        onClick={() => toggleSkillsExpansion(job.id)}
+                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
+                                        title={isExpanded ? "Click to show less" : "Click to view all requirements"}
+                                      >
+                                        {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
+                                      </button>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
                           </div>
                         )}
 
@@ -696,17 +784,16 @@ export default function AuthenticatedJobsPage() {
                             <ApplicationStatusBadge
                               status={job.userApplication.status}
                               createdAt={job.userApplication.created_at}
-                              matchScore={job.userApplication.match_score}
                               className="w-full justify-center py-2"
                             />
                             <Button
-                              variant="secondary"
-                              className="w-full"
+                              variant="info"
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-shadow"
                               size="lg"
-                              icon={Eye}
-                              disabled
+                              icon={History}
+                              onClick={() => handleViewStatusHistory(job.userApplication!)}
                             >
-                              View Application
+                              View Status History
                             </Button>
                           </div>
                         ) : (
@@ -764,6 +851,95 @@ export default function AuthenticatedJobsPage() {
         job={selectedJob}
         onSuccess={handleApplicationSuccess}
       />
+
+      {/* Status History Modal */}
+      {showStatusHistoryModal && selectedApplicationForHistory && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 flex items-center justify-between z-10 shadow-lg rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                  <History className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Application Status History</h3>
+                  <p className="text-sm text-blue-100">Track your application progress</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowStatusHistoryModal(false);
+                  setSelectedApplicationForHistory(null);
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+              {/* Job Info */}
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Briefcase className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {jobsWithApplicationStatus.find(j => j.userApplication?.id === selectedApplicationForHistory.id)?.title || 'Position'}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">Job Application</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Applied on: {new Date(selectedApplicationForHistory.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Timeline */}
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                  <span className="ml-3 text-gray-600">Loading status history...</span>
+                </div>
+              ) : selectedApplicationForHistory.status_history && selectedApplicationForHistory.status_history.length > 0 ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-6 overflow-visible">
+                  <StatusTimeline
+                    statusHistory={selectedApplicationForHistory.status_history}
+                    currentStatus={selectedApplicationForHistory.status}
+                  />
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                  <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                  <p className="text-gray-600 font-medium">No status changes yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Your application is currently in <span className="font-semibold">{selectedApplicationForHistory.status}</span> status
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end rounded-b-xl">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowStatusHistoryModal(false);
+                  setSelectedApplicationForHistory(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   );
 }

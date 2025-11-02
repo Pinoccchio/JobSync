@@ -2,10 +2,19 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import Image from 'next/image';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem, StatusFilter, QuickFilters } from '@/components/ui';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { RankingDetailsModal } from '@/components/hr/RankingDetailsModal';
 import { PDSViewerModal } from '@/components/hr/PDSViewerModal';
+import { DenyModal } from '@/components/hr/DenyModal';
+import { ShortlistModal } from '@/components/hr/ShortlistModal';
+import { ScheduleInterviewModal } from '@/components/hr/ScheduleInterviewModal';
+import { ApproveModal } from '@/components/hr/ApproveModal';
+import { MarkAsHiredModal } from '@/components/hr/MarkAsHiredModal';
+import { UnderReviewModal } from '@/components/hr/UnderReviewModal';
+import { ReverseToPendingModal } from '@/components/hr/ReverseToPendingModal';
+import { ArchiveModal } from '@/components/hr/ArchiveModal';
+import { ApplicationDrawer } from '@/components/hr/ApplicationDrawer';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +39,22 @@ import {
   X,
   Sparkles,
   Users,
+  Clock,
+  Star,
+  Calendar,
+  RotateCcw,
+  Archive,
+  Target,
+  History,
 } from 'lucide-react';
+import { StatusTimeline } from '@/components/hr/StatusTimeline';
+
+interface StatusHistoryItem {
+  from: string | null;
+  to: string;
+  changed_at: string;
+  changed_by?: string;
+}
 
 interface Application {
   id: string;
@@ -45,6 +69,7 @@ interface Application {
   pdsId: string | null;
   signatureUrl: string | null;
   signatureUploadedAt: string | null;
+  statusHistory?: StatusHistoryItem[];
   _raw: any;
 }
 
@@ -56,6 +81,10 @@ export default function RankedRecordsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<string>('all');
   const [jobs, setJobs] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [quickFilter, setQuickFilter] = useState<string>('all');
+  const [selectedApplicationForDrawer, setSelectedApplicationForDrawer] = useState<Application | null>(null);
+  const [showApplicationDrawer, setShowApplicationDrawer] = useState(false);
   const [isRanking, setIsRanking] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState<any>(null);
@@ -77,6 +106,21 @@ export default function RankedRecordsPage() {
     data: any;
     applicantName: string;
   } | null>(null);
+
+  // New workflow modals state
+  const [showDenyModal, setShowDenyModal] = useState(false);
+  const [showShortlistModal, setShowShortlistModal] = useState(false);
+  const [showScheduleInterviewModal, setShowScheduleInterviewModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showMarkAsHiredModal, setShowMarkAsHiredModal] = useState(false);
+  const [showUnderReviewModal, setShowUnderReviewModal] = useState(false);
+  const [showReverseToPendingModal, setShowReverseToPendingModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [selectedApplicationForAction, setSelectedApplicationForAction] = useState<Application | null>(null);
+
+  // Status History Modal
+  const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
+  const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<Application | null>(null);
 
   // Fetch applications
   const fetchApplications = useCallback(async () => {
@@ -100,6 +144,7 @@ export default function RankedRecordsPage() {
             pdsId: app.pds_id,
             signatureUrl: app.applicant_pds?.signature_url || null,
             signatureUploadedAt: app.applicant_pds?.signature_uploaded_at || null,
+            statusHistory: app.status_history || [],
             _raw: app,
           }))
         );
@@ -197,6 +242,304 @@ export default function RankedRecordsPage() {
     } catch (error) {
       console.error('Error denying application:', error);
       showToast('Failed to deny application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // NEW WORKFLOW HANDLERS
+
+  // Handle Mark as Under Review (with modal)
+  const handleMarkUnderReview = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowUnderReviewModal(true);
+  };
+
+  const handleMarkUnderReviewConfirm = async () => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'under_review' }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Application marked as under review`, 'success');
+        setShowUnderReviewModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error updating application:', error);
+      showToast('Failed to update application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Shortlist with modal
+  const handleShortlist = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowShortlistModal(true);
+  };
+
+  const handleShortlistConfirm = async () => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'shortlisted' }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`${selectedApplicationForAction.applicantName} has been shortlisted!`, 'success');
+        setShowShortlistModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error shortlisting application:', error);
+      showToast('Failed to shortlist application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Schedule Interview with modal
+  const handleScheduleInterview = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowScheduleInterviewModal(true);
+  };
+
+  const handleScheduleInterviewConfirm = async (interview_date: string, location: string, instructions: string) => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'interviewed',
+          interview_date,
+          next_steps: `Interview Location: ${location}. ${instructions}`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Interview scheduled for ${selectedApplicationForAction.applicantName}!`, 'success');
+        setShowScheduleInterviewModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error scheduling interview:', error);
+      showToast('Failed to schedule interview', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Approve with enhanced modal
+  const handleApproveNew = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowApproveModal(true);
+  };
+
+  const handleApproveConfirmNew = async (next_steps: string, hr_notes?: string) => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'approved',
+          next_steps,
+          hr_notes,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Application approved! Notification sent to ${selectedApplicationForAction.applicantName}`, 'success');
+        setShowApproveModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error approving application:', error);
+      showToast('Failed to approve application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Deny with enhanced modal
+  const handleDenyNew = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowDenyModal(true);
+  };
+
+  const handleDenyConfirmNew = async (denial_reason: string, hr_notes?: string) => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'denied',
+          denial_reason,
+          hr_notes,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Application denied. Notification sent to ${selectedApplicationForAction.applicantName}`, 'success');
+        setShowDenyModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error denying application:', error);
+      showToast('Failed to deny application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Mark as Hired
+  const handleMarkAsHired = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowMarkAsHiredModal(true);
+  };
+
+  const handleMarkAsHiredConfirm = async (next_steps: string, hr_notes?: string) => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'hired',
+          next_steps,
+          hr_notes,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`${selectedApplicationForAction.applicantName} marked as hired! 🎉`, 'success');
+        setShowMarkAsHiredModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error marking as hired:', error);
+      showToast('Failed to mark as hired', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Reverse to Pending
+  const handleReverseToPending = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowReverseToPendingModal(true);
+  };
+
+  const handleReverseToPendingConfirm = async () => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'pending' }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Application reversed to pending status`, 'success');
+        setShowReverseToPendingModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error reversing application:', error);
+      showToast('Failed to reverse application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Archive
+  const handleArchive = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowArchiveModal(true);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'archived' }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Application archived successfully`, 'success');
+        setShowArchiveModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error archiving application:', error);
+      showToast('Failed to archive application', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -493,11 +836,15 @@ export default function RankedRecordsPage() {
     {
       header: 'Applicant',
       accessor: 'applicantName' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
+      render: (value: string, row: Application) => (
+        <button
+          onClick={() => handleViewApplicationDetails(row)}
+          className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer text-left"
+          title="Click to view application details"
+        >
           <User className="w-4 h-4 text-gray-400" />
-          <span className="font-medium text-gray-900">{value}</span>
-        </div>
+          <span className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{value}</span>
+        </button>
       ),
     },
     {
@@ -542,13 +889,57 @@ export default function RankedRecordsPage() {
     {
       header: 'Status',
       accessor: 'status' as const,
-      render: (value: string) => (
-        <Badge
-          variant={value === 'approved' ? 'success' : value === 'denied' ? 'danger' : 'warning'}
-        >
-          {value.charAt(0).toUpperCase() + value.slice(1)}
-        </Badge>
-      ),
+      render: (value: string) => {
+        let variant: 'success' | 'danger' | 'warning' | 'info' | 'default' | 'pending' = 'default';
+        let displayText = value.charAt(0).toUpperCase() + value.slice(1);
+
+        switch (value) {
+          case 'pending':
+            variant = 'pending';
+            displayText = 'Pending Review';
+            break;
+          case 'under_review':
+            variant = 'info';
+            displayText = 'Under Review';
+            break;
+          case 'shortlisted':
+            variant = 'warning';
+            displayText = 'Shortlisted';
+            break;
+          case 'interviewed':
+            variant = 'info';
+            displayText = 'Interviewed';
+            break;
+          case 'approved':
+            variant = 'success';
+            displayText = 'Approved';
+            break;
+          case 'denied':
+            variant = 'danger';
+            displayText = 'Denied';
+            break;
+          case 'hired':
+            variant = 'success';
+            displayText = 'Hired 🎉';
+            break;
+          case 'archived':
+            variant = 'default';
+            displayText = 'Archived';
+            break;
+          case 'withdrawn':
+            variant = 'default';
+            displayText = 'Withdrawn';
+            break;
+          default:
+            displayText = value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        return (
+          <Badge variant={variant}>
+            {displayText}
+          </Badge>
+        );
+      },
     },
     {
       header: 'Applied',
@@ -581,10 +972,34 @@ export default function RankedRecordsPage() {
       )
     },
     {
+      header: 'Status History',
+      accessor: 'id' as const,
+      render: (_: any, row: Application) => {
+        const hasHistory = row.statusHistory && row.statusHistory.length > 0;
+        return (
+          <Button
+            variant={hasHistory ? "info" : "default"}
+            size="sm"
+            icon={History}
+            onClick={() => {
+              setSelectedApplicationForHistory(row);
+              setShowStatusHistoryModal(true);
+            }}
+            className="text-xs whitespace-nowrap"
+          >
+            {hasHistory ? `View History (${row.statusHistory.length})` : 'View Status'}
+          </Button>
+        );
+      }
+    },
+    {
       header: 'Actions',
       accessor: 'actions' as const,
       render: (_: any, row: Application) => {
-        const menuItems: DropdownMenuItem[] = [
+        const menuItems: DropdownMenuItem[] = [];
+
+        // Always show these actions
+        menuItems.push(
           {
             label: 'View Ranking Details',
             icon: FileText,
@@ -597,34 +1012,230 @@ export default function RankedRecordsPage() {
             icon: Eye,
             onClick: () => handleDownloadPDS(row),
             variant: 'default',
-          },
-          {
-            label: 'Approve',
-            icon: CheckCircle,
-            onClick: () => handleApprove(row),
-            variant: 'success',
-            disabled: submitting,
-            hidden: row.status !== 'pending',
-          },
-          {
-            label: 'Deny',
-            icon: XCircle,
-            onClick: () => handleDeny(row),
-            variant: 'danger',
-            disabled: submitting,
-            hidden: row.status !== 'pending',
-          },
-        ];
+          }
+        );
+
+        // Status-specific actions
+        switch (row.status) {
+          case 'pending':
+            menuItems.push(
+              {
+                label: 'Mark as Under Review',
+                icon: Clock,
+                onClick: () => handleMarkUnderReview(row),
+                variant: 'default',
+                disabled: submitting,
+              },
+              {
+                label: 'Shortlist',
+                icon: Star,
+                onClick: () => handleShortlist(row),
+                variant: 'default',
+                disabled: submitting,
+              },
+              {
+                label: 'Approve',
+                icon: CheckCircle,
+                onClick: () => handleApproveNew(row),
+                variant: 'success',
+                disabled: submitting,
+              },
+              {
+                label: 'Deny',
+                icon: XCircle,
+                onClick: () => handleDenyNew(row),
+                variant: 'danger',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'under_review':
+            menuItems.push(
+              {
+                label: 'Shortlist',
+                icon: Star,
+                onClick: () => handleShortlist(row),
+                variant: 'default',
+                disabled: submitting,
+              },
+              {
+                label: 'Approve',
+                icon: CheckCircle,
+                onClick: () => handleApproveNew(row),
+                variant: 'success',
+                disabled: submitting,
+              },
+              {
+                label: 'Deny',
+                icon: XCircle,
+                onClick: () => handleDenyNew(row),
+                variant: 'danger',
+                disabled: submitting,
+              },
+              {
+                label: 'Back to Pending',
+                icon: RotateCcw,
+                onClick: () => handleReverseToPending(row),
+                variant: 'default',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'shortlisted':
+            menuItems.push(
+              {
+                label: 'Schedule Interview',
+                icon: Calendar,
+                onClick: () => handleScheduleInterview(row),
+                variant: 'default',
+                disabled: submitting,
+              },
+              {
+                label: 'Approve',
+                icon: CheckCircle,
+                onClick: () => handleApproveNew(row),
+                variant: 'success',
+                disabled: submitting,
+              },
+              {
+                label: 'Deny',
+                icon: XCircle,
+                onClick: () => handleDenyNew(row),
+                variant: 'danger',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'interviewed':
+            menuItems.push(
+              {
+                label: 'Approve',
+                icon: CheckCircle,
+                onClick: () => handleApproveNew(row),
+                variant: 'success',
+                disabled: submitting,
+              },
+              {
+                label: 'Deny',
+                icon: XCircle,
+                onClick: () => handleDenyNew(row),
+                variant: 'danger',
+                disabled: submitting,
+              },
+              {
+                label: 'Reschedule Interview',
+                icon: Calendar,
+                onClick: () => handleScheduleInterview(row),
+                variant: 'default',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'approved':
+            menuItems.push(
+              {
+                label: 'Mark as Hired',
+                icon: Briefcase,
+                onClick: () => handleMarkAsHired(row),
+                variant: 'success',
+                disabled: submitting,
+              },
+              {
+                label: 'Reverse to Pending',
+                icon: RotateCcw,
+                onClick: () => handleReverseToPending(row),
+                variant: 'default',
+                disabled: submitting,
+              },
+              {
+                label: 'Archive',
+                icon: Archive,
+                onClick: () => handleArchive(row),
+                variant: 'default',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'denied':
+            menuItems.push(
+              {
+                label: 'Reverse to Pending',
+                icon: RotateCcw,
+                onClick: () => handleReverseToPending(row),
+                variant: 'default',
+                disabled: submitting,
+              },
+              {
+                label: 'Archive',
+                icon: Archive,
+                onClick: () => handleArchive(row),
+                variant: 'default',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'hired':
+            menuItems.push(
+              {
+                label: 'Archive',
+                icon: Archive,
+                onClick: () => handleArchive(row),
+                variant: 'default',
+                disabled: submitting,
+              }
+            );
+            break;
+
+          case 'archived':
+            // Only view actions for archived applications
+            break;
+
+          default:
+            // For any other status, show basic actions
+            menuItems.push(
+              {
+                label: 'Update Status',
+                icon: AlertCircle,
+                onClick: () => showToast('Please select an action', 'info'),
+                variant: 'default',
+                disabled: submitting,
+              }
+            );
+        }
 
         return <DropdownMenu items={menuItems} />;
       },
     },
   ];
 
-  // Filter applications by selected job
-  const filteredApplications = selectedJob === 'all'
-    ? applications
-    : applications.filter((app) => app._raw.job_id === selectedJob);
+  // Filter applications by selected job and status
+  const filteredApplications = applications.filter((app) => {
+    // Job filter
+    const matchesJob = selectedJob === 'all' || app._raw.job_id === selectedJob;
+
+    // Status filter (from dropdown)
+    const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
+
+    // Quick filter (from pills)
+    let matchesQuickFilter = true;
+    if (quickFilter !== 'all') {
+      const quickFilterMap: Record<string, string[]> = {
+        needsAction: ['pending'],
+        inProgress: ['under_review', 'shortlisted', 'interviewed'],
+        approved: ['approved', 'hired'],
+        denied: ['denied'],
+      };
+      matchesQuickFilter = quickFilterMap[quickFilter]?.includes(app.status) || false;
+    }
+
+    return matchesJob && matchesStatus && matchesQuickFilter;
+  });
 
   // Sort by rank (nulls last), then by match score
   const sortedApplications = [...filteredApplications].sort((a, b) => {
@@ -634,10 +1245,29 @@ export default function RankedRecordsPage() {
     return a.rank - b.rank;
   });
 
-  const pendingCount = applications.filter((a) => a.status === 'pending').length;
-  const approvedCount = applications.filter((a) => a.status === 'approved').length;
-  const deniedCount = applications.filter((a) => a.status === 'denied').length;
+  // Calculate complementary metrics (not redundant with Quick Filters)
   const rankedCount = applications.filter((a) => a.rank !== null).length;
+  const unrankedCount = applications.filter((a) => a.rank === null).length;
+
+  // Calculate average match score from ranked applications
+  const rankedApps = applications.filter((a) => a.matchScore !== null);
+  const avgMatchScore = rankedApps.length > 0
+    ? rankedApps.reduce((sum, app) => sum + (app.matchScore || 0), 0) / rankedApps.length
+    : 0;
+
+  // Quick filter counts
+  const quickFilterCounts = {
+    needsAction: applications.filter((a) => a.status === 'pending').length,
+    inProgress: applications.filter((a) => ['under_review', 'shortlisted', 'interviewed'].includes(a.status)).length,
+    approved: applications.filter((a) => ['approved', 'hired'].includes(a.status)).length,
+    denied: applications.filter((a) => a.status === 'denied').length,
+  };
+
+  // Handler for opening application details drawer
+  const handleViewApplicationDetails = (application: Application) => {
+    setSelectedApplicationForDrawer(application);
+    setShowApplicationDrawer(true);
+  };
 
   return (
     <AdminLayout
@@ -663,6 +1293,11 @@ export default function RankedRecordsPage() {
                   </option>
                 ))}
               </select>
+
+              <StatusFilter
+                value={statusFilter}
+                onChange={setStatusFilter}
+              />
 
               <Button
                 variant="primary"
@@ -704,7 +1339,7 @@ export default function RankedRecordsPage() {
             />
           </div>
 
-          {/* Summary Stats */}
+          {/* Summary Stats - Complementary Metrics (Non-Redundant with Quick Filters) */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
@@ -718,14 +1353,15 @@ export default function RankedRecordsPage() {
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-l-4 border-yellow-500">
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Pending Review</p>
-                  <p className="text-3xl font-bold text-gray-900">{pendingCount}</p>
+                  <p className="text-sm text-gray-600 mb-1">Applications Ranked</p>
+                  <p className="text-3xl font-bold text-gray-900">{rankedCount}</p>
+                  <p className="text-xs text-gray-500 mt-1">AI-ranked applicants</p>
                 </div>
-                <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <TrendingUp className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Award className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -733,26 +1369,40 @@ export default function RankedRecordsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Approved</p>
-                  <p className="text-3xl font-bold text-gray-900">{approvedCount}</p>
+                  <p className="text-sm text-gray-600 mb-1">Avg Match Score</p>
+                  <p className="text-3xl font-bold text-gray-900">{avgMatchScore.toFixed(1)}%</p>
+                  <p className="text-xs text-gray-500 mt-1">Pool quality indicator</p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
-                  <CheckCircle className="w-6 h-6 text-white" />
+                  <TrendingUp className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
 
-            <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500">
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Denied</p>
-                  <p className="text-3xl font-bold text-gray-900">{deniedCount}</p>
+                  <p className="text-sm text-gray-600 mb-1">Unranked Applicants</p>
+                  <p className="text-3xl font-bold text-gray-900">{unrankedCount}</p>
+                  <p className="text-xs text-gray-500 mt-1">Awaiting AI ranking</p>
                 </div>
-                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <XCircle className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Target className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex items-center justify-between">
+            <QuickFilters
+              activeFilter={quickFilter}
+              onChange={setQuickFilter}
+              counts={quickFilterCounts}
+            />
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-semibold text-gray-900">{filteredApplications.length}</span> of {applications.length} applications
+            </div>
           </div>
 
           {/* Applications Table */}
@@ -1121,6 +1771,181 @@ export default function RankedRecordsPage() {
         pdsData={pdsDataModal?.data}
         applicantName={pdsDataModal?.applicantName || ''}
       />
+
+      {/* NEW WORKFLOW MODALS */}
+
+      {/* Deny Modal with Reason */}
+      <DenyModal
+        isOpen={showDenyModal}
+        onClose={() => {
+          setShowDenyModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleDenyConfirmNew}
+        submitting={submitting}
+      />
+
+      {/* Shortlist Modal */}
+      <ShortlistModal
+        isOpen={showShortlistModal}
+        onClose={() => {
+          setShowShortlistModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleShortlistConfirm}
+        submitting={submitting}
+      />
+
+      {/* Schedule Interview Modal */}
+      <ScheduleInterviewModal
+        isOpen={showScheduleInterviewModal}
+        onClose={() => {
+          setShowScheduleInterviewModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleScheduleInterviewConfirm}
+        submitting={submitting}
+      />
+
+      {/* Approve Modal with Next Steps */}
+      <ApproveModal
+        isOpen={showApproveModal}
+        onClose={() => {
+          setShowApproveModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleApproveConfirmNew}
+        submitting={submitting}
+      />
+
+      {/* Mark as Hired Modal */}
+      <MarkAsHiredModal
+        isOpen={showMarkAsHiredModal}
+        onClose={() => {
+          setShowMarkAsHiredModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleMarkAsHiredConfirm}
+        submitting={submitting}
+      />
+
+      {/* Under Review Modal */}
+      <UnderReviewModal
+        isOpen={showUnderReviewModal}
+        onClose={() => {
+          setShowUnderReviewModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleMarkUnderReviewConfirm}
+        submitting={submitting}
+      />
+
+      {/* Reverse to Pending Modal */}
+      <ReverseToPendingModal
+        isOpen={showReverseToPendingModal}
+        onClose={() => {
+          setShowReverseToPendingModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleReverseToPendingConfirm}
+        submitting={submitting}
+      />
+
+      {/* Archive Modal */}
+      <ArchiveModal
+        isOpen={showArchiveModal}
+        onClose={() => {
+          setShowArchiveModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        application={selectedApplicationForAction}
+        onConfirm={handleArchiveConfirm}
+        submitting={submitting}
+      />
+
+      {/* Application Details Drawer */}
+      <ApplicationDrawer
+        isOpen={showApplicationDrawer}
+        onClose={() => {
+          setShowApplicationDrawer(false);
+          setSelectedApplicationForDrawer(null);
+        }}
+        application={selectedApplicationForDrawer}
+      />
+
+      {/* Status History Modal */}
+      {showStatusHistoryModal && selectedApplicationForHistory && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl transform transition-all">
+            {/* Blue Gradient Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <History className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Status History</h3>
+                    <p className="text-sm text-white/90">{selectedApplicationForHistory.applicantName}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowStatusHistoryModal(false);
+                    setSelectedApplicationForHistory(null);
+                  }}
+                  className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Position Info */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <Briefcase className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium">{selectedApplicationForHistory.jobTitle}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                  <Clock className="w-3 h-3" />
+                  <span>Applied on {selectedApplicationForHistory.appliedDate}</span>
+                </div>
+              </div>
+
+              {/* Status Timeline */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4 overflow-visible">
+                <StatusTimeline
+                  statusHistory={selectedApplicationForHistory.statusHistory || []}
+                  currentStatus={selectedApplicationForHistory.status}
+                />
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowStatusHistoryModal(false);
+                    setSelectedApplicationForHistory(null);
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

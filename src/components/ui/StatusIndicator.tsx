@@ -45,7 +45,7 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex items-center justify-center p-1">
         <div
           className={cn(
             'rounded-full',

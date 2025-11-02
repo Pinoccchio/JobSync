@@ -1,12 +1,22 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button, Card, Container, RefreshButton, EnhancedTable, Badge } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Briefcase, Download, Calendar, Users, GraduationCap, Megaphone, Loader2, CheckCircle2, Clock, TrendingUp, FileText } from 'lucide-react';
+import { Briefcase, Download, Calendar, Users, GraduationCap, Megaphone, Loader2, CheckCircle2, Clock, FileText, Tag, ImageIcon, Eye, Star, XCircle, AlertCircle, Archive, History, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
+import { AnnouncementViewModal } from '@/components/applicant/AnnouncementViewModal';
+import { StatusTimeline } from '@/components/hr/StatusTimeline';
+
+interface StatusHistoryItem {
+  from: string | null;
+  to: string;
+  changed_at: string;
+  changed_by?: string;
+}
 
 interface DashboardStats {
   activeJobs: number;
@@ -21,8 +31,9 @@ interface RecentApplication {
   position: string;
   type: 'Job Application' | 'Training Application';
   dateApplied: string;
-  status: 'Pending Review' | 'Approved' | 'Disapproved';
+  status: string;
   matchScore?: string;
+  statusHistory?: StatusHistoryItem[];
 }
 
 interface Announcement {
@@ -32,6 +43,12 @@ interface Announcement {
   category: string;
   image_url: string | null;
   published_at: string;
+  created_at: string;
+  profiles?: {
+    id: string;
+    full_name: string;
+    role: string;
+  };
 }
 
 export default function ApplicantDashboard() {
@@ -47,7 +64,10 @@ export default function ApplicantDashboard() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedAnnouncements, setExpandedAnnouncements] = useState<Set<string>>(new Set());
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
+  const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<RecentApplication | null>(null);
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
@@ -106,16 +126,18 @@ export default function ApplicantDashboard() {
           position: app.jobs?.title || 'Unknown Position',
           type: 'Job Application' as const,
           dateApplied: app.created_at,
-          status: app.status === 'pending' ? 'Pending Review' : app.status === 'approved' ? 'Approved' : 'Disapproved',
-          matchScore: app.match_score ? `${app.match_score}%` : 'N/A'
+          status: app.status, // Use actual status for accurate display
+          matchScore: app.match_score ? `${app.match_score}%` : 'N/A',
+          statusHistory: app.status_history || []
         })),
         ...trainingApplications.map((app: any) => ({
           id: app.id,
           position: app.training_programs?.title || 'Unknown Program',
           type: 'Training Application' as const,
           dateApplied: app.submitted_at || app.created_at,
-          status: app.status === 'pending' ? 'Pending Review' : app.status === 'approved' ? 'Approved' : 'Disapproved',
-          matchScore: 'N/A'
+          status: app.status, // Use actual status for accurate display
+          matchScore: 'N/A',
+          statusHistory: app.status_history || []
         }))
       ];
 
@@ -204,16 +226,18 @@ export default function ApplicantDashboard() {
     ).join(' ');
   };
 
-  const toggleAnnouncementExpansion = (announcementId: string) => {
-    setExpandedAnnouncements(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(announcementId)) {
-        newSet.delete(announcementId);
-      } else {
-        newSet.add(announcementId);
-      }
-      return newSet;
-    });
+  const handleViewAnnouncement = (announcement: Announcement) => {
+    setSelectedAnnouncement(announcement);
+    setShowAnnouncementModal(true);
+  };
+
+  const getCategoryBadgeColor = (category: string) => {
+    switch (category) {
+      case 'job_opening': return 'bg-blue-100 text-blue-800';
+      case 'training': return 'bg-purple-100 text-purple-800';
+      case 'notice': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   // Table columns for recent applications
@@ -239,34 +263,81 @@ export default function ApplicantDashboard() {
       header: 'Status',
       accessor: 'status' as const,
       render: (value: string) => {
-        let variant: 'success' | 'danger' | 'pending' = 'pending';
+        let variant: 'success' | 'danger' | 'pending' | 'info' | 'warning' | 'default' = 'default';
         let icon = Clock;
+        let displayText = value;
 
-        if (value === 'Approved') {
-          variant = 'success';
-          icon = CheckCircle2;
-        } else if (value === 'Disapproved') {
-          variant = 'danger';
-          icon = FileText;
+        switch (value) {
+          case 'pending':
+            variant = 'pending';
+            icon = Clock;
+            displayText = 'Pending Review';
+            break;
+          case 'under_review':
+            variant = 'info';
+            icon = Eye;
+            displayText = 'Under Review';
+            break;
+          case 'shortlisted':
+            variant = 'warning';
+            icon = Star;
+            displayText = 'Shortlisted';
+            break;
+          case 'interviewed':
+            variant = 'info';
+            icon = Calendar;
+            displayText = 'Interviewed';
+            break;
+          case 'approved':
+            variant = 'success';
+            icon = CheckCircle2;
+            displayText = 'Approved';
+            break;
+          case 'denied':
+            variant = 'danger';
+            icon = XCircle;
+            displayText = 'Not Approved';
+            break;
+          case 'hired':
+            variant = 'success';
+            icon = Briefcase;
+            displayText = 'Hired';
+            break;
+          case 'archived':
+            variant = 'default';
+            icon = Archive;
+            displayText = 'Archived';
+            break;
+          case 'withdrawn':
+            variant = 'default';
+            icon = AlertCircle;
+            displayText = 'Withdrawn';
+            break;
+          default:
+            displayText = value.charAt(0).toUpperCase() + value.slice(1);
         }
 
-        return <Badge variant={variant} icon={icon}>{value}</Badge>;
+        return <Badge variant={variant} icon={icon}>{displayText}</Badge>;
       }
     },
     {
-      header: 'Match Score',
-      accessor: 'matchScore' as const,
-      render: (value?: string) => {
-        if (!value || value === 'N/A') {
-          return <span className="text-gray-400 text-sm">N/A</span>;
-        }
-        const score = parseFloat(value);
-        const color = score >= 90 ? 'text-[#22A555]' : score >= 75 ? 'text-blue-600' : 'text-orange-600';
+      header: 'Status History',
+      accessor: 'id' as const,
+      render: (_: any, row: RecentApplication) => {
+        const hasHistory = row.statusHistory && row.statusHistory.length > 0;
         return (
-          <div className="flex items-center gap-2">
-            <TrendingUp className={`w-4 h-4 ${color}`} />
-            <span className={`font-semibold ${color}`}>{value}</span>
-          </div>
+          <Button
+            variant={hasHistory ? "info" : "default"}
+            size="sm"
+            icon={History}
+            onClick={() => {
+              setSelectedApplicationForHistory(row);
+              setShowStatusHistoryModal(true);
+            }}
+            className="text-xs whitespace-nowrap"
+          >
+            {hasHistory ? `View History (${row.statusHistory.length})` : 'View Status'}
+          </Button>
         );
       }
     },
@@ -411,93 +482,181 @@ export default function ApplicantDashboard() {
                 <p className="text-sm text-gray-500 mt-2">Check back later for updates</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {announcements.map((announcement) => {
-                  const Icon = getCategoryIcon(announcement.category);
-                  const colors = getCategoryColor(announcement.category);
-                  const isExpanded = expandedAnnouncements.has(announcement.id);
-                  const isLongDescription = announcement.description.length > 150;
-                  return (
-                    <div
-                      key={announcement.id}
-                      className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-lg border border-gray-100 transition-all duration-200 hover:border-[#22A555]/30"
-                    >
-                      <div className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                        <Icon className={`w-6 h-6 ${colors.text}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className="font-semibold text-gray-900 line-clamp-1">
-                            {announcement.title}
-                          </h3>
-                          <Badge variant="default" size="sm">
-                            {formatCategory(announcement.category)}
-                          </Badge>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {announcements.map((announcement) => (
+                  <div
+                    key={announcement.id}
+                    onClick={() => handleViewAnnouncement(announcement)}
+                    className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                  >
+                    {/* Image */}
+                    <div className="relative w-full h-40 bg-gradient-to-br from-gray-200 to-gray-300">
+                      {announcement.image_url ? (
+                        <img
+                          src={announcement.image_url}
+                          alt={announcement.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ImageIcon className="w-12 h-12 text-gray-400" />
                         </div>
-                        <p className={`text-sm text-gray-600 mb-2 ${isExpanded ? '' : 'line-clamp-3'}`}>
-                          {announcement.description}
-                        </p>
-                        {isLongDescription && (
-                          <button
-                            onClick={() => toggleAnnouncementExpansion(announcement.id)}
-                            className="text-xs text-[#22A555] hover:text-[#1a8a44] font-medium mb-2 flex items-center gap-1 transition-colors"
-                          >
-                            {isExpanded ? (
-                              <>
-                                Read less <span className="text-sm">↑</span>
-                              </>
-                            ) : (
-                              <>
-                                Read more <span className="text-sm">↓</span>
-                              </>
-                            )}
-                          </button>
-                        )}
+                      )}
+                      {/* Category Badge Overlay */}
+                      <div className="absolute top-3 right-3">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shadow-md ${getCategoryBadgeColor(announcement.category)}`}>
+                          <Tag className="w-3 h-3 inline mr-1" />
+                          {formatCategory(announcement.category)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-4 space-y-3">
+                      {/* Title */}
+                      <h3 className="font-bold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                        {announcement.title}
+                      </h3>
+
+                      {/* Description */}
+                      <p className="text-sm text-gray-600 line-clamp-3">
+                        {announcement.description}
+                      </p>
+
+                      {/* Metadata */}
+                      <div className="pt-3 border-t border-gray-100 space-y-2">
+                        {/* Published Date */}
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           <Calendar className="w-3.5 h-3.5" />
                           <span>{formatDate(announcement.published_at)}</span>
                         </div>
+
+                        {/* Creator Info */}
+                        {announcement.profiles && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                              <Users className="w-3.5 h-3.5 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-700 truncate">
+                                {announcement.profiles.full_name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {announcement.profiles.role}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* View All Button */}
+            {!loading && announcements.length > 0 && (
+              <div className="mt-6 flex justify-center">
+                <Link href="/applicant/announcements">
+                  <Button variant="primary" icon={Megaphone} size="md" className="shadow-md hover:shadow-lg transition-shadow">
+                    View All Announcements
+                  </Button>
+                </Link>
               </div>
             )}
           </Card>
 
-          {/* Quick Actions */}
-          <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Briefcase className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900 mb-3">Quick Actions</p>
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/applicant/jobs">
-                    <Button variant="success" icon={Briefcase} size="sm">
-                      Browse Jobs
-                    </Button>
-                  </Link>
-                  <Link href="/applicant/trainings">
-                    <Button variant="primary" icon={GraduationCap} size="sm">
-                      View Trainings
-                    </Button>
-                  </Link>
-                  <Link href="/applicant/applications">
-                    <Button variant="secondary" icon={FileText} size="sm">
-                      My Applications
-                    </Button>
-                  </Link>
-                  <Link href="/applicant/pds">
-                    <Button variant="outline" icon={Download} size="sm">
-                      Download PDS Form
-                    </Button>
-                  </Link>
+          {/* Announcement Preview Modal */}
+          <AnnouncementViewModal
+            isOpen={showAnnouncementModal}
+            onClose={() => setShowAnnouncementModal(false)}
+            announcement={selectedAnnouncement}
+          />
+
+          {/* Status History Modal */}
+          {showStatusHistoryModal && selectedApplicationForHistory && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+                {/* Modal Header */}
+                <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 flex items-center justify-between z-10 shadow-lg rounded-t-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                      <History className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">Application Status History</h3>
+                      <p className="text-sm text-blue-100">Track your application progress</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowStatusHistoryModal(false);
+                      setSelectedApplicationForHistory(null);
+                    }}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                  {/* Application Info */}
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Briefcase className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 text-lg">
+                          {selectedApplicationForHistory.position}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {selectedApplicationForHistory.type}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Applied on: {new Date(selectedApplicationForHistory.dateApplied).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Timeline */}
+                  {selectedApplicationForHistory.statusHistory && selectedApplicationForHistory.statusHistory.length > 0 ? (
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 overflow-visible">
+                      <StatusTimeline
+                        statusHistory={selectedApplicationForHistory.statusHistory}
+                        currentStatus={selectedApplicationForHistory.status}
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                      <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <p className="text-gray-600 font-medium">No status changes yet</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Your application is currently in <span className="font-semibold">{selectedApplicationForHistory.status}</span> status
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end rounded-b-xl">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowStatusHistoryModal(false);
+                      setSelectedApplicationForHistory(null);
+                    }}
+                  >
+                    Close
+                  </Button>
                 </div>
               </div>
             </div>
-          </Card>
+          )}
         </div>
       </Container>
     </AdminLayout>

@@ -9,8 +9,9 @@ import { formatDateOnly } from '@/lib/utils/dateFormatters';
  * @param pdsData - The PDS data to export
  * @param includeSignature - Whether to include the digital signature image (default: false)
  * @param returnDoc - Whether to return the document instead of auto-downloading (default: false)
+ * @param useCurrentDate - Whether to use current date instead of original PDS date (default: false)
  */
-export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: boolean = false, returnDoc: boolean = false): Promise<jsPDF | void> {
+export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature: boolean = false, returnDoc: boolean = false, useCurrentDate: boolean = false): Promise<jsPDF | void> {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 15;
@@ -671,8 +672,18 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
     doc.text('Signature', 14, labelY);
 
     // Right side - Date (ALWAYS same structure for consistency)
+    // Use current date in Philippine timezone if useCurrentDate is true, otherwise use original PDS date
+    const dateToShow = useCurrentDate
+      ? new Date().toLocaleDateString('en-CA', {
+          timeZone: 'Asia/Manila',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }) // Returns YYYY-MM-DD format in Philippine timezone
+      : pdsData.otherInformation.declaration.dateAccomplished;
+
     doc.text('______________________________', pageWidth - 70, underlineY);
-    doc.text(`Date: ${formatDateOnly(pdsData.otherInformation.declaration.dateAccomplished)}`, pageWidth - 70, labelY);
+    doc.text(`Date: ${formatDateOnly(dateToShow)}`, pageWidth - 70, labelY);
 
     // Move position down after signature section
     yPosition = labelY + 5;

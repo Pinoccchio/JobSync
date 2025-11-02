@@ -61,14 +61,15 @@ export async function GET(
 
     const applicantName = applicantProfile?.full_name || 'Unknown Applicant';
 
-    // Read includeSignature from query parameters
+    // Read includeSignature and useCurrentDate from query parameters
     const includeSignature = request.nextUrl.searchParams.get('includeSignature') === 'true';
+    const useCurrentDate = request.nextUrl.searchParams.get('useCurrentDate') === 'true';
 
     // Transform database format (snake_case) to application format (camelCase)
     const transformedPDSData = transformPDSFromDatabase(pdsData);
 
     // Generate PDF using pdfGenerator (returnDoc = true to get the jsPDF object)
-    const doc = await generatePDSPDF(transformedPDSData, includeSignature, true);
+    const doc = await generatePDSPDF(transformedPDSData, includeSignature, true, useCurrentDate);
 
     if (!doc) {
       return NextResponse.json(

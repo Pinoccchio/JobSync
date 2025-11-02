@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         applicant_profile_id,
         pds_id,
         status,
+        status_history,
         rank,
         match_score,
         education_score,

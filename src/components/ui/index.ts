@@ -19,3 +19,5 @@ export { StatusIndicator } from './StatusIndicator';
 export { EventIcon } from './EventIcon';
 export { EventFilter, EventFilterGroup } from './EventFilter';
 export { DropdownMenu, type DropdownMenuItem } from './DropdownMenu';
+export { StatusFilter } from './StatusFilter';
+export { QuickFilters } from './QuickFilters';

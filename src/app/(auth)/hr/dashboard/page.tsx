@@ -4,15 +4,18 @@ import { AdminLayout } from '@/components/layout';
 import { DashboardTile, Card, Button, Container, RefreshButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2, Activity } from 'lucide-react';
+import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2, Activity, Star, Archive } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
+import { MonthlyApplicantsChart, JobMatchedChart } from '@/components/charts';
+import { generateDashboardReport } from '@/lib/utils/reportGenerator';
 
 interface DashboardStats {
   totalScanned: number;
   pendingReview: number;
-  noMatches: number;
-  approved: number;
-  rejected: number;
+  inProgress: number;
+  approvedHired: number;
+  deniedWithdrawn: number;
+  archived: number;
   activeJobs: number;
 }
 
@@ -22,12 +25,14 @@ export default function HRDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalScanned: 0,
     pendingReview: 0,
-    noMatches: 0,
-    approved: 0,
-    rejected: 0,
+    inProgress: 0,
+    approvedHired: 0,
+    deniedWithdrawn: 0,
+    archived: 0,
     activeJobs: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
@@ -52,23 +57,35 @@ export default function HRDashboard() {
         .from('applications')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch pending applications
+      // Fetch pending applications (only pending status)
       const { count: pendingReview } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      // Fetch approved applications
-      const { count: approved } = await supabase
+      // Fetch in progress applications (under_review, shortlisted, interviewed)
+      const { count: inProgress } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved');
+        .in('status', ['under_review', 'shortlisted', 'interviewed']);
 
-      // Fetch rejected applications
-      const { count: rejected } = await supabase
+      // Fetch approved/hired applications
+      const { count: approvedHired } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'denied');
+        .in('status', ['approved', 'hired']);
+
+      // Fetch denied/withdrawn applications
+      const { count: deniedWithdrawn } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['denied', 'withdrawn']);
+
+      // Fetch archived applications
+      const { count: archived } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'archived');
 
       // Fetch active job postings
       const { count: activeJobs } = await supabase
@@ -76,28 +93,15 @@ export default function HRDashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
 
-      // For "no matches", we'd need more complex logic
-      // For now, using jobs with no applications or low match scores
-      const { data: jobsWithApps } = await supabase
-        .from('jobs')
-        .select(`
-          id,
-          applications!applications_job_id_fkey(count)
-        `)
-        .eq('status', 'active');
-
-      const noMatches = jobsWithApps?.filter(job =>
-        !job.applications || job.applications.length === 0
-      ).length || 0;
-
       // Only update state if component is still mounted
       if (isMounted.current) {
         setStats({
           totalScanned: totalScanned || 0,
           pendingReview: pendingReview || 0,
-          noMatches: noMatches,
-          approved: approved || 0,
-          rejected: rejected || 0,
+          inProgress: inProgress || 0,
+          approvedHired: approvedHired || 0,
+          deniedWithdrawn: deniedWithdrawn || 0,
+          archived: archived || 0,
           activeJobs: activeJobs || 0,
         });
       }
@@ -122,42 +126,61 @@ export default function HRDashboard() {
     }
   }, [authLoading, isAuthenticated, fetchDashboardStats]); // All dependencies to prevent race condition
 
+  const handleGenerateReport = async () => {
+    setGeneratingReport(true);
+    try {
+      await generateDashboardReport(stats);
+      showToast('Report generated successfully! Check your downloads folder.', 'success');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      showToast('Failed to generate report. Please try again.', 'error');
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const tiles = [
     {
-      title: 'Total PDS Scanned',
+      title: 'Total Applications',
       value: loading ? '...' : stats.totalScanned.toString(),
       icon: FileText,
       color: 'from-blue-500 to-blue-600'
     },
     {
-      title: 'Number of PDS Pending Review',
+      title: 'Pending Review',
       value: loading ? '...' : stats.pendingReview.toString(),
       icon: Clock,
       color: 'from-orange-500 to-orange-600'
     },
     {
-      title: 'Jobs with No Qualified Matches',
-      value: loading ? '...' : stats.noMatches.toString(),
-      icon: AlertCircle,
-      color: 'from-red-500 to-red-600'
+      title: 'In Progress',
+      value: loading ? '...' : stats.inProgress.toString(),
+      icon: Star,
+      color: 'from-purple-500 to-purple-600'
     },
     {
-      title: 'Total Approved Applications',
-      value: loading ? '...' : stats.approved.toString(),
+      title: 'Approved / Hired',
+      value: loading ? '...' : stats.approvedHired.toString(),
       icon: CheckCircle2,
       color: 'from-green-500 to-green-600'
     },
     {
-      title: 'Total Rejected Applications',
-      value: loading ? '...' : stats.rejected.toString(),
+      title: 'Denied / Withdrawn',
+      value: loading ? '...' : stats.deniedWithdrawn.toString(),
       icon: XCircle,
+      color: 'from-red-500 to-red-600'
+    },
+    {
+      title: 'Archived',
+      value: loading ? '...' : stats.archived.toString(),
+      icon: Archive,
       color: 'from-gray-500 to-gray-600'
     },
     {
       title: 'Active Job Postings',
       value: loading ? '...' : stats.activeJobs.toString(),
       icon: Briefcase,
-      color: 'from-purple-500 to-purple-600'
+      color: 'from-teal-500 to-teal-600'
     },
   ];
 
@@ -179,30 +202,40 @@ export default function HRDashboard() {
             />
             <Button
               variant="success"
-              icon={Download}
-              onClick={() => showToast('Generate report feature coming soon', 'info')}
-              disabled={loading}
+              icon={generatingReport ? Loader2 : Download}
+              onClick={handleGenerateReport}
+              disabled={loading || generatingReport}
+              className={generatingReport ? 'opacity-75' : ''}
             >
-              Generate Report
+              {generatingReport ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Generating...
+                </>
+              ) : (
+                'Generate Report'
+              )}
             </Button>
           </div>
 
           {/* Dashboard Tiles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {tiles.map((tile, index) => {
               const Icon = tile.icon;
               const bgGradient = tile.color.includes('blue') ? 'from-blue-50 to-blue-100 border-blue-500' :
                                tile.color.includes('orange') ? 'from-orange-50 to-orange-100 border-orange-500' :
-                               tile.color.includes('red') ? 'from-red-50 to-red-100 border-red-500' :
+                               tile.color.includes('purple') ? 'from-purple-50 to-purple-100 border-purple-500' :
                                tile.color.includes('green') ? 'from-green-50 to-green-100 border-green-500' :
+                               tile.color.includes('red') ? 'from-red-50 to-red-100 border-red-500' :
                                tile.color.includes('gray') ? 'from-gray-50 to-gray-100 border-gray-500' :
-                               'from-purple-50 to-purple-100 border-purple-500';
+                               'from-teal-50 to-teal-100 border-teal-500';
               const iconBg = tile.color.includes('blue') ? 'bg-blue-500' :
                             tile.color.includes('orange') ? 'bg-orange-500' :
-                            tile.color.includes('red') ? 'bg-red-500' :
+                            tile.color.includes('purple') ? 'bg-purple-500' :
                             tile.color.includes('green') ? 'bg-[#22A555]' :
+                            tile.color.includes('red') ? 'bg-red-500' :
                             tile.color.includes('gray') ? 'bg-gray-500' :
-                            'bg-purple-500';
+                            'bg-teal-500';
 
               return (
                 <Card key={index} variant="flat" className={`bg-gradient-to-br ${bgGradient} border-l-4 hover:shadow-xl transition-all duration-300`}>
@@ -230,38 +263,12 @@ export default function HRDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Monthly Applicants Chart */}
             <Card title="MONTHLY APPLICANTS" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
-              <div className="h-64 flex items-center justify-center bg-gradient-to-br from-blue-50 to-white rounded-lg p-4 border border-gray-100">
-                {loading ? (
-                  <div className="text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-[#22A555] mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">Loading chart data...</p>
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-500">
-                    <Activity className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-sm font-medium text-gray-700">Chart visualization coming soon</p>
-                    <p className="text-xs mt-2 text-gray-500">Will display monthly application trends</p>
-                  </div>
-                )}
-              </div>
+              <MonthlyApplicantsChart />
             </Card>
 
-            {/* Job Matched Chart */}
-            <Card title="JOB MATCHED" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
-              <div className="h-64 flex items-center justify-center bg-gradient-to-br from-green-50 to-white rounded-lg p-4 border border-gray-100">
-                {loading ? (
-                  <div className="text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-[#22A555] mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">Loading chart data...</p>
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-500">
-                    <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-sm font-medium text-gray-700">Chart visualization coming soon</p>
-                    <p className="text-xs mt-2 text-gray-500">Will display application distribution by job</p>
-                  </div>
-                )}
-              </div>
+            {/* Applications by Job Chart */}
+            <Card title="APPLICATIONS BY JOB" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
+              <JobMatchedChart />
             </Card>
           </div>
         </div>

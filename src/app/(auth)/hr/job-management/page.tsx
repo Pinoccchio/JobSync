@@ -67,7 +67,10 @@ export default function JobManagementPage() {
           degree: job.degree_requirement,
           eligibilities: job.eligibilities.join(', '),
           skills: job.skills.join(', '),
-          experience: job.experience || `${job.min_years_experience}-${job.max_years_experience} years`,
+          experience: job.experience ||
+            (job.min_years_experience && job.max_years_experience
+              ? `${job.min_years_experience}-${job.max_years_experience} years`
+              : 'Not specified'),
           status: job.status === 'active' ? 'Active' : job.status === 'hidden' ? 'Hidden' : 'Archived',
           _raw: job
         })));
