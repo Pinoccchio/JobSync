@@ -40,6 +40,7 @@ export default function JobManagementPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [applicationCount, setApplicationCount] = useState<number>(0);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden' | 'archived'>('all');
+  const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState({
     position: '',
@@ -382,6 +383,19 @@ Employment Type: ${formData.employment_type}
     }
   };
 
+  // Handle Toggle Skills Expansion
+  const toggleSkillsExpansion = (jobId: string) => {
+    setExpandedSkillsCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
   const columns = [
     {
       header: 'Position',
@@ -406,38 +420,64 @@ Employment Type: ${formData.employment_type}
     {
       header: 'Eligibilities',
       accessor: 'eligibilities' as const,
-      render: (value: string) => (
-        <div className="flex flex-wrap gap-1">
-          {value.split(',').slice(0, 2).map((elig, idx) => (
-            <Badge key={idx} variant="info" className="text-xs">
-              {elig.trim()}
-            </Badge>
-          ))}
-          {value.split(',').length > 2 && (
-            <Badge variant="default" className="text-xs">
-              +{value.split(',').length - 2}
-            </Badge>
-          )}
-        </div>
-      )
+      render: (value: string, row: Job) => {
+        const isExpanded = expandedSkillsCards.has(row.id);
+        const eligArray = value.split(',').map(e => e.trim());
+        const totalCount = eligArray.length;
+        const showAll = isExpanded || totalCount <= 2;
+        const eligsToShow = showAll ? eligArray : eligArray.slice(0, 2);
+        const shownCount = eligsToShow.length;
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {eligsToShow.map((elig, idx) => (
+              <Badge key={idx} variant="info" className="text-xs">
+                {elig}
+              </Badge>
+            ))}
+            {totalCount > 2 && (
+              <button
+                onClick={() => toggleSkillsExpansion(row.id)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
+                title={isExpanded ? "Click to show less" : "Click to view all eligibilities"}
+              >
+                {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
+              </button>
+            )}
+          </div>
+        );
+      }
     },
     {
       header: 'Skills',
       accessor: 'skills' as const,
-      render: (value: string) => (
-        <div className="flex flex-wrap gap-1">
-          {value.split(',').slice(0, 2).map((skill, idx) => (
-            <Badge key={idx} variant="default" className="text-xs">
-              {skill.trim()}
-            </Badge>
-          ))}
-          {value.split(',').length > 2 && (
-            <Badge variant="default" className="text-xs">
-              +{value.split(',').length - 2}
-            </Badge>
-          )}
-        </div>
-      )
+      render: (value: string, row: Job) => {
+        const isExpanded = expandedSkillsCards.has(row.id);
+        const skillsArray = value.split(',').map(s => s.trim());
+        const totalCount = skillsArray.length;
+        const showAll = isExpanded || totalCount <= 2;
+        const skillsToShow = showAll ? skillsArray : skillsArray.slice(0, 2);
+        const shownCount = skillsToShow.length;
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {skillsToShow.map((skill, idx) => (
+              <Badge key={idx} variant="default" className="text-xs">
+                {skill}
+              </Badge>
+            ))}
+            {totalCount > 2 && (
+              <button
+                onClick={() => toggleSkillsExpansion(row.id)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
+                title={isExpanded ? "Click to show less" : "Click to view all skills"}
+              >
+                {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
+              </button>
+            )}
+          </div>
+        );
+      }
     },
     { header: 'Experience', accessor: 'experience' as const },
     {

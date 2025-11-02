@@ -240,13 +240,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Check for duplicate application (exclude withdrawn applications)
+    // 6. Check for duplicate application (exclude withdrawn and denied applications)
     const { data: existingApplication, error: duplicateError } = await supabase
       .from('applications')
       .select('id, status')
       .eq('job_id', job_id)
       .eq('applicant_id', user.id)
-      .neq('status', 'withdrawn')  // Allow reapplication after withdrawal
+      .not('status', 'in', '(withdrawn,denied)')  // Allow reapplication after withdrawal or denial
       .maybeSingle();  // Returns null if no active application exists
 
     if (existingApplication) {

@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, EnhancedTable, Container, Badge, RefreshButton, Button, ModernModal } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
-import { FileText, CheckCircle, XCircle, Clock, Info, Loader2, Star, Calendar, Briefcase, AlertCircle, Eye, ArrowRight, History, X } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, Info, Loader2, Star, Calendar, Briefcase, AlertCircle, Eye, ArrowRight, History, X, GraduationCap, Search, Download, Phone, Mail, Archive } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
@@ -121,6 +121,9 @@ export default function MyApplicationsPage() {
   //   showToast('Application status updated', 'info');
   //   fetchApplications();
   // });
+
+  // Icon constant for withdraw modal (prevents React static flag error)
+  const WithdrawIcon = AlertCircle;
 
   // Handle Withdraw Application
   const handleWithdraw = (application: Application) => {
@@ -320,38 +323,140 @@ export default function MyApplicationsPage() {
 
           case 'approved':
             return (
-              <div className="bg-green-50 border border-green-200 p-2 rounded text-xs">
-                <p className="font-semibold text-green-800">Application Approved!</p>
-                {row.nextSteps && (
-                  <p className="text-green-700 mt-1">{row.nextSteps}</p>
-                )}
+              <div className="space-y-3">
+                {/* Success Message */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-5 h-5 text-green-700" />
+                    <p className="font-bold text-green-900 text-base">Application Approved! ✅</p>
+                  </div>
+                  <p className="text-green-700 text-sm">
+                    Congratulations! Your application has been approved and you are moving forward in the hiring process.
+                  </p>
+                  {row.nextSteps && (
+                    <p className="text-green-800 text-sm mt-2 font-medium">{row.nextSteps}</p>
+                  )}
+                </div>
+
+                {/* Timeline & Expectations */}
+                <div className="bg-white border border-gray-200 p-3 rounded-lg">
+                  <p className="font-semibold text-gray-800 text-sm mb-2">⏰ What Happens Next:</p>
+                  <ul className="text-gray-700 text-xs space-y-1 list-disc list-inside">
+                    <li>HR will send you a formal job offer within 5-7 business days</li>
+                    <li>The offer will include salary, benefits, and start date details</li>
+                    <li>You will have time to review and accept the offer</li>
+                  </ul>
+                </div>
+
+                {/* Important Notice */}
+                <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+                  <p className="font-semibold text-yellow-800 text-sm mb-1">📌 Important Notice:</p>
+                  <p className="text-yellow-700 text-xs">
+                    Your application is now locked and can no longer be withdrawn. Please wait for the official job offer.
+                  </p>
+                </div>
+
+                {/* HR Contact */}
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                  <p className="font-semibold text-blue-800 text-sm mb-2">💬 Have Questions?</p>
+                  <div className="space-y-1 text-xs text-blue-700">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3 h-3" />
+                      <span>hr@asuncion.gov.ph</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3 h-3" />
+                      <span>(043) 123-4567</span>
+                    </div>
+                    <p className="text-xs opacity-75 mt-1">Office Hours: Mon-Fri, 8AM-5PM</p>
+                  </div>
+                </div>
               </div>
             );
 
           case 'denied':
             return (
               <div className="flex flex-col gap-2">
+                {/* Denial Reason */}
                 {row.denialReason && (
-                  <div className="bg-red-50 border border-red-200 p-2 rounded text-xs">
-                    <p className="font-semibold text-red-800">Reason:</p>
-                    <p className="text-red-700">{row.denialReason}</p>
+                  <div className="bg-red-50 border border-red-200 p-3 rounded">
+                    <p className="font-semibold text-red-800 text-sm">Reason:</p>
+                    <p className="text-red-700 text-sm mt-1">{row.denialReason}</p>
                   </div>
                 )}
-                <Link href="/applicant/jobs">
-                  <Button variant="primary" size="sm" icon={ArrowRight} className="text-xs w-full">
-                    View Other Jobs
-                  </Button>
-                </Link>
+
+                {/* Improvement Suggestions */}
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                  <p className="font-semibold text-blue-800 text-sm">💡 Ways to Improve:</p>
+                  <ul className="text-blue-700 text-xs mt-2 space-y-1 list-disc list-inside">
+                    <li>Complete relevant training programs</li>
+                    <li>Gain more work experience</li>
+                    <li>Obtain required certifications</li>
+                  </ul>
+                </div>
+
+                {/* Note about reapplication */}
+                <div className="bg-yellow-50 border border-yellow-200 p-2 rounded">
+                  <p className="text-yellow-800 text-xs">
+                    ℹ️ You may reapply to this position after improving your qualifications.
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Link href="/applicant/trainings" className="flex-1">
+                    <Button variant="info" size="sm" icon={GraduationCap} className="w-full text-xs">
+                      Training Programs
+                    </Button>
+                  </Link>
+                  <Link href="/applicant/jobs" className="flex-1">
+                    <Button variant="secondary" size="sm" icon={Search} className="w-full text-xs">
+                      Other Jobs
+                    </Button>
+                  </Link>
+                </div>
               </div>
             );
 
           case 'hired':
             return (
-              <div className="bg-teal-50 border border-teal-200 p-2 rounded text-xs">
-                <p className="font-semibold text-teal-800">Welcome to the Team! 🎉</p>
-                {row.nextSteps && (
-                  <p className="text-teal-700 mt-1">{row.nextSteps}</p>
-                )}
+              <div className="space-y-3">
+                {/* Celebration Message */}
+                <div className="bg-gradient-to-r from-teal-50 to-green-50 border-2 border-teal-300 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Briefcase className="w-5 h-5 text-teal-700" />
+                    <p className="font-bold text-teal-900 text-base">Welcome to the Team! 🎉</p>
+                  </div>
+                  {row.nextSteps && (
+                    <p className="text-teal-700 text-sm mt-2">{row.nextSteps}</p>
+                  )}
+                </div>
+
+                {/* Next Steps Info */}
+                <div className="bg-white border border-gray-200 p-3 rounded-lg">
+                  <p className="font-semibold text-gray-800 text-sm mb-2">📋 What's Next:</p>
+                  <ul className="text-gray-700 text-xs space-y-1 list-disc list-inside">
+                    <li>HR will contact you with onboarding details</li>
+                    <li>Prepare required documents (ID, certificates)</li>
+                    <li>Attend orientation on your start date</li>
+                  </ul>
+                </div>
+
+                {/* HR Contact */}
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                  <p className="font-semibold text-blue-800 text-sm mb-2">📞 Need Help?</p>
+                  <div className="space-y-1 text-xs text-blue-700">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3 h-3" />
+                      <span>hr@asuncion.gov.ph</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3 h-3" />
+                      <span>(043) 123-4567</span>
+                    </div>
+                    <p className="text-xs opacity-75 mt-1">Office Hours: Mon-Fri, 8AM-5PM</p>
+                  </div>
+                </div>
               </div>
             );
 
@@ -374,7 +479,32 @@ export default function MyApplicationsPage() {
 
           case 'archived':
             return (
-              <p className="text-xs text-gray-500">Application archived</p>
+              <div className="space-y-2">
+                {/* Explanation */}
+                <div className="bg-gray-50 border border-gray-200 p-3 rounded">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Archive className="w-4 h-4 text-gray-600" />
+                    <p className="font-semibold text-gray-800 text-sm">Application Archived</p>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    This application was archived because the job posting has been closed or filled.
+                  </p>
+                </div>
+
+                {/* Info Note */}
+                <div className="bg-blue-50 border border-blue-200 p-2 rounded">
+                  <p className="text-blue-800 text-xs">
+                    ℹ️ Your application data is preserved for record-keeping purposes.
+                  </p>
+                </div>
+
+                {/* Action Button */}
+                <Link href="/applicant/jobs">
+                  <Button variant="info" size="sm" icon={Search} className="w-full text-xs">
+                    Find Similar Jobs
+                  </Button>
+                </Link>
+              </div>
             );
 
           default:
@@ -531,7 +661,7 @@ export default function MyApplicationsPage() {
         title="Withdraw Application"
         subtitle="This action cannot be undone"
         colorVariant="orange"
-        icon={AlertCircle}
+        icon={WithdrawIcon}
         size="md"
       >
         {applicationToWithdraw && (
@@ -598,7 +728,7 @@ export default function MyApplicationsPage() {
               </Button>
               <Button
                 variant="danger"
-                icon={AlertCircle}
+                icon={WithdrawIcon}
                 loading={withdrawing}
                 onClick={handleWithdrawConfirm}
                 className="flex-1"

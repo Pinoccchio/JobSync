@@ -644,49 +644,155 @@ export default function AuthenticatedJobsPage() {
                         </div>
 
                         {/* Application Status & Apply Button */}
-                        {job.hasApplied && job.userApplication ? (
-                          <div className="space-y-3">
-                            <ApplicationStatusBadge
-                              status={job.userApplication.status}
-                              createdAt={job.userApplication.created_at}
-                              className="w-full justify-center py-2"
-                            />
-                            <Button
-                              variant="info"
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-shadow"
-                              size="lg"
-                              icon={History}
-                              onClick={() => handleViewStatusHistory(job.userApplication!)}
-                            >
-                              View Status History
-                            </Button>
-                          </div>
-                        ) : job.userApplication?.status === 'withdrawn' ? (
-                          <div className="space-y-3">
-                            <ApplicationStatusBadge
-                              status="withdrawn"
-                              createdAt={job.userApplication.created_at}
-                              className="w-full justify-center py-2"
-                            />
-                            <Button
-                              variant="success"
-                              className="w-full shadow-md hover:shadow-lg transition-shadow"
-                              size="lg"
-                              icon={CheckCircle2}
-                              onClick={() => handleApplyClick(job)}
-                            >
-                              Reapply Now
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              className="w-full"
-                              size="sm"
-                              icon={History}
-                              onClick={() => handleViewStatusHistory(job.userApplication!)}
-                            >
-                              View Status History
-                            </Button>
-                          </div>
+                        {job.userApplication ? (
+                          (() => {
+                            const status = job.userApplication.status;
+
+                            // WITHDRAWN: Allow reapply immediately
+                            if (status === 'withdrawn') {
+                              return (
+                                <div className="space-y-3">
+                                  <ApplicationStatusBadge
+                                    status="withdrawn"
+                                    createdAt={job.userApplication.created_at}
+                                    className="w-full justify-center py-2"
+                                  />
+                                  <Button
+                                    variant="success"
+                                    className="w-full shadow-md hover:shadow-lg transition-shadow"
+                                    size="lg"
+                                    icon={CheckCircle2}
+                                    onClick={() => handleApplyClick(job)}
+                                  >
+                                    Reapply Now
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    className="w-full"
+                                    size="sm"
+                                    icon={History}
+                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
+                                  >
+                                    View Status History
+                                  </Button>
+                                </div>
+                              );
+                            }
+
+                            // DENIED: Allow reapply immediately
+                            if (status === 'denied') {
+                              return (
+                                <div className="space-y-3">
+                                  <ApplicationStatusBadge
+                                    status="denied"
+                                    createdAt={job.userApplication.created_at}
+                                    className="w-full justify-center py-2"
+                                  />
+                                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <p className="text-xs text-yellow-800 text-center">
+                                      💡 Consider improving your qualifications before reapplying
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="success"
+                                    className="w-full shadow-md hover:shadow-lg transition-shadow"
+                                    size="lg"
+                                    icon={CheckCircle2}
+                                    onClick={() => handleApplyClick(job)}
+                                  >
+                                    Reapply Now
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    className="w-full"
+                                    size="sm"
+                                    icon={History}
+                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
+                                  >
+                                    View Status History
+                                  </Button>
+                                </div>
+                              );
+                            }
+
+                            // HIRED: Show celebration + onboarding link
+                            if (status === 'hired') {
+                              return (
+                                <div className="space-y-3">
+                                  <ApplicationStatusBadge
+                                    status="hired"
+                                    createdAt={job.userApplication.created_at}
+                                    className="w-full justify-center py-2"
+                                  />
+                                  <div className="bg-gradient-to-r from-teal-50 to-green-50 border-2 border-teal-300 rounded-lg p-3">
+                                    <p className="text-sm font-semibold text-teal-900 text-center">
+                                      🎉 Congratulations! You've been hired!
+                                    </p>
+                                    <p className="text-xs text-teal-700 text-center mt-1">
+                                      Check your applications page for next steps
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="info"
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-shadow"
+                                    size="lg"
+                                    icon={History}
+                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
+                                  >
+                                    View Application Details
+                                  </Button>
+                                </div>
+                              );
+                            }
+
+                            // ARCHIVED: Show explanation + browse jobs
+                            if (status === 'archived') {
+                              return (
+                                <div className="space-y-3">
+                                  <ApplicationStatusBadge
+                                    status="archived"
+                                    createdAt={job.userApplication.created_at}
+                                    className="w-full justify-center py-2"
+                                  />
+                                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                    <p className="text-xs text-gray-700 text-center">
+                                      This job posting has been closed. Your application has been archived.
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="secondary"
+                                    className="w-full"
+                                    size="sm"
+                                    icon={History}
+                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
+                                  >
+                                    View Status History
+                                  </Button>
+                                </div>
+                              );
+                            }
+
+                            // ACTIVE STATUSES (pending, under_review, shortlisted, interviewed, approved):
+                            // Keep as view-only since these are in active hiring pipeline
+                            return (
+                              <div className="space-y-3">
+                                <ApplicationStatusBadge
+                                  status={status}
+                                  createdAt={job.userApplication.created_at}
+                                  className="w-full justify-center py-2"
+                                />
+                                <Button
+                                  variant="info"
+                                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-shadow"
+                                  size="lg"
+                                  icon={History}
+                                  onClick={() => handleViewStatusHistory(job.userApplication!)}
+                                >
+                                  View Status History
+                                </Button>
+                              </div>
+                            );
+                          })()
                         ) : (
                           <Button
                             variant="success"
