@@ -47,6 +47,7 @@ export default function ApplicantDashboard() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedAnnouncements, setExpandedAnnouncements] = useState<Set<string>>(new Set());
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
@@ -201,6 +202,18 @@ export default function ApplicantDashboard() {
     return category.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  const toggleAnnouncementExpansion = (announcementId: string) => {
+    setExpandedAnnouncements(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(announcementId)) {
+        newSet.delete(announcementId);
+      } else {
+        newSet.add(announcementId);
+      }
+      return newSet;
+    });
   };
 
   // Table columns for recent applications
@@ -402,10 +415,12 @@ export default function ApplicantDashboard() {
                 {announcements.map((announcement) => {
                   const Icon = getCategoryIcon(announcement.category);
                   const colors = getCategoryColor(announcement.category);
+                  const isExpanded = expandedAnnouncements.has(announcement.id);
+                  const isLongDescription = announcement.description.length > 150;
                   return (
                     <div
                       key={announcement.id}
-                      className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-lg border border-gray-100 transition-all duration-200 cursor-pointer hover:border-[#22A555]/30"
+                      className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-lg border border-gray-100 transition-all duration-200 hover:border-[#22A555]/30"
                     >
                       <div className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
                         <Icon className={`w-6 h-6 ${colors.text}`} />
@@ -419,9 +434,25 @@ export default function ApplicantDashboard() {
                             {formatCategory(announcement.category)}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                        <p className={`text-sm text-gray-600 mb-2 ${isExpanded ? '' : 'line-clamp-3'}`}>
                           {announcement.description}
                         </p>
+                        {isLongDescription && (
+                          <button
+                            onClick={() => toggleAnnouncementExpansion(announcement.id)}
+                            className="text-xs text-[#22A555] hover:text-[#1a8a44] font-medium mb-2 flex items-center gap-1 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <>
+                                Read less <span className="text-sm">↑</span>
+                              </>
+                            ) : (
+                              <>
+                                Read more <span className="text-sm">↓</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           <Calendar className="w-3.5 h-3.5" />
                           <span>{formatDate(announcement.published_at)}</span>
@@ -458,9 +489,11 @@ export default function ApplicantDashboard() {
                       My Applications
                     </Button>
                   </Link>
-                  <Button variant="outline" icon={Download} size="sm">
-                    Download PDS Form
-                  </Button>
+                  <Link href="/applicant/pds">
+                    <Button variant="outline" icon={Download} size="sm">
+                      Download PDS Form
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>

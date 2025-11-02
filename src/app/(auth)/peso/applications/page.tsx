@@ -519,7 +519,7 @@ export default function PESOApplicationsPage() {
                   <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
-                  The applicant will receive a notification about the approval.
+                  The applicant will receive an in-app notification about the approval. They will see it in their notification bell icon.
                 </p>
               </div>
 
@@ -566,7 +566,7 @@ export default function PESOApplicationsPage() {
                   <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
-                  The applicant will receive a notification about the denial.
+                  The applicant will receive an in-app notification about the denial. They will see it in their notification bell icon.
                 </p>
               </div>
 

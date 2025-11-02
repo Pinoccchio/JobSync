@@ -674,6 +674,28 @@ export default function RankedRecordsPage() {
               >
                 {isRanking ? 'Ranking with AI...' : 'Rank Applicants'}
               </Button>
+
+              <Button
+                variant="success"
+                icon={Download}
+                onClick={() => {
+                  // Build export URL with filters
+                  let exportUrl = '/api/applications/export';
+                  const params = new URLSearchParams();
+                  if (selectedJob !== 'all') {
+                    params.append('job_id', selectedJob);
+                  }
+                  if (params.toString()) {
+                    exportUrl += `?${params.toString()}`;
+                  }
+                  // Trigger download
+                  window.location.href = exportUrl;
+                  showToast('Exporting applications to Excel...', 'success');
+                }}
+                className="whitespace-nowrap"
+              >
+                Export to Excel
+              </Button>
             </div>
             <RefreshButton
               onRefresh={fetchApplications}
@@ -908,7 +930,7 @@ export default function RankedRecordsPage() {
                   <div>
                     <p className="font-semibold text-green-800 mb-1">Approve Application</p>
                     <p className="text-sm text-green-700">
-                      This applicant will be notified via email about their application approval.
+                      This applicant will be notified in-app about their application approval. They will see the notification in their dashboard bell icon.
                     </p>
                   </div>
                 </div>
@@ -1015,7 +1037,7 @@ export default function RankedRecordsPage() {
                   <div>
                     <p className="font-semibold text-red-800 mb-1">Deny Application</p>
                     <p className="text-sm text-red-700">
-                      This applicant will be notified that their application has been denied. This action can be reversed later if needed.
+                      This applicant will be notified in-app that their application has been denied. They will see the notification in their dashboard bell icon. This action can be reversed later if needed.
                     </p>
                   </div>
                 </div>
