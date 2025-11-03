@@ -240,23 +240,26 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
   doc.text(`held from ${startDate} to ${endDate}`, centerX, 125, { align: 'center' });
   doc.text(`with a duration of ${data.program.duration}`, centerX, 131, { align: 'center' });
 
-  // Skills covered (if available)
-  let yPos = 137;
+  // ===== SKILLS SECTION (FIXED POSITIONS) =====
+  const SKILLS_Y = 137;
   if (data.program.skills_covered && data.program.skills_covered.length > 0) {
-    doc.text('covering the following skills:', centerX, yPos, { align: 'center' });
-    yPos += 6;
+    doc.text('covering the following skills:', centerX, SKILLS_Y, { align: 'center' });
 
-    // Display up to 6 skills
+    // Display up to 6 skills, TRUNCATED to prevent overflow
     const skills = data.program.skills_covered.slice(0, 6);
-    const skillsText = skills.join('  •  ');
+    let skillsText = skills.join('  •  ');
+
+    // Truncate if too long (max 120 characters)
+    if (skillsText.length > 120) {
+      skillsText = skillsText.substring(0, 117) + '...';
+    }
+
     doc.setFontSize(10);
-    doc.text(`• ${skillsText}`, centerX, yPos, { align: 'center' });
-    yPos += 6;
+    doc.text(`• ${skillsText}`, centerX, SKILLS_Y + 6, { align: 'center' });
   }
 
-  // ===== PERFORMANCE METRICS =====
-  yPos += 6; // Add spacing before metrics
-
+  // ===== PERFORMANCE METRICS (FIXED POSITIONS) =====
+  const METRICS_Y = 155;
   const hasMetrics =
     data.completion.assessment_score !== null ||
     data.completion.attendance_percentage !== null;
@@ -269,47 +272,46 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
       doc.text(
         `Assessment Score: ${data.completion.assessment_score}%`,
         centerX,
-        yPos,
+        METRICS_Y,
         { align: 'center' }
       );
-      yPos += 6;
     }
 
     if (data.completion.attendance_percentage !== null) {
+      const attendanceY = data.completion.assessment_score !== null ? METRICS_Y + 6 : METRICS_Y;
       doc.text(
         `Attendance Rate: ${data.completion.attendance_percentage}%`,
         centerX,
-        yPos,
+        attendanceY,
         { align: 'center' }
       );
-      yPos += 6;
     }
   }
 
-  // ===== CERTIFICATE ID AND ISSUE DATE =====
-  yPos += 10; // Add spacing before certificate info
+  // ===== CERTIFICATE ID AND ISSUE DATE (FIXED POSITIONS) =====
+  const CERT_ID_Y = 172;  // Fixed position - after skills (137-143) and metrics (155-161)
 
   // Decorative line
   doc.setLineWidth(0.5);
   doc.setDrawColor(34, 165, 85);
-  doc.line(60, yPos, pageWidth - 60, yPos);
-  yPos += 7;
+  doc.line(60, CERT_ID_Y, pageWidth - 60, CERT_ID_Y);
 
   // Certificate details
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(0, 0, 0);
-  doc.text(`Certificate ID: ${data.certification.certificate_id}`, centerX, yPos, {
-    align: 'center',
-  });
-  yPos += 5;
-
-  doc.text(`Issued on: ${formatDate(data.certification.issued_at)}`, centerX, yPos, {
+  doc.text(`Certificate ID: ${data.certification.certificate_id}`, centerX, CERT_ID_Y + 7, {
     align: 'center',
   });
 
-  // ===== SIGNATURE SECTION =====
-  const signatureY = pageHeight - 50;
+  doc.text(`Issued on: ${formatDate(data.certification.issued_at)}`, centerX, CERT_ID_Y + 12, {
+    align: 'center',
+  });
+
+  // ===== SIGNATURE SECTION (FIXED POSITIONS) =====
+  const SIG_LINE_Y = 193;  // Signature line at 193mm (fits inside 200mm border)
+  const SIG_IMAGE_HEIGHT = 10;
+  const SIG_GAP = 5;  // 5mm gap between image and line
 
   // PESO officer signature line
   doc.setFontSize(10);
@@ -320,10 +322,10 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
   if (signatureBase64) {
     try {
       // Add signature image above the signature line
-      const sigWidth = 35; // 35mm width (reduced for better fit)
-      const sigHeight = 10; // 10mm height (more professional size)
-      const sigX = 87.5 - sigWidth / 2; // Center horizontally
-      const sigY = signatureY - sigHeight - 5; // 5mm above the line for clean separation
+      const sigWidth = 35;
+      const sigHeight = SIG_IMAGE_HEIGHT;
+      const sigX = centerX - sigWidth / 2;  // Center horizontally
+      const sigY = SIG_LINE_Y - sigHeight - SIG_GAP;  // Position above line with gap
       doc.addImage(signatureBase64, 'PNG', sigX, sigY, sigWidth, sigHeight);
     } catch (error) {
       console.error('Error adding signature image to PDF:', error);
@@ -332,47 +334,40 @@ export async function generateCertificatePDF(data: CertificateData): Promise<Uin
   }
 
   // Signature line
-  doc.line(50, signatureY, 125, signatureY);
+  doc.line(50, SIG_LINE_Y, 125, SIG_LINE_Y);
 
   // PESO officer name
-  doc.text(data.certification.issued_by.name, 87.5, signatureY + 6, { align: 'center' });
+  doc.text(data.certification.issued_by.name, 87.5, SIG_LINE_Y + 6, { align: 'center' });
 
   // Title
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(9);
-  doc.text(data.certification.issued_by.title, 87.5, signatureY + 11, { align: 'center' });
+  doc.text(data.certification.issued_by.title, 87.5, SIG_LINE_Y + 11, { align: 'center' });
 
   // Optional: QR Code placeholder
   // If QR code is provided, add it to the right side
   if (data.verification?.qr_code_url) {
     try {
       // QR code would be added here
-      // doc.addImage(qr_code_url, 'PNG', pageWidth - 60, signatureY, 30, 30);
+      // doc.addImage(qr_code_url, 'PNG', pageWidth - 60, SIG_LINE_Y - 15, 30, 30);
       doc.setFontSize(7);
       doc.setFont('helvetica', 'italic');
-      doc.text('Scan to verify', pageWidth - 45, signatureY + 35, { align: 'center' });
+      doc.text('Scan to verify', pageWidth - 45, SIG_LINE_Y + 20, { align: 'center' });
     } catch (error) {
       console.error('Error adding QR code:', error);
     }
   }
 
-  // Optional: Notes section (if provided)
-  if (data.notes) {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(60, 60, 60);
-    const noteLines = doc.splitTextToSize(data.notes, pageWidth - 100);
-    doc.text(noteLines, centerX, signatureY + 12, { align: 'center', maxWidth: pageWidth - 100 });
-  }
+  // ===== FOOTER (FIXED POSITION) =====
+  const FOOTER_Y = 199;  // Footer at 199mm (1mm inside 200mm border)
 
-  // ===== FOOTER =====
   doc.setFontSize(9);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
   doc.text(
     'Generated by JobSync - Municipal Hall HR System',
     centerX,
-    pageHeight - 15,
+    FOOTER_Y,
     { align: 'center' }
   );
 

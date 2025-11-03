@@ -10,7 +10,7 @@ import { getStatusConfig } from '@/lib/config/statusConfig';
 import { generateCertificatePreview, generateCertificateId } from '@/lib/certificates/certificateGenerator';
 import type { CertificateData } from '@/types/certificate.types';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, FileText, Sparkles, AlertCircle } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -65,9 +65,6 @@ export default function PESOApplicationsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [nextSteps, setNextSteps] = useState('');
   const [denialReason, setDenialReason] = useState('');
-  const [certificateFile, setCertificateFile] = useState<File | null>(null);
-  const [certificateTab, setCertificateTab] = useState<'generate' | 'upload'>('generate');
-  const [certificateNotes, setCertificateNotes] = useState('');
   const [includeSignature, setIncludeSignature] = useState(false);
   const [hasSignature, setHasSignature] = useState<boolean>(false);
   const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
@@ -305,67 +302,7 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  // Handle issue certificate
-  const handleCertify = async () => {
-    if (!selectedApplication) return;
-
-    try {
-      setActionLoading(true);
-
-      let certificateUrl = '';
-
-      // Upload certificate file if provided
-      if (certificateFile) {
-        const fileName = `${selectedApplication.applicant_id}/${Date.now()}-${certificateFile.name}`;
-        const formData = new FormData();
-        formData.append('file', certificateFile);
-        formData.append('bucket', 'certificates');
-        formData.append('path', fileName);
-
-        const uploadResponse = await fetch('/api/storage/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        const uploadResult = await uploadResponse.json();
-
-        if (!uploadResponse.ok) {
-          throw new Error(uploadResult.error || 'Failed to upload certificate');
-        }
-
-        certificateUrl = uploadResult.path; // Store the path, not the URL
-      }
-
-      // Update status to certified with certificate URL
-      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'certified',
-          certificate_url: certificateUrl || null,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to issue certificate');
-      }
-
-      showToast(result.message || 'Certificate issued successfully', 'success');
-      setCertifyModalOpen(false);
-      setSelectedApplication(null);
-      setCertificateFile(null);
-      fetchApplications();
-    } catch (error: any) {
-      console.error('Error issuing certificate:', error);
-      showToast(getErrorMessage(error), 'error');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Handle generate certificate (new functionality)
+  // Handle generate certificate
   const handleGenerateCertificate = async () => {
     if (!selectedApplication) return;
 
@@ -378,7 +315,6 @@ export default function PESOApplicationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           application_id: selectedApplication.id,
-          notes: certificateNotes || undefined,
           include_signature: includeSignature,
         }),
       });
@@ -392,11 +328,9 @@ export default function PESOApplicationsPage() {
       showToast(result.message || 'Certificate generated and issued successfully!', 'success');
       setCertifyModalOpen(false);
       setSelectedApplication(null);
-      setCertificateNotes('');
       setIncludeSignature(false);
       setHasSignature(false);
       setSignatureLoading(false);
-      setCertificateTab('generate');
       fetchApplications();
     } catch (error: any) {
       console.error('Error generating certificate:', error);
@@ -417,7 +351,6 @@ export default function PESOApplicationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           application_id: selectedApplication.id,
-          notes: certificateNotes || undefined,
           include_signature: includeSignature,
         }),
       });
@@ -1263,45 +1196,15 @@ export default function PESOApplicationsPage() {
           onClose={() => {
             setCertifyModalOpen(false);
             setSelectedApplication(null);
-            setCertificateFile(null);
           }}
-          title="Issue Training Certificate"
+          title="Generate Training Certificate"
           subtitle="Grant certificate of completion"
-          colorVariant="orange"
+          colorVariant="green"
           icon={Award}
           size="md"
         >
           {selectedApplication && (
             <div className="space-y-4">
-              {/* Tab Navigation */}
-              <div className="flex border-b border-gray-200">
-                <button
-                  className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                    certificateTab === 'generate'
-                      ? 'text-green-600 border-b-2 border-green-500 bg-green-50'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setCertificateTab('generate')}
-                >
-                  <Sparkles className="w-4 h-4 inline mr-2" />
-                  Generate Certificate
-                </button>
-                <button
-                  className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                    certificateTab === 'upload'
-                      ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setCertificateTab('upload')}
-                >
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Upload Certificate
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              {certificateTab === 'generate' ? (
-                <div className="space-y-4">
                   {/* Certificate Preview */}
                   <div className="bg-gradient-to-br from-green-50 to-teal-50 border-2 border-dashed border-green-300 rounded-lg p-6">
                     <div className="flex items-center justify-center mb-4">
@@ -1337,22 +1240,6 @@ export default function PESOApplicationsPage() {
                         </span>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Optional: Notes */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Additional Notes (Optional)
-                    </label>
-                    <Textarea
-                      value={certificateNotes}
-                      onChange={(e) => setCertificateNotes(e.target.value)}
-                      placeholder="Any special recognition or notes to include on the certificate..."
-                      rows={2}
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      These notes will appear at the bottom of the certificate
-                    </p>
                   </div>
 
                   {/* Digital Signature Option */}
@@ -1401,11 +1288,9 @@ export default function PESOApplicationsPage() {
                       onClick={() => {
                         setCertifyModalOpen(false);
                         setSelectedApplication(null);
-                        setCertificateNotes('');
                         setIncludeSignature(false);
                         setHasSignature(false);
                         setSignatureLoading(false);
-                        setCertificateTab('generate');
                       }}
                       disabled={generateLoading}
                     >
@@ -1428,73 +1313,6 @@ export default function PESOApplicationsPage() {
                       Generate & Issue
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Upload Tab Content */}
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <p className="text-gray-700">
-                      Upload certificate for{' '}
-                      <span className="font-semibold">{selectedApplication.full_name}</span>
-                    </p>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Use this option if you have a pre-designed certificate file to upload.
-                    </p>
-                  </div>
-
-                  {/* Certificate Upload */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Upload Certificate File
-                    </label>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => setCertificateFile(e.target.files?.[0] || null)}
-                      className="block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-lg file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-orange-50 file:text-orange-700
-                        hover:file:bg-orange-100
-                        cursor-pointer border border-gray-300 rounded-lg"
-                    />
-                    {certificateFile && (
-                      <p className="mt-2 text-sm text-gray-600">
-                        Selected: <span className="font-medium">{certificateFile.name}</span>
-                      </p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Accepted formats: PDF, JPG, PNG (Max 10MB)
-                    </p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end gap-3 pt-4 border-t">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setCertifyModalOpen(false);
-                        setSelectedApplication(null);
-                        setCertificateFile(null);
-                        setCertificateTab('generate');
-                      }}
-                      disabled={actionLoading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="warning"
-                      icon={Award}
-                      onClick={handleCertify}
-                      loading={actionLoading}
-                      disabled={!certificateFile}
-                    >
-                      Upload & Issue
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </ModernModal>
