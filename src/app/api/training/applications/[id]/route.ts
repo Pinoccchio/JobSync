@@ -374,7 +374,7 @@ export async function PATCH(
         break;
       case 'certified':
         notificationTitle = 'Certificate Issued!';
-        notificationMessage = `Your certificate for "${program?.title}" has been issued by ${profile.full_name} (${profile.role}). You can now download it from your dashboard.`;
+        notificationMessage = `Your certificate for "${program?.title}" has been issued by ${profile.full_name} (${profile.role}). You can now download it from your trainings page.`;
         break;
       case 'withdrawn':
         notificationTitle = 'Training Application Withdrawn';

@@ -293,6 +293,33 @@ export default function TrainingsPage() {
     }
   };
 
+  // Handle download certificate
+  const handleDownloadCertificate = async (certificateUrl: string, applicationId: string) => {
+    try {
+      const response = await fetch('/api/training/certificates/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          certificate_url: certificateUrl,
+          application_id: applicationId
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to get certificate download URL');
+      }
+
+      // Open the signed URL in a new tab to download
+      window.open(result.signed_url, '_blank');
+      showToast('Opening certificate download...', 'success');
+    } catch (error: any) {
+      console.error('Error downloading certificate:', error);
+      showToast(getErrorMessage(error), 'error');
+    }
+  };
+
   // Handle Toggle Skills Expansion
   const toggleSkillsExpansion = (programId: string) => {
     setExpandedSkillsCards(prev => {
@@ -739,6 +766,20 @@ export default function TrainingsPage() {
                         })()}
                         {getStatusBadge(userApp.status).label}
                       </Badge>
+
+                      {/* Download Certificate Button (if certified) */}
+                      {userApp.status === 'certified' && userApp.certificate_url && (
+                        <Button
+                          variant="success"
+                          className="w-full shadow-md"
+                          size="sm"
+                          icon={Download}
+                          onClick={() => handleDownloadCertificate(userApp.certificate_url!, userApp.id)}
+                        >
+                          Download Certificate
+                        </Button>
+                      )}
+
                       <Button
                         variant="secondary"
                         className="w-full"
@@ -1029,7 +1070,7 @@ export default function TrainingsPage() {
                     variant="success"
                     size="sm"
                     icon={Download}
-                    onClick={() => window.open(selectedApplication.certificate_url, '_blank')}
+                    onClick={() => handleDownloadCertificate(selectedApplication.certificate_url!, selectedApplication.id)}
                   >
                     Download Certificate
                   </Button>
@@ -1188,6 +1229,34 @@ export default function TrainingsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Certificate Download Section */}
+              {selectedApplicationForHistory.status === 'certified' && selectedApplicationForHistory.certificate_url && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Award className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-lg font-bold text-green-900 mb-1">Certificate Available!</p>
+                        <p className="text-sm text-green-700 mb-3">
+                          Your training certificate has been issued. Download it now to add to your credentials.
+                        </p>
+                        <Button
+                          variant="success"
+                          size="sm"
+                          icon={Download}
+                          className="shadow-md"
+                          onClick={() => handleDownloadCertificate(selectedApplicationForHistory.certificate_url!, selectedApplicationForHistory.id)}
+                        >
+                          Download Certificate
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Close Button */}
               <div className="flex justify-end pt-4 border-t">

@@ -7,8 +7,10 @@ import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusTimeline } from '@/components/peso/StatusTimeline';
 import { getStatusConfig } from '@/lib/config/statusConfig';
+import { generateCertificatePreview, generateCertificateId } from '@/lib/certificates/certificateGenerator';
+import type { CertificateData } from '@/types/certificate.types';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, FileText } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, FileText, Sparkles, AlertCircle } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -64,6 +66,12 @@ export default function PESOApplicationsPage() {
   const [nextSteps, setNextSteps] = useState('');
   const [denialReason, setDenialReason] = useState('');
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
+  const [certificateTab, setCertificateTab] = useState<'generate' | 'upload'>('generate');
+  const [certificateNotes, setCertificateNotes] = useState('');
+  const [includeSignature, setIncludeSignature] = useState(false);
+  const [hasSignature, setHasSignature] = useState<boolean>(false);
+  const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
+  const [generateLoading, setGenerateLoading] = useState(false);
 
   // Fetch training applications function
   const fetchApplications = useCallback(async () => {
@@ -357,6 +365,101 @@ export default function PESOApplicationsPage() {
     }
   };
 
+  // Handle generate certificate (new functionality)
+  const handleGenerateCertificate = async () => {
+    if (!selectedApplication) return;
+
+    try {
+      setGenerateLoading(true);
+
+      // Call generate API
+      const response = await fetch('/api/training/certificates/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: selectedApplication.id,
+          notes: certificateNotes || undefined,
+          include_signature: includeSignature,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate certificate');
+      }
+
+      showToast(result.message || 'Certificate generated and issued successfully!', 'success');
+      setCertifyModalOpen(false);
+      setSelectedApplication(null);
+      setCertificateNotes('');
+      setIncludeSignature(false);
+      setHasSignature(false);
+      setSignatureLoading(false);
+      setCertificateTab('generate');
+      fetchApplications();
+    } catch (error: any) {
+      console.error('Error generating certificate:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setGenerateLoading(false);
+    }
+  };
+
+  // Handle preview certificate
+  const handlePreviewCertificate = async () => {
+    if (!selectedApplication || !selectedApplication.training_programs) return;
+
+    try {
+      // Call server-side preview API (supports signature loading)
+      const response = await fetch('/api/training/certificates/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: selectedApplication.id,
+          notes: certificateNotes || undefined,
+          include_signature: includeSignature,
+        }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to generate preview');
+      }
+
+      // Get PDF blob from server
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      // Clean up the URL after opening
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (error: any) {
+      console.error('Error previewing certificate:', error);
+      showToast(getErrorMessage(error), 'error');
+    }
+  };
+
+  // Fetch signature status
+  const fetchSignatureStatus = async () => {
+    try {
+      setSignatureLoading(true);
+      const response = await fetch('/api/peso/signature');
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setHasSignature(!!result.signatureUrl);
+      } else {
+        setHasSignature(false);
+      }
+    } catch (error: any) {
+      console.error('Error fetching signature status:', error);
+      setHasSignature(false);
+    } finally {
+      setSignatureLoading(false);
+    }
+  };
+
   // Get unique programs for filter
   const uniquePrograms = Array.from(
     new Set(applications.map(a => a.training_programs?.title).filter(Boolean))
@@ -569,6 +672,7 @@ export default function PESOApplicationsPage() {
             onClick: () => {
               setSelectedApplication(row);
               setCertifyModalOpen(true);
+              fetchSignatureStatus(); // Fetch signature status when modal opens
             },
             variant: 'warning' as const,
           });
@@ -1169,65 +1273,228 @@ export default function PESOApplicationsPage() {
         >
           {selectedApplication && (
             <div className="space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-gray-700">
-                  Issue training certificate to{' '}
-                  <span className="font-semibold">{selectedApplication.full_name}</span> for{' '}
-                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
-                </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  The applicant will be marked as certified and can download their certificate.
-                </p>
+              {/* Tab Navigation */}
+              <div className="flex border-b border-gray-200">
+                <button
+                  className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+                    certificateTab === 'generate'
+                      ? 'text-green-600 border-b-2 border-green-500 bg-green-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setCertificateTab('generate')}
+                >
+                  <Sparkles className="w-4 h-4 inline mr-2" />
+                  Generate Certificate
+                </button>
+                <button
+                  className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+                    certificateTab === 'upload'
+                      ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setCertificateTab('upload')}
+                >
+                  <FileText className="w-4 h-4 inline mr-2" />
+                  Upload Certificate
+                </button>
               </div>
 
-              {/* Certificate Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Certificate (Optional)
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setCertificateFile(e.target.files?.[0] || null)}
-                  className="block w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-lg file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-orange-50 file:text-orange-700
-                    hover:file:bg-orange-100
-                    cursor-pointer border border-gray-300 rounded-lg"
-                />
-                {certificateFile && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Selected: <span className="font-medium">{certificateFile.name}</span>
-                  </p>
-                )}
-                <p className="mt-1 text-xs text-gray-500">
-                  Accepted formats: PDF, JPG, PNG (Max 10MB)
-                </p>
-              </div>
+              {/* Tab Content */}
+              {certificateTab === 'generate' ? (
+                <div className="space-y-4">
+                  {/* Certificate Preview */}
+                  <div className="bg-gradient-to-br from-green-50 to-teal-50 border-2 border-dashed border-green-300 rounded-lg p-6">
+                    <div className="flex items-center justify-center mb-4">
+                      <Award className="w-12 h-12 text-green-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 text-center mb-3">
+                      Auto-Generated Certificate
+                    </h3>
+                    <p className="text-sm text-gray-600 text-center mb-4">
+                      A professional certificate will be generated with the following details:
+                    </p>
+                    <div className="bg-white rounded-lg p-4 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Trainee:</span>
+                        <span className="font-semibold text-gray-900">{selectedApplication.full_name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Program:</span>
+                        <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.title}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Duration:</span>
+                        <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.duration}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Completion:</span>
+                        <span className="font-semibold text-gray-900">
+                          {new Date().toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setCertifyModalOpen(false);
-                    setSelectedApplication(null);
-                    setCertificateFile(null);
-                  }}
-                  disabled={actionLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="warning"
-                  icon={Award}
-                  onClick={handleCertify}
-                  loading={actionLoading}
-                >
-                  Issue Certificate
-                </Button>
-              </div>
+                  {/* Optional: Notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Additional Notes (Optional)
+                    </label>
+                    <Textarea
+                      value={certificateNotes}
+                      onChange={(e) => setCertificateNotes(e.target.value)}
+                      placeholder="Any special recognition or notes to include on the certificate..."
+                      rows={2}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      These notes will appear at the bottom of the certificate
+                    </p>
+                  </div>
+
+                  {/* Digital Signature Option */}
+                  <div className={`${
+                    hasSignature ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
+                  } border rounded-lg p-4`}>
+                    <label className={`flex items-start gap-3 ${hasSignature ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+                      <div className="flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          checked={includeSignature}
+                          onChange={(e) => setIncludeSignature(e.target.checked)}
+                          disabled={!hasSignature || signatureLoading}
+                          className={`w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ${
+                            hasSignature ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <span className={`text-sm font-medium ${hasSignature ? 'text-gray-900 group-hover:text-blue-700' : 'text-amber-900'}`}>
+                          Include my digital signature
+                        </span>
+                        <p className={`text-xs mt-0.5 ${hasSignature ? 'text-gray-600' : 'text-amber-700'}`}>
+                          {signatureLoading ? (
+                            <span className="flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 inline animate-spin" />
+                              Checking signature status...
+                            </span>
+                          ) : hasSignature ? (
+                            'Your signature will be embedded on the certificate above your printed name for authenticity'
+                          ) : (
+                            <>
+                              <AlertCircle className="w-3 h-3 inline mr-1" />
+                              You haven't uploaded your digital signature yet. Go to Settings page.
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-4 border-t">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setCertifyModalOpen(false);
+                        setSelectedApplication(null);
+                        setCertificateNotes('');
+                        setIncludeSignature(false);
+                        setHasSignature(false);
+                        setSignatureLoading(false);
+                        setCertificateTab('generate');
+                      }}
+                      disabled={generateLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      icon={Eye}
+                      onClick={handlePreviewCertificate}
+                      disabled={generateLoading}
+                    >
+                      Preview PDF
+                    </Button>
+                    <Button
+                      variant="success"
+                      icon={Award}
+                      onClick={handleGenerateCertificate}
+                      loading={generateLoading}
+                    >
+                      Generate & Issue
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Upload Tab Content */}
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <p className="text-gray-700">
+                      Upload certificate for{' '}
+                      <span className="font-semibold">{selectedApplication.full_name}</span>
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Use this option if you have a pre-designed certificate file to upload.
+                    </p>
+                  </div>
+
+                  {/* Certificate Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload Certificate File
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setCertificateFile(e.target.files?.[0] || null)}
+                      className="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-lg file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-orange-50 file:text-orange-700
+                        hover:file:bg-orange-100
+                        cursor-pointer border border-gray-300 rounded-lg"
+                    />
+                    {certificateFile && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        Selected: <span className="font-medium">{certificateFile.name}</span>
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Accepted formats: PDF, JPG, PNG (Max 10MB)
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-3 pt-4 border-t">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setCertifyModalOpen(false);
+                        setSelectedApplication(null);
+                        setCertificateFile(null);
+                        setCertificateTab('generate');
+                      }}
+                      disabled={actionLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="warning"
+                      icon={Award}
+                      onClick={handleCertify}
+                      loading={actionLoading}
+                      disabled={!certificateFile}
+                    >
+                      Upload & Issue
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </ModernModal>

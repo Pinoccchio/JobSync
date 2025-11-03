@@ -43,6 +43,7 @@ const PESO_MENU_ITEMS = [
   { label: 'Dashboard', href: '/peso/dashboard', icon: Home },
   { label: 'Training Applications', href: '/peso/applications', icon: ClipboardList },
   { label: 'Training Programs', href: '/peso/programs', icon: GraduationCap },
+  { label: 'Settings', href: '/peso/settings', icon: Settings },
 ];
 
 const APPLICANT_MENU_ITEMS = [

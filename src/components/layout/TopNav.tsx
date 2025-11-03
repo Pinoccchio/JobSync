@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, Settings, LogOut, CheckCircle, XCircle, Clock, ChevronDown, Trash2, FileText } from 'lucide-react';
+import { Bell, LogOut, CheckCircle, XCircle, Clock, ChevronDown, Trash2, FileText } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -404,16 +404,6 @@ export const TopNav: React.FC<TopNavProps> = ({
                       </button>
                     </Link>
                   )}
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      showToast('Settings feature coming soon', 'info');
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-3 transition-colors"
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span className="text-sm">Settings</span>
-                  </button>
                   <button
                     onClick={async () => {
                       try {
