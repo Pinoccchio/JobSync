@@ -296,12 +296,12 @@ export async function PATCH(
     switch (status) {
       case 'under_review':
         notificationTitle = 'Application Under Review';
-        notificationMessage = `Your application for ${jobTitle} is now being reviewed by our HR team.`;
+        notificationMessage = `Your application for ${jobTitle} is now being reviewed by ${profile.full_name} (${profile.role}).`;
         break;
 
       case 'shortlisted':
         notificationTitle = 'You\'ve Been Shortlisted! 🎉';
-        notificationMessage = `Great news! You've been shortlisted for ${jobTitle}. We'll contact you soon regarding the next steps.`;
+        notificationMessage = `Great news! You've been shortlisted for ${jobTitle} by ${profile.full_name} (${profile.role}). We'll contact you soon regarding the next steps.`;
         break;
 
       case 'interviewed':
@@ -315,36 +315,36 @@ export async function PATCH(
             hour: '2-digit',
             minute: '2-digit'
           });
-          notificationMessage = `Your interview for ${jobTitle} has been scheduled for ${interviewDate}. ${body.next_steps || 'Please check your email for more details.'}`;
+          notificationMessage = `Your interview for ${jobTitle} has been scheduled for ${interviewDate} by ${profile.full_name} (${profile.role}). ${body.next_steps || 'Please check your email for more details.'}`;
         } else {
-          notificationMessage = `Your interview for ${jobTitle} has been scheduled. Please check your application for details.`;
+          notificationMessage = `Your interview for ${jobTitle} has been scheduled by ${profile.full_name} (${profile.role}). Please check your application for details.`;
         }
         break;
 
       case 'approved':
         notificationTitle = 'Application Approved! ✅';
-        notificationMessage = `Congratulations! Your application for ${jobTitle} has been approved. ${body.next_steps || 'We will contact you soon with the next steps.'}`;
+        notificationMessage = `Congratulations! Your application for ${jobTitle} has been approved by ${profile.full_name} (${profile.role}). ${body.next_steps || 'We will contact you soon with the next steps.'}`;
         break;
 
       case 'denied':
         notificationTitle = 'Application Update';
         const denialReason = body.denial_reason || 'Please check your application for more information';
-        notificationMessage = `Thank you for applying to ${jobTitle}. ${denialReason}. We encourage you to apply for other positions.`;
+        notificationMessage = `Your application for ${jobTitle} was reviewed by ${profile.full_name} (${profile.role}). ${denialReason} We encourage you to apply for other positions.`;
         break;
 
       case 'hired':
         notificationTitle = 'Welcome to the Team! 🎉';
-        notificationMessage = `Congratulations! You've been hired for ${jobTitle}. Welcome to the Municipality of Asuncion team! ${body.next_steps || 'HR will contact you with onboarding details.'}`;
+        notificationMessage = `Congratulations! You've been hired for ${jobTitle} by ${profile.full_name} (${profile.role}). Welcome to the Municipality of Asuncion team! ${body.next_steps || 'HR will contact you with onboarding details.'}`;
         break;
 
       case 'pending':
         notificationTitle = 'Application Status Updated';
-        notificationMessage = `Your application for ${jobTitle} status has been updated to pending review.`;
+        notificationMessage = `Your application for ${jobTitle} status has been updated to pending review by ${profile.full_name} (${profile.role}).`;
         break;
 
       case 'archived':
         notificationTitle = 'Application Archived';
-        notificationMessage = `Your application for ${jobTitle} has been archived.`;
+        notificationMessage = `Your application for ${jobTitle} has been archived by ${profile.full_name} (${profile.role}).`;
         break;
 
       case 'withdrawn':

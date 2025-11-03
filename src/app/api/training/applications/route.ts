@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getViewableUrl } from '@/lib/supabase/storage';
+import { createInitialStatusHistory } from '@/lib/utils/statusHistory';
 
 /**
  * Training Applications Management API Routes
@@ -90,10 +92,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Generate signed URLs for ID images
+    const applicationsWithSignedUrls = await Promise.all(
+      (applications || []).map(async (app) => {
+        if (app.id_image_url) {
+          try {
+            // Generate a signed URL that expires in 1 hour
+            const signedUrl = await getViewableUrl('id-images', app.id_image_url, 3600);
+            return { ...app, id_image_url: signedUrl };
+          } catch (error) {
+            console.error(`Failed to generate signed URL for application ${app.id}:`, error);
+            // Return app with original path if signing fails
+            return app;
+          }
+        }
+        return app;
+      })
+    );
+
     return NextResponse.json({
       success: true,
-      data: applications,
-      count: applications?.length || 0,
+      data: applicationsWithSignedUrls,
+      count: applicationsWithSignedUrls?.length || 0,
     });
 
   } catch (error: any) {
@@ -199,6 +219,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 8. Create application
+    const currentTimestamp = new Date().toISOString();
     const { data: application, error: createError } = await supabase
       .from('training_applications')
       .insert({
@@ -206,13 +227,15 @@ export async function POST(request: NextRequest) {
         applicant_id: user.id,
         full_name,
         email,
-        phone,
+        phone: phone.replace(/\s/g, ''), // Strip all spaces to ensure clean storage
         address,
         highest_education,
         id_image_url,
         id_image_name: id_image_name || 'id-image.jpg',
         status: 'pending',
-        submitted_at: new Date().toISOString(),
+        submitted_at: currentTimestamp,
+        // Initialize status_history with the initial "null → pending" transition
+        status_history: createInitialStatusHistory('pending', currentTimestamp, user.id),
       })
       .select(`
         *,

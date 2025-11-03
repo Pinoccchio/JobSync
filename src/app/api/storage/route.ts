@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
  * Storage Buckets:
  * - pds-files: PDF files (10MB max, private)
  * - id-images: ID verification images (5MB max, private)
+ * - certificates: Training certificates (10MB max, private)
  * - announcements: Announcement images (5MB max, public)
  * - profiles: Profile pictures (2MB max, public)
  */
@@ -26,6 +27,11 @@ const BUCKET_CONFIG = {
     maxSize: 5 * 1024 * 1024, // 5MB
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png'],
     allowedExtensions: ['.jpg', '.jpeg', '.png'],
+  },
+  'certificates': {
+    maxSize: 10 * 1024 * 1024, // 10MB
+    allowedTypes: ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'],
+    allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png'],
   },
   'announcements': {
     maxSize: 5 * 1024 * 1024, // 5MB
@@ -109,9 +115,9 @@ export async function POST(request: NextRequest) {
     const uniqueFileName = `${timestamp}-${randomString}-${sanitizedFileName}`;
 
     // 7. Create file path (with optional folder)
-    // For private buckets (id-images, pds-files), always organize by user ID for RLS policies
+    // For private buckets (id-images, pds-files, certificates), always organize by user ID for RLS policies
     let filePath: string;
-    if (bucket === 'id-images' || bucket === 'pds-files') {
+    if (bucket === 'id-images' || bucket === 'pds-files' || bucket === 'certificates') {
       // Private buckets: enforce user ID folder structure for RLS
       const userFolder = user.id;
       filePath = `${userFolder}/${uniqueFileName}`;

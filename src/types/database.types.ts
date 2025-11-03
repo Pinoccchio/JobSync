@@ -114,6 +114,74 @@ export type Database = {
           },
         ]
       }
+      applicant_pds: {
+        Row: {
+          completion_percentage: number | null
+          created_at: string | null
+          educational_background: Json | null
+          eligibility: Json | null
+          family_background: Json | null
+          id: string
+          is_completed: boolean | null
+          last_saved_section: string | null
+          other_information: Json | null
+          personal_info: Json | null
+          signature_uploaded_at: string | null
+          signature_url: string | null
+          trainings: Json | null
+          updated_at: string | null
+          user_id: string
+          voluntary_work: Json | null
+          work_experience: Json | null
+        }
+        Insert: {
+          completion_percentage?: number | null
+          created_at?: string | null
+          educational_background?: Json | null
+          eligibility?: Json | null
+          family_background?: Json | null
+          id?: string
+          is_completed?: boolean | null
+          last_saved_section?: string | null
+          other_information?: Json | null
+          personal_info?: Json | null
+          signature_uploaded_at?: string | null
+          signature_url?: string | null
+          trainings?: Json | null
+          updated_at?: string | null
+          user_id: string
+          voluntary_work?: Json | null
+          work_experience?: Json | null
+        }
+        Update: {
+          completion_percentage?: number | null
+          created_at?: string | null
+          educational_background?: Json | null
+          eligibility?: Json | null
+          family_background?: Json | null
+          id?: string
+          is_completed?: boolean | null
+          last_saved_section?: string | null
+          other_information?: Json | null
+          personal_info?: Json | null
+          signature_uploaded_at?: string | null
+          signature_url?: string | null
+          trainings?: Json | null
+          updated_at?: string | null
+          user_id?: string
+          voluntary_work?: Json | null
+          work_experience?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applicant_pds_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       applicant_profiles: {
         Row: {
           ai_processed: boolean | null
@@ -223,16 +291,21 @@ export type Database = {
       }
       applications: {
         Row: {
+          algorithm_details: Json | null
           algorithm_used: string | null
           applicant_id: string
           applicant_profile_id: string | null
           created_at: string
+          denial_reason: string | null
           education_score: number | null
           eligibility_score: number | null
           experience_score: number | null
+          hr_notes: string | null
           id: string
+          interview_date: string | null
           job_id: string
           match_score: number | null
+          next_steps: string | null
           notification_sent: boolean | null
           pds_id: string | null
           rank: number | null
@@ -241,19 +314,27 @@ export type Database = {
           reviewed_by: string | null
           skills_score: number | null
           status: Database["public"]["Enums"]["application_status"]
+          status_history: Json | null
           updated_at: string
+          withdrawn_at: string | null
+          withdrawn_by: string | null
         }
         Insert: {
+          algorithm_details?: Json | null
           algorithm_used?: string | null
           applicant_id: string
           applicant_profile_id?: string | null
           created_at?: string
+          denial_reason?: string | null
           education_score?: number | null
           eligibility_score?: number | null
           experience_score?: number | null
+          hr_notes?: string | null
           id?: string
+          interview_date?: string | null
           job_id: string
           match_score?: number | null
+          next_steps?: string | null
           notification_sent?: boolean | null
           pds_id?: string | null
           rank?: number | null
@@ -262,19 +343,27 @@ export type Database = {
           reviewed_by?: string | null
           skills_score?: number | null
           status?: Database["public"]["Enums"]["application_status"]
+          status_history?: Json | null
           updated_at?: string
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
         }
         Update: {
+          algorithm_details?: Json | null
           algorithm_used?: string | null
           applicant_id?: string
           applicant_profile_id?: string | null
           created_at?: string
+          denial_reason?: string | null
           education_score?: number | null
           eligibility_score?: number | null
           experience_score?: number | null
+          hr_notes?: string | null
           id?: string
+          interview_date?: string | null
           job_id?: string
           match_score?: number | null
+          next_steps?: string | null
           notification_sent?: boolean | null
           pds_id?: string | null
           rank?: number | null
@@ -283,7 +372,10 @@ export type Database = {
           reviewed_by?: string | null
           skills_score?: number | null
           status?: Database["public"]["Enums"]["application_status"]
+          status_history?: Json | null
           updated_at?: string
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
         }
         Relationships: [
           {
@@ -308,8 +400,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "applications_pds_id_fkey"
+            columns: ["pds_id"]
+            isOneToOne: false
+            referencedRelation: "applicant_pds"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "applications_reviewed_by_fkey"
             columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_withdrawn_by_fkey"
+            columns: ["withdrawn_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -380,8 +486,12 @@ export type Database = {
           description: string
           eligibilities: string[]
           employment_type: string | null
+          experience: string | null
           id: string
           location: string | null
+          max_years_experience: number | null
+          min_years_experience: number | null
+          remote: boolean | null
           skills: string[]
           status: Database["public"]["Enums"]["job_status"]
           title: string
@@ -395,8 +505,12 @@ export type Database = {
           description: string
           eligibilities?: string[]
           employment_type?: string | null
+          experience?: string | null
           id?: string
           location?: string | null
+          max_years_experience?: number | null
+          min_years_experience?: number | null
+          remote?: boolean | null
           skills?: string[]
           status?: Database["public"]["Enums"]["job_status"]
           title: string
@@ -410,8 +524,12 @@ export type Database = {
           description?: string
           eligibilities?: string[]
           employment_type?: string | null
+          experience?: string | null
           id?: string
           location?: string | null
+          max_years_experience?: number | null
+          min_years_experience?: number | null
+          remote?: boolean | null
           skills?: string[]
           status?: Database["public"]["Enums"]["job_status"]
           title?: string
@@ -530,58 +648,91 @@ export type Database = {
         Row: {
           address: string
           applicant_id: string
+          assessment_score: number | null
+          attendance_percentage: number | null
+          certificate_issued_at: string | null
+          certificate_url: string | null
           created_at: string
+          denial_reason: string | null
           email: string
+          enrollment_confirmed_at: string | null
           full_name: string
           highest_education: string
           id: string
           id_image_name: string
           id_image_url: string
+          next_steps: string | null
           notification_sent: boolean | null
+          peso_notes: string | null
           phone: string
           program_id: string
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["application_status"]
+          status_history: Json | null
           submitted_at: string
+          training_completed_at: string | null
+          training_started_at: string | null
           updated_at: string
         }
         Insert: {
           address: string
           applicant_id: string
+          assessment_score?: number | null
+          attendance_percentage?: number | null
+          certificate_issued_at?: string | null
+          certificate_url?: string | null
           created_at?: string
+          denial_reason?: string | null
           email: string
+          enrollment_confirmed_at?: string | null
           full_name: string
           highest_education: string
           id?: string
           id_image_name: string
           id_image_url: string
+          next_steps?: string | null
           notification_sent?: boolean | null
+          peso_notes?: string | null
           phone: string
           program_id: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["application_status"]
+          status_history?: Json | null
           submitted_at?: string
+          training_completed_at?: string | null
+          training_started_at?: string | null
           updated_at?: string
         }
         Update: {
           address?: string
           applicant_id?: string
+          assessment_score?: number | null
+          attendance_percentage?: number | null
+          certificate_issued_at?: string | null
+          certificate_url?: string | null
           created_at?: string
+          denial_reason?: string | null
           email?: string
+          enrollment_confirmed_at?: string | null
           full_name?: string
           highest_education?: string
           id?: string
           id_image_name?: string
           id_image_url?: string
+          next_steps?: string | null
           notification_sent?: boolean | null
+          peso_notes?: string | null
           phone?: string
           program_id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["application_status"]
+          status_history?: Json | null
           submitted_at?: string
+          training_completed_at?: string | null
+          training_started_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -597,6 +748,13 @@ export type Database = {
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "training_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_applications_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "v_training_enrollment_check"
             referencedColumns: ["id"]
           },
           {
@@ -675,12 +833,478 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mv_audit_summary_by_table: {
+        Row: {
+          audit_date: string | null
+          operation: Database["public"]["Enums"]["audit_operation"] | null
+          operation_count: number | null
+          table_name: string | null
+          unique_records: number | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
+      mv_daily_activity_summary: {
+        Row: {
+          activity_count: number | null
+          activity_date: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          unique_users: number | null
+          user_role: string | null
+        }
+        Relationships: []
+      }
+      mv_recent_activities: {
+        Row: {
+          details: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          event_type: string | null
+          id: string | null
+          minutes_ago: number | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mv_top_active_users: {
+        Row: {
+          action_count: number | null
+          application_actions: number | null
+          distinct_event_types: number | null
+          last_seen_at: string | null
+          training_actions: number | null
+          user_email: string | null
+          user_id: string | null
+          user_mgmt_actions: number | null
+          user_role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mv_user_activity_counts: {
+        Row: {
+          activities_24h: number | null
+          activities_30d: number | null
+          activities_7d: number | null
+          failed_activities: number | null
+          last_activity_at: string | null
+          successful_activities: number | null
+          total_activities: number | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_admin_actions: {
+        Row: {
+          details: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          event_type: string | null
+          id: string | null
+          metadata: Json | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          details?: string | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          details?: string | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_application_decisions: {
+        Row: {
+          details: string | null
+          event_type: string | null
+          id: string | null
+          metadata: Json | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          details?: string | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          details?: string | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_critical_changes: {
+        Row: {
+          changed_fields: string[] | null
+          id: string | null
+          new_values: Json | null
+          old_values: Json | null
+          operation: Database["public"]["Enums"]["audit_operation"] | null
+          record_id: string | null
+          table_name: string | null
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          changed_fields?: string[] | null
+          id?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          operation?: Database["public"]["Enums"]["audit_operation"] | null
+          record_id?: string | null
+          table_name?: string | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          changed_fields?: string[] | null
+          id?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          operation?: Database["public"]["Enums"]["audit_operation"] | null
+          record_id?: string | null
+          table_name?: string | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_trail_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_failed_operations: {
+        Row: {
+          details: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          event_type: string | null
+          id: string | null
+          metadata: Json | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Insert: {
+          details?: string | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          details?: string | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_mv_audit_summary_by_table: {
+        Row: {
+          audit_date: string | null
+          operation: Database["public"]["Enums"]["audit_operation"] | null
+          operation_count: number | null
+          table_name: string | null
+          unique_records: number | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
+      v_mv_daily_activity_summary: {
+        Row: {
+          activity_count: number | null
+          activity_date: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          unique_users: number | null
+          user_role: string | null
+        }
+        Relationships: []
+      }
+      v_mv_recent_activities: {
+        Row: {
+          details: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          event_type: string | null
+          id: string | null
+          minutes_ago: number | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_mv_top_active_users: {
+        Row: {
+          action_count: number | null
+          application_actions: number | null
+          distinct_event_types: number | null
+          last_seen_at: string | null
+          training_actions: number | null
+          user_email: string | null
+          user_id: string | null
+          user_mgmt_actions: number | null
+          user_role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_mv_user_activity_counts: {
+        Row: {
+          activities_24h: number | null
+          activities_30d: number | null
+          activities_7d: number | null
+          failed_activities: number | null
+          last_activity_at: string | null
+          successful_activities: number | null
+          total_activities: number | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_recent_activities: {
+        Row: {
+          details: string | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
+          event_type: string | null
+          id: string | null
+          metadata: Json | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Insert: {
+          details?: string | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          details?: string | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
+          event_type?: string | null
+          id?: string | null
+          metadata?: Json | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_training_enrollment_check: {
+        Row: {
+          actual_count: number | null
+          discrepancy: number | null
+          id: string | null
+          recorded_count: number | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      v_user_management_history: {
+        Row: {
+          details: string | null
+          event_type: string | null
+          id: string | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          timestamp: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          details?: string | null
+          event_type?: string | null
+          id?: string | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          details?: string | null
+          event_type?: string | null
+          id?: string | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          timestamp?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       approve_application: {
         Args: { p_application_id: string; p_reviewer_id: string }
         Returns: boolean
+      }
+      archive_old_logs: {
+        Args: {
+          p_activity_logs_days?: number
+          p_audit_trail_days?: number
+          p_dry_run?: boolean
+        }
+        Returns: {
+          action_taken: string
+          log_type: string
+          oldest_kept: string
+          records_affected: number
+        }[]
+      }
+      bulk_update_user_status: {
+        Args: {
+          p_admin_id: string
+          p_new_status: Database["public"]["Enums"]["user_status"]
+          p_reason?: string
+          p_user_ids: string[]
+        }
+        Returns: number
       }
       can_apply_to_job: {
         Args: { p_job_id: string; p_user_id: string }
@@ -718,6 +1342,66 @@ export type Database = {
         }
         Returns: boolean
       }
+      export_audit_logs_json: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_table_names?: string[]
+        }
+        Returns: Json
+      }
+      get_activity_heatmap: {
+        Args: { p_days?: number; p_user_id?: string }
+        Returns: {
+          activity_count: number
+          day_of_week: string
+          hour_of_day: number
+        }[]
+      }
+      get_activity_logs_filtered: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_category?: Database["public"]["Enums"]["event_category"]
+          p_event_type?: string
+          p_limit?: number
+          p_offset?: number
+          p_order_by?: string
+          p_search_term?: string
+          p_status?: Database["public"]["Enums"]["event_status"]
+          p_user_id?: string
+        }
+        Returns: {
+          activity_timestamp: string
+          details: string
+          event_category: string
+          event_type: string
+          id: string
+          ip_address: string
+          metadata: Json
+          status: string
+          total_count: number
+          user_agent: string
+          user_email: string
+          user_id: string
+          user_role: string
+        }[]
+      }
+      get_activity_summary: {
+        Args: { p_days?: number; p_user_id?: string }
+        Returns: {
+          activities_by_category: Json
+          activities_by_role: Json
+          activities_by_type: Json
+          failed_count: number
+          hourly_pattern: Json
+          recent_failures: Json
+          success_count: number
+          success_rate: number
+          total_activities: number
+        }[]
+      }
+      get_admin_dashboard_stats: { Args: { p_days?: number }; Returns: Json }
       get_applicant_dashboard_stats: {
         Args: { p_user_id: string }
         Returns: {
@@ -743,6 +1427,54 @@ export type Database = {
           total_applications: number
         }[]
       }
+      get_audit_dashboard_stats: {
+        Args: { p_days?: number }
+        Returns: {
+          application_table_changes: number
+          changes_30d: number
+          changes_7d: number
+          changes_today: number
+          delete_operations: number
+          insert_operations: number
+          most_modified_tables: Json
+          system_table_changes: number
+          top_active_users: Json
+          total_operations: number
+          training_table_changes: number
+          update_operations: number
+          user_table_changes: number
+        }[]
+      }
+      get_audit_trail_filtered: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_limit?: number
+          p_offset?: number
+          p_operation?: Database["public"]["Enums"]["audit_operation"]
+          p_order_by?: string
+          p_record_id?: string
+          p_search_term?: string
+          p_table_name?: string
+          p_user_id?: string
+        }
+        Returns: {
+          audit_timestamp: string
+          changed_fields: string[]
+          id: string
+          ip_address: string
+          new_values: Json
+          old_values: Json
+          operation: string
+          record_id: string
+          table_name: string
+          total_count: number
+          user_agent: string
+          user_email: string
+          user_id: string
+          user_role: string
+        }[]
+      }
       get_available_training_slots: {
         Args: { p_program_id: string }
         Returns: number
@@ -761,6 +1493,38 @@ export type Database = {
           total_jobs: number
         }[]
       }
+      get_index_usage_stats: {
+        Args: { p_schema_name?: string }
+        Returns: {
+          index_name: string
+          index_scans: number
+          rows_fetched: number
+          rows_read: number
+          table_name: string
+        }[]
+      }
+      get_live_activity_feed: {
+        Args: { p_event_categories?: string[]; p_limit?: number }
+        Returns: {
+          activity_timestamp: string
+          details: string
+          event_category: string
+          event_type: string
+          id: string
+          status: string
+          time_ago_text: string
+          user_email: string
+          user_role: string
+        }[]
+      }
+      get_materialized_view_stats: {
+        Args: never
+        Returns: {
+          row_count: number
+          size_bytes: number
+          view_name: string
+        }[]
+      }
       get_peso_dashboard_stats: {
         Args: { p_user_id?: string }
         Returns: {
@@ -774,6 +1538,28 @@ export type Database = {
           total_enrolled: number
           total_programs: number
           upcoming_programs: number
+        }[]
+      }
+      get_storage_statistics: {
+        Args: never
+        Returns: {
+          bucket_name: string
+          total_files: number
+          total_size_bytes: number
+          total_size_readable: string
+        }[]
+      }
+      get_suspicious_activities: {
+        Args: { p_days?: number; p_limit?: number }
+        Returns: {
+          details: string
+          event_type: string
+          failure_count: number
+          id: string
+          log_timestamp: string
+          metadata: Json
+          user_email: string
+          user_role: string
         }[]
       }
       get_training_statistics: {
@@ -791,6 +1577,43 @@ export type Database = {
       get_unread_notification_count: {
         Args: { p_user_id: string }
         Returns: number
+      }
+      get_unread_notification_summary: {
+        Args: { p_user_id: string }
+        Returns: {
+          by_type: Json
+          most_recent: Json
+          total_unread: number
+        }[]
+      }
+      get_user_activity_timeline: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          activity_status: string
+          activity_timestamp: string
+          details: string
+          event_category: string
+          event_type: string
+          metadata: Json
+        }[]
+      }
+      get_user_full_history: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          details: string
+          event_type: string
+          log_timestamp: string
+          metadata: Json
+          source: string
+        }[]
+      }
+      get_user_impact_analysis: {
+        Args: { p_user_id: string }
+        Returns: {
+          description: string
+          metric_name: string
+          metric_value: number
+        }[]
       }
       get_user_permissions: {
         Args: { p_user_id: string }
@@ -845,9 +1668,312 @@ export type Database = {
             }
             Returns: string
           }
+      log_admin_activate_user: {
+        Args: {
+          p_admin_id: string
+          p_metadata?: Json
+          p_reason?: string
+          p_target_user_id: string
+        }
+        Returns: string
+      }
+      log_admin_change_role: {
+        Args: {
+          p_admin_id: string
+          p_metadata?: Json
+          p_new_role: Database["public"]["Enums"]["user_role"]
+          p_old_role: Database["public"]["Enums"]["user_role"]
+          p_reason?: string
+          p_target_user_id: string
+        }
+        Returns: string
+      }
+      log_admin_create_user: {
+        Args: {
+          p_admin_id: string
+          p_created_user_email: string
+          p_created_user_id: string
+          p_created_user_role: Database["public"]["Enums"]["user_role"]
+          p_metadata?: Json
+        }
+        Returns: string
+      }
+      log_admin_deactivate_user: {
+        Args: {
+          p_admin_id: string
+          p_metadata?: Json
+          p_reason?: string
+          p_target_user_id: string
+        }
+        Returns: string
+      }
+      log_admin_delete_user: {
+        Args: {
+          p_admin_id: string
+          p_deletion_type: string
+          p_metadata?: Json
+          p_reason?: string
+          p_target_user_id: string
+        }
+        Returns: string
+      }
+      log_ai_ranking: {
+        Args: {
+          p_algorithm_used: string
+          p_application_id: string
+          p_match_score: number
+          p_metadata?: Json
+          p_rank: number
+        }
+        Returns: string
+      }
+      log_announcement_created: {
+        Args: {
+          p_announcement_id: string
+          p_announcement_title: string
+          p_category: string
+          p_hr_id: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
+      log_announcement_status_changed: {
+        Args: {
+          p_announcement_id: string
+          p_metadata?: Json
+          p_new_status: string
+          p_old_status: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      log_announcement_updated: {
+        Args: {
+          p_announcement_id: string
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      log_application_approved: {
+        Args: {
+          p_application_id: string
+          p_hr_id: string
+          p_metadata?: Json
+          p_rank: number
+          p_score: number
+        }
+        Returns: string
+      }
+      log_application_denied: {
+        Args: {
+          p_application_id: string
+          p_hr_id: string
+          p_metadata?: Json
+          p_reason?: string
+        }
+        Returns: string
+      }
+      log_application_submitted: {
+        Args: {
+          p_applicant_id: string
+          p_application_id: string
+          p_job_id: string
+          p_metadata?: Json
+          p_pds_file_name: string
+        }
+        Returns: string
+      }
+      log_bulk_operation: {
+        Args: {
+          p_admin_id: string
+          p_affected_count: number
+          p_metadata?: Json
+          p_operation_details: Json
+          p_operation_type: string
+        }
+        Returns: string
+      }
+      log_email_notification_sent: {
+        Args: {
+          p_metadata?: Json
+          p_notification_title: string
+          p_notification_type: string
+          p_success: boolean
+          p_user_id: string
+        }
+        Returns: string
+      }
+      log_file_deletion: {
+        Args: {
+          p_bucket_name: string
+          p_file_path: string
+          p_metadata?: Json
+          p_reason?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      log_file_upload: {
+        Args: {
+          p_bucket_name: string
+          p_file_path: string
+          p_file_size: number
+          p_file_type: string
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: string
+      }
+      log_job_created: {
+        Args: {
+          p_hr_id: string
+          p_job_id: string
+          p_job_title: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
+      log_job_deleted: {
+        Args: {
+          p_hr_id: string
+          p_job_id: string
+          p_metadata?: Json
+          p_reason?: string
+        }
+        Returns: string
+      }
+      log_job_status_changed: {
+        Args: {
+          p_hr_id: string
+          p_job_id: string
+          p_metadata?: Json
+          p_new_status: string
+          p_old_status: string
+        }
+        Returns: string
+      }
+      log_job_updated: {
+        Args: {
+          p_changes_made: string
+          p_hr_id: string
+          p_job_id: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
+      log_ocr_processing: {
+        Args: {
+          p_applicant_id: string
+          p_confidence_score?: number
+          p_metadata?: Json
+          p_pds_file_name: string
+          p_success: boolean
+        }
+        Returns: string
+      }
+      log_training_application_approved: {
+        Args: {
+          p_metadata?: Json
+          p_peso_id: string
+          p_training_application_id: string
+        }
+        Returns: string
+      }
+      log_training_application_denied: {
+        Args: {
+          p_metadata?: Json
+          p_peso_id: string
+          p_reason?: string
+          p_training_application_id: string
+        }
+        Returns: string
+      }
+      log_training_application_status_changed: {
+        Args: {
+          p_application_id: string
+          p_metadata?: Json
+          p_new_status: string
+          p_old_status: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      log_training_application_submitted: {
+        Args: {
+          p_applicant_id: string
+          p_application_id: string
+          p_metadata?: Json
+          p_program_id: string
+        }
+        Returns: undefined
+      }
+      log_training_created: {
+        Args: {
+          p_metadata?: Json
+          p_peso_id: string
+          p_program_id: string
+          p_program_title: string
+        }
+        Returns: string
+      }
+      log_training_deleted: {
+        Args: {
+          p_metadata?: Json
+          p_peso_id: string
+          p_program_id: string
+          p_reason?: string
+        }
+        Returns: string
+      }
+      log_training_program_created: {
+        Args: {
+          p_metadata?: Json
+          p_peso_id: string
+          p_program_id: string
+          p_program_title: string
+        }
+        Returns: undefined
+      }
+      log_training_program_deleted: {
+        Args: { p_metadata?: Json; p_program_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      log_training_program_updated: {
+        Args: { p_metadata?: Json; p_program_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      log_training_updated: {
+        Args: {
+          p_changes_made: string
+          p_metadata?: Json
+          p_peso_id: string
+          p_program_id: string
+        }
+        Returns: string
+      }
       mark_all_notifications_read: {
         Args: { p_user_id: string }
         Returns: number
+      }
+      refresh_all_materialized_views: { Args: never; Returns: undefined }
+      refresh_materialized_view: {
+        Args: { p_view_name: string }
+        Returns: boolean
+      }
+      search_audit_logs: {
+        Args: { p_limit?: number; p_search_term: string }
+        Returns: {
+          audit_timestamp: string
+          id: string
+          match_context: string
+          operation: string
+          record_id: string
+          relevance_score: number
+          table_name: string
+          user_email: string
+          user_role: string
+        }[]
       }
       soft_delete_profile: { Args: { p_user_id: string }; Returns: boolean }
       update_user_last_login: {
@@ -861,11 +1987,32 @@ export type Database = {
           reason: string
         }[]
       }
+      validate_training_application: {
+        Args: { p_applicant_id: string; p_program_id: string }
+        Returns: {
+          can_apply: boolean
+          reason: string
+        }[]
+      }
     }
     Enums: {
       announcement_category: "job_opening" | "training" | "notice" | "general"
       announcement_status: "active" | "archived"
-      application_status: "pending" | "approved" | "denied"
+      application_status:
+        | "pending"
+        | "approved"
+        | "denied"
+        | "under_review"
+        | "shortlisted"
+        | "interviewed"
+        | "hired"
+        | "archived"
+        | "withdrawn"
+        | "enrolled"
+        | "in_progress"
+        | "completed"
+        | "certified"
+        | "failed"
       audit_operation: "INSERT" | "UPDATE" | "DELETE"
       event_category:
         | "auth"
@@ -886,7 +2033,12 @@ export type Database = {
         | "training_application"
         | "announcement"
         | "job"
-      training_program_status: "active" | "upcoming" | "completed" | "cancelled"
+      training_program_status:
+        | "active"
+        | "upcoming"
+        | "completed"
+        | "cancelled"
+        | "archived"
       user_role: "ADMIN" | "HR" | "PESO" | "APPLICANT"
       user_status: "active" | "inactive"
     }
@@ -1018,7 +2170,22 @@ export const Constants = {
     Enums: {
       announcement_category: ["job_opening", "training", "notice", "general"],
       announcement_status: ["active", "archived"],
-      application_status: ["pending", "approved", "denied"],
+      application_status: [
+        "pending",
+        "approved",
+        "denied",
+        "under_review",
+        "shortlisted",
+        "interviewed",
+        "hired",
+        "archived",
+        "withdrawn",
+        "enrolled",
+        "in_progress",
+        "completed",
+        "certified",
+        "failed",
+      ],
       audit_operation: ["INSERT", "UPDATE", "DELETE"],
       event_category: [
         "auth",
@@ -1042,7 +2209,13 @@ export const Constants = {
         "announcement",
         "job",
       ],
-      training_program_status: ["active", "upcoming", "completed", "cancelled"],
+      training_program_status: [
+        "active",
+        "upcoming",
+        "completed",
+        "cancelled",
+        "archived",
+      ],
       user_role: ["ADMIN", "HR", "PESO", "APPLICANT"],
       user_status: ["active", "inactive"],
     },

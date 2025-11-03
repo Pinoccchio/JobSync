@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, File, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 
 interface FileUploadWithProgressProps {
-  bucket: 'id-images' | 'announcements' | 'profiles';
+  bucket: 'id-images' | 'announcements' | 'profiles' | 'certificates';
   folder?: string;
   accept?: string;
   onUploadComplete?: (data: {
@@ -45,6 +45,8 @@ export const FileUploadWithProgress: React.FC<FileUploadWithProgressProps> = ({
         return 'Drag and drop announcement image here';
       case 'profiles':
         return 'Drag and drop profile picture here';
+      case 'certificates':
+        return 'Drag and drop certificate file here';
       default:
         return 'Drag and drop file here';
     }
@@ -60,6 +62,8 @@ export const FileUploadWithProgress: React.FC<FileUploadWithProgressProps> = ({
         return '5MB';
       case 'profiles':
         return '2MB';
+      case 'certificates':
+        return '10MB';
       default:
         return '';
     }

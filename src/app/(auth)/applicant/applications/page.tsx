@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
+import { getStatusConfig } from '@/lib/config/statusConfig';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 
 interface StatusHistoryItem {
@@ -89,7 +90,7 @@ export default function MyApplicationsPage() {
           position: app.training_programs?.title || 'Unknown Program',
           type: 'Training Application' as const,
           dateApplied: app.submitted_at || app.created_at,
-          status: app.status === 'pending' ? 'pending' : app.status === 'approved' ? 'approved' : 'denied',
+          status: app.status, // Keep original training status (supports all 11 statuses)
           rawStatus: app.status,
           matchScore: 'N/A',
           statusHistory: app.status_history || [], // Include status change timeline
@@ -185,61 +186,9 @@ export default function MyApplicationsPage() {
       accessor: 'status',
       sortable: true,
       render: (value: string) => {
-        let variant: 'success' | 'danger' | 'pending' | 'info' | 'warning' | 'default' = 'default';
-        let IconComponent = Clock;
-        let displayText = value;
-
-        switch (value) {
-          case 'pending':
-            variant = 'pending';
-            IconComponent = Clock;
-            displayText = 'Pending Review';
-            break;
-          case 'under_review':
-            variant = 'info';
-            IconComponent = Eye;
-            displayText = 'Under Review';
-            break;
-          case 'shortlisted':
-            variant = 'warning';
-            IconComponent = Star;
-            displayText = 'Shortlisted 🎉';
-            break;
-          case 'interviewed':
-            variant = 'info';
-            IconComponent = Calendar;
-            displayText = 'Interview Scheduled';
-            break;
-          case 'approved':
-            variant = 'success';
-            IconComponent = CheckCircle;
-            displayText = 'Approved ✅';
-            break;
-          case 'denied':
-            variant = 'danger';
-            IconComponent = XCircle;
-            displayText = 'Not Approved';
-            break;
-          case 'hired':
-            variant = 'success';
-            IconComponent = Briefcase;
-            displayText = 'Hired 🎉';
-            break;
-          case 'archived':
-            variant = 'default';
-            IconComponent = FileText;
-            displayText = 'Archived';
-            break;
-          case 'withdrawn':
-            variant = 'default';
-            IconComponent = AlertCircle;
-            displayText = 'Withdrawn';
-            break;
-          default:
-            displayText = value.charAt(0).toUpperCase() + value.slice(1);
-        }
-
-        return <Badge variant={variant} icon={IconComponent}>{displayText}</Badge>;
+        // Use centralized status configuration
+        const statusConfig = getStatusConfig(value);
+        return <Badge variant={statusConfig.badgeVariant} icon={statusConfig.icon}>{statusConfig.label}</Badge>;
       }
     },
     {

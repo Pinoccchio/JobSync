@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { CheckCircle, Circle, Clock, Eye, UserCheck, Play, CheckCircle2, XCircle, Award, AlertCircle, Archive, Info, Ban } from 'lucide-react';
+import { STATUS_CONFIG } from '@/lib/config/statusConfig';
 
 interface StatusHistoryItem {
   from: string | null;
@@ -13,86 +14,6 @@ interface StatusTimelineProps {
   statusHistory: StatusHistoryItem[];
   currentStatus: string;
 }
-
-const STATUS_CONFIG = {
-  pending: {
-    label: 'Pending Review',
-    icon: Clock,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
-    borderColor: 'border-orange-600',
-  },
-  under_review: {
-    label: 'Under Review',
-    icon: Eye,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
-    borderColor: 'border-blue-600',
-  },
-  approved: {
-    label: 'Approved',
-    icon: CheckCircle2,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-    borderColor: 'border-green-600',
-  },
-  denied: {
-    label: 'Denied',
-    icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-    borderColor: 'border-red-600',
-  },
-  enrolled: {
-    label: 'Enrolled',
-    icon: UserCheck,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-    borderColor: 'border-purple-600',
-  },
-  in_progress: {
-    label: 'In Progress',
-    icon: Play,
-    color: 'text-teal-600',
-    bgColor: 'bg-teal-100',
-    borderColor: 'border-teal-600',
-  },
-  completed: {
-    label: 'Completed',
-    icon: CheckCircle,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
-    borderColor: 'border-gray-600',
-  },
-  certified: {
-    label: 'Certified',
-    icon: Award,
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    borderColor: 'border-yellow-600',
-  },
-  withdrawn: {
-    label: 'Withdrawn',
-    icon: AlertCircle,
-    color: 'text-slate-600',
-    bgColor: 'bg-slate-100',
-    borderColor: 'border-slate-600',
-  },
-  failed: {
-    label: 'Failed',
-    icon: Ban,
-    color: 'text-rose-700',
-    bgColor: 'bg-rose-100',
-    borderColor: 'border-rose-700',
-  },
-  archived: {
-    label: 'Archived',
-    icon: Archive,
-    color: 'text-gray-500',
-    bgColor: 'bg-gray-50',
-    borderColor: 'border-gray-500',
-  },
-};
 
 export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, currentStatus }) => {
   // Format the timeline from status_history
@@ -153,12 +74,12 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
                   <div
                     className={`relative w-10 h-10 rounded-full border-2 ${
                       step.isCurrent
-                        ? `${step.bgColor} ${step.borderColor} shadow-lg`
-                        : 'bg-white border-gray-300'
+                        ? `${step.bgColor} ${step.borderColor} shadow-lg scale-110`
+                        : `bg-white ${step.borderColor} opacity-80`
                     } flex items-center justify-center transition-all`}
                   >
                     <step.icon
-                      className={`w-5 h-5 ${step.isCurrent ? step.color : 'text-gray-400'}`}
+                      className={`w-5 h-5 ${step.color}`}
                     />
                     {/* Current indicator pulse */}
                     {step.isCurrent && (
@@ -173,9 +94,7 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
                 {/* Label */}
                 <div className="mt-2 text-center">
                   <p
-                    className={`text-xs font-semibold ${
-                      step.isCurrent ? step.color : 'text-gray-600'
-                    }`}
+                    className={`text-xs font-semibold ${step.color}`}
                   >
                     {step.label}
                   </p>
@@ -195,16 +114,22 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, c
               </div>
 
               {/* Connecting Line */}
-              {!step.isLast && (
-                <div className="flex items-center" style={{ width: '80px', marginTop: '20px' }}>
-                  <div className="h-0.5 w-full bg-gray-300 relative">
-                    {/* Arrow */}
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                      <div className="w-0 h-0 border-t-4 border-t-transparent border-l-8 border-l-gray-300 border-b-4 border-b-transparent"></div>
+              {!step.isLast && (() => {
+                const nextStep = timelineSteps[index + 1];
+                const lineColor = nextStep ? nextStep.borderColor.replace('border-', 'bg-') : 'bg-gray-300';
+                const arrowColor = nextStep ? nextStep.borderColor.replace('border-', 'border-l-') : 'border-l-gray-300';
+
+                return (
+                  <div className="flex items-center" style={{ width: '80px', marginTop: '20px' }}>
+                    <div className={`h-0.5 w-full ${lineColor} relative opacity-60`}>
+                      {/* Arrow */}
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                        <div className={`w-0 h-0 border-t-4 border-t-transparent ${arrowColor} border-b-4 border-b-transparent opacity-100`}></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ))}
         </div>

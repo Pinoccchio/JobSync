@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { CheckCircle, Circle, Clock, Star, Calendar, CheckCircle2, XCircle, Briefcase, AlertCircle, Archive, Eye, Info } from 'lucide-react';
+import { STATUS_CONFIG } from '@/lib/config/statusConfig';
 
 interface StatusHistoryItem {
   from: string | null;
@@ -13,72 +14,6 @@ interface StatusTimelineProps {
   statusHistory: StatusHistoryItem[];
   currentStatus: string;
 }
-
-const STATUS_CONFIG = {
-  pending: {
-    label: 'Pending Review',
-    icon: Clock,
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    borderColor: 'border-yellow-600',
-  },
-  under_review: {
-    label: 'Under Review',
-    icon: Eye,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
-    borderColor: 'border-blue-600',
-  },
-  shortlisted: {
-    label: 'Shortlisted',
-    icon: Star,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
-    borderColor: 'border-orange-600',
-  },
-  interviewed: {
-    label: 'Interviewed',
-    icon: Calendar,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-    borderColor: 'border-purple-600',
-  },
-  approved: {
-    label: 'Approved',
-    icon: CheckCircle2,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-    borderColor: 'border-green-600',
-  },
-  denied: {
-    label: 'Denied',
-    icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-    borderColor: 'border-red-600',
-  },
-  hired: {
-    label: 'Hired',
-    icon: Briefcase,
-    color: 'text-teal-600',
-    bgColor: 'bg-teal-100',
-    borderColor: 'border-teal-600',
-  },
-  withdrawn: {
-    label: 'Withdrawn',
-    icon: AlertCircle,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
-    borderColor: 'border-gray-600',
-  },
-  archived: {
-    label: 'Archived',
-    icon: Archive,
-    color: 'text-gray-500',
-    bgColor: 'bg-gray-50',
-    borderColor: 'border-gray-500',
-  },
-};
 
 export const StatusTimeline: React.FC<StatusTimelineProps> = ({ statusHistory, currentStatus }) => {
   // Format the timeline from status_history

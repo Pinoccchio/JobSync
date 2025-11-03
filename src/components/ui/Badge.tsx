@@ -10,10 +10,14 @@ const badgeVariants = cva(
       variant: {
         // Basic variants
         default: 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300',
+        primary: 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-300',
+        secondary: 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300',
         success: 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-300',
         warning: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-300',
         danger: 'bg-red-100 text-red-800 hover:bg-red-200 border border-red-300',
         info: 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-300',
+        teal: 'bg-teal-100 text-teal-800 hover:bg-teal-200 border border-teal-300',
+        purple: 'bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-300',
         pending: 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-300',
 
         // Semantic action variants

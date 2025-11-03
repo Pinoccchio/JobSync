@@ -1,13 +1,14 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, Modal, Input, Textarea } from '@/components/ui';
+import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, ModernModal, Input, Textarea, DropdownMenu } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusTimeline } from '@/components/peso/StatusTimeline';
+import { getStatusConfig } from '@/lib/config/statusConfig';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2 } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, FileText } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -62,6 +63,7 @@ export default function PESOApplicationsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [nextSteps, setNextSteps] = useState('');
   const [denialReason, setDenialReason] = useState('');
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
 
   // Fetch training applications function
   const fetchApplications = useCallback(async () => {
@@ -301,10 +303,39 @@ export default function PESOApplicationsPage() {
 
     try {
       setActionLoading(true);
+
+      let certificateUrl = '';
+
+      // Upload certificate file if provided
+      if (certificateFile) {
+        const fileName = `${selectedApplication.applicant_id}/${Date.now()}-${certificateFile.name}`;
+        const formData = new FormData();
+        formData.append('file', certificateFile);
+        formData.append('bucket', 'certificates');
+        formData.append('path', fileName);
+
+        const uploadResponse = await fetch('/api/storage/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok) {
+          throw new Error(uploadResult.error || 'Failed to upload certificate');
+        }
+
+        certificateUrl = uploadResult.path; // Store the path, not the URL
+      }
+
+      // Update status to certified with certificate URL
       const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'certified' }),
+        body: JSON.stringify({
+          status: 'certified',
+          certificate_url: certificateUrl || null,
+        }),
       });
 
       const result = await response.json();
@@ -316,6 +347,7 @@ export default function PESOApplicationsPage() {
       showToast(result.message || 'Certificate issued successfully', 'success');
       setCertifyModalOpen(false);
       setSelectedApplication(null);
+      setCertificateFile(null);
       fetchApplications();
     } catch (error: any) {
       console.error('Error issuing certificate:', error);
@@ -336,22 +368,14 @@ export default function PESOApplicationsPage() {
     return a.training_programs?.title === programFilter;
   });
 
-  // Get badge variant and icon for status
+  // Get badge variant and icon for status using centralized config
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: any; icon: any; label: string }> = {
-      pending: { variant: 'warning', icon: Clock, label: 'Pending' },
-      under_review: { variant: 'primary', icon: Eye, label: 'Under Review' },
-      approved: { variant: 'success', icon: CheckCircle2, label: 'Approved' },
-      denied: { variant: 'danger', icon: XCircle, label: 'Denied' },
-      enrolled: { variant: 'primary', icon: UserCheck, label: 'Enrolled' },
-      in_progress: { variant: 'teal', icon: Play, label: 'In Progress' },
-      completed: { variant: 'secondary', icon: CheckCircle, label: 'Completed' },
-      certified: { variant: 'warning', icon: Award, label: 'Certified' },
-      withdrawn: { variant: 'secondary', icon: XCircle, label: 'Withdrawn' },
-      failed: { variant: 'danger', icon: XCircle, label: 'Failed' },
-      archived: { variant: 'secondary', icon: XCircle, label: 'Archived' },
+    const statusConfig = getStatusConfig(status);
+    return {
+      variant: statusConfig.badgeVariant,
+      icon: statusConfig.icon,
+      label: statusConfig.label,
     };
-    return config[status] || { variant: 'secondary', icon: Clock, label: status };
   };
 
   const columns = [
@@ -440,145 +464,118 @@ export default function PESOApplicationsPage() {
     {
       header: 'Actions',
       accessor: 'id' as const,
-      render: (_: any, row: TrainingApplication) => (
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={Eye}
-            onClick={() => handleView(row)}
-          >
-            View
-          </Button>
+      render: (_: any, row: TrainingApplication) => {
+        const menuItems = [
+          {
+            label: 'View Details',
+            icon: Eye,
+            onClick: () => handleView(row),
+            variant: 'default' as const,
+          },
+          {
+            label: 'View Status History',
+            icon: History,
+            onClick: () => handleViewHistory(row),
+            variant: 'default' as const,
+          },
+        ];
 
-          {/* Pending: Under Review, Approve, Deny */}
-          {row.status === 'pending' && (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Eye}
-                onClick={() => {
-                  setSelectedApplication(row);
-                  setUnderReviewModalOpen(true);
-                }}
-              >
-                Under Review
-              </Button>
-              <Button
-                variant="success"
-                size="sm"
-                icon={CheckCircle2}
-                onClick={() => {
-                  setSelectedApplication(row);
-                  setApproveModalOpen(true);
-                }}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon={XCircle}
-                onClick={() => {
-                  setSelectedApplication(row);
-                  setDenyModalOpen(true);
-                }}
-              >
-                Deny
-              </Button>
-            </>
-          )}
-
-          {/* Under Review: Approve, Deny */}
-          {row.status === 'under_review' && (
-            <>
-              <Button
-                variant="success"
-                size="sm"
-                icon={CheckCircle2}
-                onClick={() => {
-                  setSelectedApplication(row);
-                  setApproveModalOpen(true);
-                }}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon={XCircle}
-                onClick={() => {
-                  setSelectedApplication(row);
-                  setDenyModalOpen(true);
-                }}
-              >
-                Deny
-              </Button>
-            </>
-          )}
-
-          {/* Approved: Enroll */}
-          {row.status === 'approved' && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={UserCheck}
-              onClick={() => {
+        // Add status-specific actions
+        if (row.status === 'pending') {
+          menuItems.push(
+            {
+              label: 'Mark as Under Review',
+              icon: Eye,
+              onClick: () => {
                 setSelectedApplication(row);
-                setEnrollModalOpen(true);
-              }}
-            >
-              Enroll
-            </Button>
-          )}
-
-          {/* Enrolled: Start Training */}
-          {row.status === 'enrolled' && (
-            <Button
-              variant="teal"
-              size="sm"
-              icon={Play}
-              onClick={() => {
+                setUnderReviewModalOpen(true);
+              },
+              variant: 'default' as const,
+            },
+            {
+              label: 'Approve',
+              icon: CheckCircle2,
+              onClick: () => {
                 setSelectedApplication(row);
-                setStartTrainingModalOpen(true);
-              }}
-            >
-              Start Training
-            </Button>
-          )}
-
-          {/* In Progress: Mark as Completed */}
-          {row.status === 'in_progress' && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={CheckCircle}
-              onClick={() => {
+                setApproveModalOpen(true);
+              },
+              variant: 'success' as const,
+            },
+            {
+              label: 'Deny',
+              icon: XCircle,
+              onClick: () => {
                 setSelectedApplication(row);
-                setCompleteModalOpen(true);
-              }}
-            >
-              Complete
-            </Button>
-          )}
-
-          {/* Completed: Issue Certificate */}
-          {row.status === 'completed' && (
-            <Button
-              variant="warning"
-              size="sm"
-              icon={Award}
-              onClick={() => {
+                setDenyModalOpen(true);
+              },
+              variant: 'danger' as const,
+            }
+          );
+        } else if (row.status === 'under_review') {
+          menuItems.push(
+            {
+              label: 'Approve',
+              icon: CheckCircle2,
+              onClick: () => {
                 setSelectedApplication(row);
-                setCertifyModalOpen(true);
-              }}
-            >
-              Issue Certificate
-            </Button>
-          )}
-        </div>
-      )
+                setApproveModalOpen(true);
+              },
+              variant: 'success' as const,
+            },
+            {
+              label: 'Deny',
+              icon: XCircle,
+              onClick: () => {
+                setSelectedApplication(row);
+                setDenyModalOpen(true);
+              },
+              variant: 'danger' as const,
+            }
+          );
+        } else if (row.status === 'approved') {
+          menuItems.push({
+            label: 'Enroll',
+            icon: UserCheck,
+            onClick: () => {
+              setSelectedApplication(row);
+              setEnrollModalOpen(true);
+            },
+            variant: 'default' as const,
+          });
+        } else if (row.status === 'enrolled') {
+          menuItems.push({
+            label: 'Start Training',
+            icon: Play,
+            onClick: () => {
+              setSelectedApplication(row);
+              setStartTrainingModalOpen(true);
+            },
+            variant: 'default' as const,
+          });
+        } else if (row.status === 'in_progress') {
+          menuItems.push({
+            label: 'Mark as Completed',
+            icon: CheckCircle,
+            onClick: () => {
+              setSelectedApplication(row);
+              setCompleteModalOpen(true);
+            },
+            variant: 'default' as const,
+          });
+        } else if (row.status === 'completed') {
+          menuItems.push({
+            label: 'Issue Certificate',
+            icon: Award,
+            onClick: () => {
+              setSelectedApplication(row);
+              setCertifyModalOpen(true);
+            },
+            variant: 'warning' as const,
+          });
+        }
+
+        return <DropdownMenu items={menuItems} />;
+      },
     },
   ];
 
@@ -694,13 +691,16 @@ export default function PESOApplicationsPage() {
         </div>
 
         {/* View Details Modal */}
-        <Modal
+        <ModernModal
           isOpen={viewModalOpen}
           onClose={() => {
             setViewModalOpen(false);
             setSelectedApplication(null);
           }}
           title="Application Details"
+          subtitle="View training application information"
+          colorVariant="blue"
+          icon={FileText}
           size="lg"
         >
           {selectedApplication && (
@@ -793,12 +793,17 @@ export default function PESOApplicationsPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">Status</label>
                       <div className="mt-1">
-                        <Badge
-                          variant={selectedApplication.status === 'approved' ? 'success' : selectedApplication.status === 'denied' ? 'danger' : 'warning'}
-                          icon={selectedApplication.status === 'approved' ? CheckCircle : selectedApplication.status === 'denied' ? XCircle : Clock}
-                        >
-                          {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
-                        </Badge>
+                        {(() => {
+                          const statusBadge = getStatusBadge(selectedApplication.status);
+                          return (
+                            <Badge
+                              variant={statusBadge.variant as any}
+                              icon={statusBadge.icon}
+                            >
+                              {statusBadge.label}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div>
@@ -820,10 +825,10 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Approve Confirmation Modal */}
-        <Modal
+        <ModernModal
           isOpen={approveModalOpen}
           onClose={() => {
             setApproveModalOpen(false);
@@ -831,6 +836,9 @@ export default function PESOApplicationsPage() {
             setNextSteps('');
           }}
           title="Approve Application"
+          subtitle="Set next steps for applicant"
+          colorVariant="green"
+          icon={CheckCircle2}
           size="md"
         >
           {selectedApplication && (
@@ -881,10 +889,10 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Deny Confirmation Modal */}
-        <Modal
+        <ModernModal
           isOpen={denyModalOpen}
           onClose={() => {
             setDenyModalOpen(false);
@@ -892,6 +900,9 @@ export default function PESOApplicationsPage() {
             setDenialReason('');
           }}
           title="Deny Application"
+          subtitle="Provide reason for denial"
+          colorVariant="red"
+          icon={XCircle}
           size="md"
         >
           {selectedApplication && (
@@ -942,16 +953,19 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Mark as Under Review Modal */}
-        <Modal
+        <ModernModal
           isOpen={underReviewModalOpen}
           onClose={() => {
             setUnderReviewModalOpen(false);
             setSelectedApplication(null);
           }}
           title="Mark as Under Review"
+          subtitle="Update application status"
+          colorVariant="blue"
+          icon={Eye}
           size="md"
         >
           {selectedApplication && (
@@ -989,16 +1003,19 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Enroll Applicant Modal */}
-        <Modal
+        <ModernModal
           isOpen={enrollModalOpen}
           onClose={() => {
             setEnrollModalOpen(false);
             setSelectedApplication(null);
           }}
           title="Enroll Applicant"
+          subtitle="Confirm enrollment in training program"
+          colorVariant="purple"
+          icon={UserCheck}
           size="md"
         >
           {selectedApplication && (
@@ -1036,16 +1053,19 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Start Training Modal */}
-        <Modal
+        <ModernModal
           isOpen={startTrainingModalOpen}
           onClose={() => {
             setStartTrainingModalOpen(false);
             setSelectedApplication(null);
           }}
           title="Start Training"
+          subtitle="Begin training program"
+          colorVariant="teal"
+          icon={Play}
           size="md"
         >
           {selectedApplication && (
@@ -1082,16 +1102,19 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Mark as Completed Modal */}
-        <Modal
+        <ModernModal
           isOpen={completeModalOpen}
           onClose={() => {
             setCompleteModalOpen(false);
             setSelectedApplication(null);
           }}
           title="Mark Training as Completed"
+          subtitle="Confirm training completion"
+          colorVariant="gray"
+          icon={CheckCircle}
           size="md"
         >
           {selectedApplication && (
@@ -1128,16 +1151,20 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Issue Certificate Modal */}
-        <Modal
+        <ModernModal
           isOpen={certifyModalOpen}
           onClose={() => {
             setCertifyModalOpen(false);
             setSelectedApplication(null);
+            setCertificateFile(null);
           }}
           title="Issue Training Certificate"
+          subtitle="Grant certificate of completion"
+          colorVariant="orange"
+          icon={Award}
           size="md"
         >
           {selectedApplication && (
@@ -1153,12 +1180,40 @@ export default function PESOApplicationsPage() {
                 </p>
               </div>
 
+              {/* Certificate Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Certificate (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setCertificateFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-orange-50 file:text-orange-700
+                    hover:file:bg-orange-100
+                    cursor-pointer border border-gray-300 rounded-lg"
+                />
+                {certificateFile && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Selected: <span className="font-medium">{certificateFile.name}</span>
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Accepted formats: PDF, JPG, PNG (Max 10MB)
+                </p>
+              </div>
+
               <div className="flex justify-end gap-3 pt-4">
                 <Button
                   variant="secondary"
                   onClick={() => {
                     setCertifyModalOpen(false);
                     setSelectedApplication(null);
+                    setCertificateFile(null);
                   }}
                   disabled={actionLoading}
                 >
@@ -1175,28 +1230,23 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </Modal>
+        </ModernModal>
 
         {/* Status History Modal */}
-        <Modal
+        <ModernModal
           isOpen={historyModalOpen}
           onClose={() => {
             setHistoryModalOpen(false);
             setSelectedApplication(null);
           }}
           title="Application Status History"
+          subtitle={selectedApplication ? `${selectedApplication.full_name} - ${selectedApplication.training_programs?.title || 'N/A'}` : ''}
+          colorVariant="blue"
+          icon={History}
           size="xl"
         >
           {selectedApplication && (
             <div className="space-y-6">
-              {/* Applicant Info Header */}
-              <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white p-4 rounded-lg -mt-6 -mx-6 mb-6">
-                <h3 className="text-lg font-bold">{selectedApplication.full_name}</h3>
-                <p className="text-sm text-teal-100 mt-1">
-                  {selectedApplication.training_programs?.title || 'N/A'}
-                </p>
-              </div>
-
               {/* Status Timeline */}
               {selectedApplication.status_history && selectedApplication.status_history.length > 0 ? (
                 <StatusTimeline
@@ -1214,7 +1264,7 @@ export default function PESOApplicationsPage() {
               )}
             </div>
           )}
-        </Modal>
+        </ModernModal>
       </Container>
     </AdminLayout>
   );

@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle, Clock, XCircle, Eye, Star, Calendar, Briefcase, Archive, AlertCircle } from 'lucide-react';
+import { getStatusConfig as getCentralizedStatusConfig } from '@/lib/config/statusConfig';
 
 interface ApplicationStatusBadgeProps {
   status: 'pending' | 'under_review' | 'shortlisted' | 'interviewed' | 'approved' | 'denied' | 'hired' | 'archived' | 'withdrawn';
@@ -16,71 +17,6 @@ export const ApplicationStatusBadge: React.FC<ApplicationStatusBadgeProps> = ({
   className = '',
   showDate = false,
 }) => {
-  const getStatusConfig = () => {
-    switch (status) {
-      case 'pending':
-        return {
-          color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-          icon: Clock,
-          label: 'Pending Review',
-        };
-      case 'under_review':
-        return {
-          color: 'bg-blue-100 text-blue-800 border-blue-200',
-          icon: Eye,
-          label: 'Under Review',
-        };
-      case 'shortlisted':
-        return {
-          color: 'bg-orange-100 text-orange-800 border-orange-200',
-          icon: Star,
-          label: 'Shortlisted',
-        };
-      case 'interviewed':
-        return {
-          color: 'bg-purple-100 text-purple-800 border-purple-200',
-          icon: Calendar,
-          label: 'Interviewed',
-        };
-      case 'approved':
-        return {
-          color: 'bg-green-100 text-green-800 border-green-200',
-          icon: CheckCircle,
-          label: 'Approved',
-        };
-      case 'denied':
-        return {
-          color: 'bg-red-100 text-red-800 border-red-200',
-          icon: XCircle,
-          label: 'Not Approved',
-        };
-      case 'hired':
-        return {
-          color: 'bg-teal-100 text-teal-800 border-teal-200',
-          icon: Briefcase,
-          label: 'Hired',
-        };
-      case 'archived':
-        return {
-          color: 'bg-gray-100 text-gray-800 border-gray-200',
-          icon: Archive,
-          label: 'Archived',
-        };
-      case 'withdrawn':
-        return {
-          color: 'bg-gray-100 text-gray-800 border-gray-200',
-          icon: AlertCircle,
-          label: 'Withdrawn',
-        };
-      default:
-        return {
-          color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-          icon: Clock,
-          label: 'Pending',
-        };
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -100,8 +36,14 @@ export const ApplicationStatusBadge: React.FC<ApplicationStatusBadgeProps> = ({
     });
   };
 
-  const config = getStatusConfig();
-  const Icon = config.icon;
+  // Use centralized status configuration
+  const statusConfig = getCentralizedStatusConfig(status);
+  const Icon = statusConfig.icon;
+  const config = {
+    color: statusConfig.legacyColor || 'bg-gray-100 text-gray-800 border-gray-200',
+    icon: Icon,
+    label: statusConfig.label,
+  };
 
   return (
     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border ${config.color} ${className}`}>

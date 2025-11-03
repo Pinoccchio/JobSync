@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { GraduationCap, Clock, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
+import { getStatusConfig } from '@/lib/config/statusConfig';
 
 interface DashboardStats {
   totalApplications: number;
@@ -143,16 +144,12 @@ export default function PESODashboard() {
   ];
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="warning" icon={Clock}>Pending</Badge>;
-      case 'approved':
-        return <Badge variant="success">Approved</Badge>;
-      case 'denied':
-        return <Badge variant="danger">Denied</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
+    const statusConfig = getStatusConfig(status);
+    return {
+      variant: statusConfig.badgeVariant,
+      icon: statusConfig.icon,
+      label: statusConfig.label,
+    };
   };
 
   return (
@@ -241,7 +238,14 @@ export default function PESODashboard() {
                         </div>
                       </div>
                     </div>
-                    {getStatusBadge(application.status)}
+                    {(() => {
+                      const statusBadge = getStatusBadge(application.status);
+                      return (
+                        <Badge variant={statusBadge.variant as any} icon={statusBadge.icon}>
+                          {statusBadge.label}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

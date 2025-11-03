@@ -10,6 +10,7 @@ import { Briefcase, Download, Calendar, Users, GraduationCap, Megaphone, Loader2
 import { supabase } from '@/lib/supabase/auth';
 import { AnnouncementViewModal } from '@/components/applicant/AnnouncementViewModal';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
+import { getStatusConfig } from '@/lib/config/statusConfig';
 
 interface StatusHistoryItem {
   from: string | null;
@@ -263,61 +264,9 @@ export default function ApplicantDashboard() {
       header: 'Status',
       accessor: 'status' as const,
       render: (value: string) => {
-        let variant: 'success' | 'danger' | 'pending' | 'info' | 'warning' | 'default' = 'default';
-        let IconComponent = Clock;
-        let displayText = value;
-
-        switch (value) {
-          case 'pending':
-            variant = 'pending';
-            IconComponent = Clock;
-            displayText = 'Pending Review';
-            break;
-          case 'under_review':
-            variant = 'info';
-            IconComponent = Eye;
-            displayText = 'Under Review';
-            break;
-          case 'shortlisted':
-            variant = 'warning';
-            IconComponent = Star;
-            displayText = 'Shortlisted';
-            break;
-          case 'interviewed':
-            variant = 'info';
-            IconComponent = Calendar;
-            displayText = 'Interviewed';
-            break;
-          case 'approved':
-            variant = 'success';
-            IconComponent = CheckCircle2;
-            displayText = 'Approved';
-            break;
-          case 'denied':
-            variant = 'danger';
-            IconComponent = XCircle;
-            displayText = 'Not Approved';
-            break;
-          case 'hired':
-            variant = 'success';
-            IconComponent = Briefcase;
-            displayText = 'Hired';
-            break;
-          case 'archived':
-            variant = 'default';
-            IconComponent = Archive;
-            displayText = 'Archived';
-            break;
-          case 'withdrawn':
-            variant = 'default';
-            IconComponent = AlertCircle;
-            displayText = 'Withdrawn';
-            break;
-          default:
-            displayText = value.charAt(0).toUpperCase() + value.slice(1);
-        }
-
-        return <Badge variant={variant} icon={IconComponent}>{displayText}</Badge>;
+        // Use centralized status configuration
+        const statusConfig = getStatusConfig(value);
+        return <Badge variant={statusConfig.badgeVariant} icon={statusConfig.icon}>{statusConfig.label}</Badge>;
       }
     },
     {

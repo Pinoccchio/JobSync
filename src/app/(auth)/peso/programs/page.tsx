@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton } from '@/components/ui';
+import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton, ModernModal } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -329,6 +329,24 @@ export default function PESOProgramsPage() {
     return p.status === statusFilter;
   });
 
+  // Helper function to get program status badge configuration
+  const getProgramStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { variant: 'success' as const, icon: CheckCircle2, label: 'Active' };
+      case 'upcoming':
+        return { variant: 'info' as const, icon: Clock, label: 'Upcoming' };
+      case 'completed':
+        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
+      case 'cancelled':
+        return { variant: 'danger' as const, icon: X, label: 'Cancelled' };
+      case 'archived':
+        return { variant: 'secondary' as const, icon: Archive, label: 'Archived' };
+      default:
+        return { variant: 'secondary' as const, icon: AlertCircle, label: status };
+    }
+  };
+
   // Table columns
   const columns = [
     {
@@ -384,11 +402,14 @@ export default function PESOProgramsPage() {
     {
       header: 'Status',
       accessor: 'status' as const,
-      render: (value: string) => (
-        <Badge variant={value === 'active' ? 'success' : value === 'completed' ? 'default' : 'danger'}>
-          {value}
-        </Badge>
-      )
+      render: (value: string) => {
+        const statusBadge = getProgramStatusBadge(value);
+        return (
+          <Badge variant={statusBadge.variant} icon={statusBadge.icon}>
+            {statusBadge.label}
+          </Badge>
+        );
+      }
     },
     {
       header: 'Actions',
@@ -597,27 +618,16 @@ export default function PESOProgramsPage() {
         </Card>
 
         {/* Add Program Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center">
-                    <GraduationCap className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Create Training Program</h2>
-                    <p className="text-sm text-gray-600">Add a new job training program</p>
-                  </div>
-                </div>
-                <button onClick={() => { setShowAddModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleCreate} className="p-6 space-y-4">
+        <ModernModal
+          isOpen={showAddModal}
+          onClose={() => { setShowAddModal(false); resetForm(); }}
+          title="Create Training Program"
+          subtitle="Add a new job training program"
+          colorVariant="green"
+          icon={GraduationCap}
+          size="lg"
+        >
+          <form onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
                   <Input
@@ -720,32 +730,19 @@ export default function PESOProgramsPage() {
                   </Button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
+        </ModernModal>
 
         {/* Edit Program Modal */}
-        {showEditModal && editingProgram && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
-                    <Edit className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Edit Training Program</h2>
-                    <p className="text-sm text-gray-600">Update program details</p>
-                  </div>
-                </div>
-                <button onClick={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Form - Same as Add but with Update button */}
-              <form onSubmit={handleUpdate} className="p-6 space-y-4">
+        <ModernModal
+          isOpen={showEditModal && editingProgram !== null}
+          onClose={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }}
+          title="Edit Training Program"
+          subtitle="Update program details"
+          colorVariant="orange"
+          icon={Edit}
+          size="lg"
+        >
+          <form onSubmit={handleUpdate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
                   <Input
@@ -848,27 +845,25 @@ export default function PESOProgramsPage() {
                   </Button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
+        </ModernModal>
 
         {/* Archive Confirmation Modal */}
-        {showArchiveConfirm && archivingProgram && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-              <div className="p-6">
-                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Archive className="w-8 h-8 text-orange-600" />
-                </div>
+        <ModernModal
+          isOpen={showArchiveConfirm && archivingProgram !== null}
+          onClose={() => { setShowArchiveConfirm(false); setArchivingProgram(null); }}
+          title="Archive Training Program"
+          subtitle="Program can be restored later"
+          colorVariant="orange"
+          icon={Archive}
+          size="md"
+        >
+          {archivingProgram && (
+            <div className="space-y-4">
+              <p className="text-gray-600 text-center">
+                Are you sure you want to archive "<strong>{archivingProgram.title}</strong>"? You can restore it later from the Archived tab.
+              </p>
 
-                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
-                  Archive Training Program
-                </h3>
-                <p className="text-gray-600 text-center mb-6">
-                  Are you sure you want to archive "<strong>{archivingProgram.title}</strong>"? You can restore it later from the Archived tab.
-                </p>
-
-                <div className="flex gap-3">
+              <div className="flex gap-3 pt-4">
                   <Button
                     variant="secondary"
                     onClick={() => { setShowArchiveConfirm(false); setArchivingProgram(null); }}
@@ -886,28 +881,27 @@ export default function PESOProgramsPage() {
                     {submitting ? 'Archiving...' : 'Archive Program'}
                   </Button>
                 </div>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </ModernModal>
 
         {/* Restore Confirmation Modal */}
-        {showRestoreConfirm && restoringProgram && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-              <div className="p-6">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Undo2 className="w-8 h-8 text-green-600" />
-                </div>
+        <ModernModal
+          isOpen={showRestoreConfirm && restoringProgram !== null}
+          onClose={() => { setShowRestoreConfirm(false); setRestoringProgram(null); }}
+          title="Restore Training Program"
+          subtitle="Reactivate archived program"
+          colorVariant="green"
+          icon={Undo2}
+          size="md"
+        >
+          {restoringProgram && (
+            <div className="space-y-4">
+              <p className="text-gray-600 text-center">
+                Are you sure you want to restore "<strong>{restoringProgram.title}</strong>"? It will be marked as active again.
+              </p>
 
-                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
-                  Restore Training Program
-                </h3>
-                <p className="text-gray-600 text-center mb-6">
-                  Are you sure you want to restore "<strong>{restoringProgram.title}</strong>"? It will be marked as active again.
-                </p>
-
-                <div className="flex gap-3">
+              <div className="flex gap-3 pt-4">
                   <Button
                     variant="secondary"
                     onClick={() => { setShowRestoreConfirm(false); setRestoringProgram(null); }}
@@ -925,28 +919,27 @@ export default function PESOProgramsPage() {
                     {submitting ? 'Restoring...' : 'Restore Program'}
                   </Button>
                 </div>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </ModernModal>
 
         {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && deletingProgram && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-              <div className="p-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="w-8 h-8 text-red-600" />
-                </div>
+        <ModernModal
+          isOpen={showDeleteConfirm && deletingProgram !== null}
+          onClose={() => { setShowDeleteConfirm(false); setDeletingProgram(null); }}
+          title="Delete Training Program"
+          subtitle="This action cannot be undone"
+          colorVariant="red"
+          icon={Trash2}
+          size="md"
+        >
+          {deletingProgram && (
+            <div className="space-y-4">
+              <p className="text-gray-600 text-center">
+                Are you sure you want to permanently delete "<strong>{deletingProgram.title}</strong>"? This action cannot be undone.
+              </p>
 
-                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
-                  Delete Training Program
-                </h3>
-                <p className="text-gray-600 text-center mb-6">
-                  Are you sure you want to permanently delete "<strong>{deletingProgram.title}</strong>"? This action cannot be undone.
-                </p>
-
-                <div className="flex gap-3">
+              <div className="flex gap-3 pt-4">
                   <Button
                     variant="secondary"
                     onClick={() => { setShowDeleteConfirm(false); setDeletingProgram(null); }}
@@ -964,10 +957,9 @@ export default function PESOProgramsPage() {
                     {submitting ? 'Deleting...' : 'Delete Program'}
                   </Button>
                 </div>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </ModernModal>
       </Container>
     </AdminLayout>
   );

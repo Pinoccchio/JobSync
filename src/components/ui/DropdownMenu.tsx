@@ -207,7 +207,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
     return null;
   }
 
-  const dropdownMenu = isOpen && mounted && positionReady ? (
+  const dropdownMenu = isOpen && positionReady ? (
     <div
       ref={menuRef}
       className={cn(
@@ -269,7 +269,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
       </button>
 
       {/* Portal dropdown menu to document.body */}
-      {mounted && typeof document !== 'undefined' && createPortal(dropdownMenu, document.body)}
+      {mounted && dropdownMenu && typeof document !== 'undefined' && createPortal(dropdownMenu, document.body)}
     </>
   );
 };

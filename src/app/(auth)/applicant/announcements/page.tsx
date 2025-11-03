@@ -5,6 +5,7 @@ import { Card, Container, Badge, RefreshButton, Button } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { Megaphone, Calendar, Tag, ImageIcon, Loader2, Users, Filter } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { AnnouncementViewModal } from '@/components/applicant/AnnouncementViewModal';
 
 interface Announcement {
@@ -24,6 +25,7 @@ interface Announcement {
 
 export default function AnnouncementsPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
@@ -101,7 +103,7 @@ export default function AnnouncementsPage() {
   ];
 
   return (
-    <AdminLayout role="Applicant">
+    <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'}>
       <Container>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

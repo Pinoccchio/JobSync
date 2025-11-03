@@ -12,6 +12,7 @@ import { StatusTimeline } from '@/components/peso/StatusTimeline';
 import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, Filter, Loader2, Award, Star, TrendingUp, User, Laptop, Briefcase, BarChart3, Palette, Wrench, BookOpen, Code, Lightbulb, Eye, XCircle, UserCheck, Play, Ban, AlertCircle, Archive, Download, FileText, History, X } from 'lucide-react';
 import { FileUploadWithProgress } from '@/components/ui';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
+import { getStatusConfig } from '@/lib/config/statusConfig';
 
 interface TrainingProgram {
   id: string;
@@ -234,22 +235,14 @@ export default function TrainingsPage() {
     return userApplications.find(app => app.program_id === programId);
   };
 
-  // Get status badge configuration
+  // Get status badge configuration using centralized config
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: any; icon: any; label: string }> = {
-      pending: { variant: 'warning', icon: Clock, label: 'Pending Review' },
-      under_review: { variant: 'primary', icon: Eye, label: 'Under Review' },
-      approved: { variant: 'success', icon: CheckCircle2, label: 'Approved' },
-      denied: { variant: 'danger', icon: XCircle, label: 'Denied' },
-      enrolled: { variant: 'primary', icon: UserCheck, label: 'Enrolled' },
-      in_progress: { variant: 'teal', icon: Play, label: 'In Progress' },
-      completed: { variant: 'secondary', icon: CheckCircle2, label: 'Completed' },
-      certified: { variant: 'warning', icon: Award, label: 'Certified' },
-      withdrawn: { variant: 'secondary', icon: AlertCircle, label: 'Withdrawn' },
-      failed: { variant: 'danger', icon: Ban, label: 'Failed' },
-      archived: { variant: 'secondary', icon: Archive, label: 'Archived' },
+    const statusConfig = getStatusConfig(status);
+    return {
+      variant: statusConfig.badgeVariant,
+      icon: statusConfig.icon,
+      label: statusConfig.label,
     };
-    return config[status] || { variant: 'secondary', icon: Clock, label: status };
   };
 
   // Handle view application details
