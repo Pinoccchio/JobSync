@@ -611,6 +611,9 @@ export default function PESOProgramsPage() {
           <EnhancedTable
             data={filteredPrograms}
             columns={columns}
+            searchable={true}
+            paginated={true}
+            pageSize={10}
             searchPlaceholder="Search programs..."
           />
         </Card>

@@ -100,6 +100,21 @@ export default function RegisterPage() {
         emailConfirmationSent: result.data.emailConfirmationSent
       });
 
+      // Send notification to ADMIN (non-blocking)
+      fetch('/api/auth/notify-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: result.data.userId,
+          fullName: formData.fullName,
+          email: formData.email,
+          role: 'APPLICANT',
+        }),
+      }).catch(err => {
+        console.error('⚠️ Failed to send admin notification:', err);
+        // Don't show error to user - notification failure shouldn't block registration
+      });
+
       // Always redirect to login page after signup
       // User must log in separately (following INCLOUD pattern)
       console.log('➡️ Redirecting to /login');

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { appendStatusHistory } from '@/lib/utils/statusHistory';
+import { notifyAdmins } from '@/lib/notifications';
 
 /**
  * Application Management API - Individual Application Operations
@@ -373,6 +374,30 @@ export async function PATCH(
 
       if (notificationError) {
         console.error('Error creating notification:', notificationError);
+        // Don't fail the request if notification fails
+      }
+    }
+
+    // 11.5. Notify ADMIN of critical status changes for system monitoring
+    const criticalStatuses = ['hired', 'denied', 'withdrawn'];
+    if (criticalStatuses.includes(status)) {
+      try {
+        const statusLabels: Record<string, string> = {
+          hired: 'Hired',
+          denied: 'Denied',
+          withdrawn: 'Withdrawn',
+        };
+
+        await notifyAdmins({
+          type: 'system',
+          title: `Application ${statusLabels[status]}`,
+          message: `Application for "${jobTitle}" has been ${status} (Applicant: ${(existingApplication as any).full_name || 'Unknown'})`,
+          related_entity_type: 'application',
+          related_entity_id: id,
+          link_url: '/hr/scanned-records',
+        });
+      } catch (adminNotifError) {
+        console.error('Error sending ADMIN notification:', adminNotifError);
         // Don't fail the request if notification fails
       }
     }

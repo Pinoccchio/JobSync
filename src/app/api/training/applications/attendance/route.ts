@@ -123,8 +123,8 @@ export async function POST(request: NextRequest) {
           .from('training_applications')
           .update({
             status: 'in_progress',
-            attendance_marked_at: currentTimestamp,
-            training_started_at: app.status !== 'in_progress' ? currentTimestamp : undefined, // Only set if first time
+            attendance_marked_at: currentTimestamp, // Always update to latest attendance marking
+            training_started_at: app.training_started_at || currentTimestamp, // Keep first timestamp, set if null
             status_history: updatedStatusHistory,
           })
           .eq('id', app.id);

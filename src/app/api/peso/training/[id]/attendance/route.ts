@@ -98,11 +98,11 @@ export async function POST(
 
     // Update attended applicants
     if (applicant_ids.length > 0) {
+      // First, update attendance_marked_at for all selected applicants
       const { error: updateError } = await supabase
         .from('training_applications')
         .update({
-          attendance_marked_at: now,
-          training_started_at: now, // First attendance marks training start
+          attendance_marked_at: now, // Always update to latest attendance marking
           updated_at: now
         })
         .in('id', applicant_ids)
@@ -114,6 +114,21 @@ export async function POST(
           { success: false, error: 'Failed to mark attendance' },
           { status: 500 }
         );
+      }
+
+      // Then, set training_started_at only for those who don't have it yet (first time)
+      const { error: startError } = await supabase
+        .from('training_applications')
+        .update({
+          training_started_at: now, // Only set for first-time attendance
+        })
+        .in('id', applicant_ids)
+        .eq('program_id', programId)
+        .is('training_started_at', null); // Only update if null
+
+      if (startError) {
+        console.error('Error setting training_started_at:', startError);
+        // Don't fail the request, this is a secondary operation
       }
     }
 

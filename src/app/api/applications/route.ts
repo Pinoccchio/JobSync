@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createInitialStatusHistory } from '@/lib/utils/statusHistory';
+import { createNotification, notifyJobCreator, notifyAdmins } from '@/lib/notifications';
 
 /**
  * Application Management API Routes
@@ -341,7 +342,34 @@ export async function POST(request: NextRequest) {
     // 9. Ranking will be triggered manually by HR via "Rank Applicants" button
     // No automatic ranking on submission - HR has full control
 
-    // 10. TODO: Send notification to applicant (Phase 5)
+    // 10. Send notifications to all relevant parties
+    try {
+      // Notify applicant of successful submission
+      await createNotification(profile.id, {
+        type: 'application_status',
+        title: 'Application Submitted Successfully',
+        message: `Your application for "${job.title}" has been received and is under review.`,
+        related_entity_type: 'application',
+        related_entity_id: application.id,
+        link_url: '/applicant/applications',
+      });
+
+      // Notify job creator (HR) of new application
+      await notifyJobCreator(jobId, profile.full_name);
+
+      // Notify ADMIN of new application for system monitoring
+      await notifyAdmins({
+        type: 'system',
+        title: 'New Job Application Received',
+        message: `${profile.full_name} applied for "${job.title}"`,
+        related_entity_type: 'application',
+        related_entity_id: application.id,
+        link_url: '/hr/scanned-records',
+      });
+    } catch (notifError) {
+      // Log error but don't fail the application submission
+      console.error('Error sending notifications:', notifError);
+    }
 
     return NextResponse.json({
       success: true,

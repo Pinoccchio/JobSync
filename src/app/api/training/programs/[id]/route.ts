@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { notifyPESO, notifyProgramApplicants } from '@/lib/notifications';
+import { notifyPESO, notifyProgramApplicants, notifyAdmins } from '@/lib/notifications';
 
 /**
  * Training Program Management API - Individual Program Operations
@@ -368,6 +368,14 @@ export async function DELETE(
         title: 'Training Program Deleted',
         message: `Training program "${existingProgram.title}" has been deleted`,
         link_url: `/peso/programs`,
+      });
+
+      // Notify ADMIN of training program deletion for system monitoring
+      await notifyAdmins({
+        type: 'system',
+        title: 'Training Program Deleted',
+        message: `PESO officer deleted the training program: "${existingProgram.title}"`,
+        link_url: '/peso/programs',
       });
 
       // Notify all enrolled applicants that program was cancelled

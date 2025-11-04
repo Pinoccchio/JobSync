@@ -268,36 +268,6 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  // Handle start training
-  const handleStartTraining = async () => {
-    if (!selectedApplication) return;
-
-    try {
-      setActionLoading(true);
-      const response = await fetch(`/api/training/applications/${selectedApplication.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'in_progress' }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to start training');
-      }
-
-      showToast(result.message || 'Training started successfully', 'success');
-      setStartTrainingModalOpen(false);
-      setSelectedApplication(null);
-      fetchApplications();
-    } catch (error: any) {
-      console.error('Error starting training:', error);
-      showToast(getErrorMessage(error), 'error');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // Handle mark as completed
   const handleComplete = async () => {
     if (!selectedApplication) return;
@@ -1139,7 +1109,22 @@ export default function PESOApplicationsPage() {
     if (programFilter !== 'all') {
       return [
         {
-          header: '',
+          header: (
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={selectedApplications.size === filteredApplications.length && filteredApplications.length > 0}
+                ref={(el) => {
+                  if (el) {
+                    el.indeterminate = selectedApplications.size > 0 && selectedApplications.size < filteredApplications.length;
+                  }
+                }}
+                onChange={handleSelectAll}
+                className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
+                title={selectedApplications.size === filteredApplications.length ? "Deselect All" : "Select All"}
+              />
+            </div>
+          ),
           accessor: 'select' as const,
           render: (_: any, row: TrainingApplication) => (
             <div className="flex items-center justify-center">
@@ -1870,55 +1855,6 @@ export default function PESOApplicationsPage() {
                   loading={actionLoading}
                 >
                   Confirm Enrollment
-                </Button>
-              </div>
-            </div>
-          )}
-        </ModernModal>
-
-        {/* Start Training Modal */}
-        <ModernModal
-          isOpen={startTrainingModalOpen}
-          onClose={() => {
-            setStartTrainingModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          title="Start Training"
-          subtitle="Begin training program"
-          colorVariant="teal"
-          icon={Play}
-          size="md"
-        >
-          {selectedApplication && (
-            <div className="space-y-4">
-              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-                <p className="text-gray-700">
-                  Mark training as started for{' '}
-                  <span className="font-semibold">{selectedApplication.full_name}</span>?
-                </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  This indicates the applicant has begun the training program.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setStartTrainingModalOpen(false);
-                    setSelectedApplication(null);
-                  }}
-                  disabled={actionLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="teal"
-                  icon={Play}
-                  onClick={handleStartTraining}
-                  loading={actionLoading}
-                >
-                  Start Training
                 </Button>
               </div>
             </div>

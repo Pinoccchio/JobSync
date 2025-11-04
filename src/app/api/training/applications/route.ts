@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getViewableUrl } from '@/lib/supabase/storage';
 import { createInitialStatusHistory } from '@/lib/utils/statusHistory';
+import { createNotification, notifyAdmins } from '@/lib/notifications';
 
 /**
  * Training Applications Management API Routes
@@ -375,22 +376,41 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if logging fails
     }
 
-    // 10. Send notification to applicant
+    // 10. Send notifications to all relevant parties
     try {
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          type: 'training_application',
-          title: 'Training Application Submitted',
-          message: `Your application for "${program.title}" has been submitted successfully. You will be notified once it is reviewed.`,
+      // Notify applicant of successful submission
+      await createNotification(user.id, {
+        type: 'training_status',
+        title: 'Training Application Submitted',
+        message: `Your application for "${program.title}" has been received and will be reviewed soon.`,
+        related_entity_type: 'training_application',
+        related_entity_id: application.id,
+        link_url: '/applicant/trainings',
+      });
+
+      // Notify PESO officer who created the program
+      if (program.created_by) {
+        await createNotification(program.created_by, {
+          type: 'training_status',
+          title: 'New Training Application',
+          message: `${full_name} applied for "${program.title}"`,
           related_entity_type: 'training_application',
           related_entity_id: application.id,
-          link_url: `/applicant/trainings`,
-          is_read: false,
+          link_url: '/peso/applications',
         });
+      }
+
+      // Notify ADMIN of new training application for system monitoring
+      await notifyAdmins({
+        type: 'system',
+        title: 'New Training Application',
+        message: `${full_name} applied for "${program.title}"`,
+        related_entity_type: 'training_application',
+        related_entity_id: application.id,
+        link_url: '/peso/applications',
+      });
     } catch (notifError) {
-      console.error('Error sending notification:', notifError);
+      console.error('Error sending notifications:', notifError);
       // Don't fail the request if notification fails
     }
 
