@@ -1,0 +1,246 @@
+'use client';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Button, Input } from '@/components/ui';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useToast } from '@/contexts/ToastContext';
+import { updatePassword } from '@/lib/supabase/auth';
+import { Lock, CheckCircle, ArrowLeft } from 'lucide-react';
+
+export default function ResetPasswordPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { showToast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
+  const [formData, setFormData] = useState({
+    password: '',
+    confirmPassword: '',
+  });
+  const [errors, setErrors] = useState({
+    password: '',
+    confirmPassword: '',
+  });
+
+  // Check if we have the required parameters
+  useEffect(() => {
+    const tokenHash = searchParams.get('token_hash');
+    const type = searchParams.get('type');
+
+    if (!tokenHash || type !== 'recovery') {
+      showToast('Invalid or expired password reset link', 'error');
+      setTimeout(() => router.push('/forgot-password'), 2000);
+    }
+  }, [searchParams, router, showToast]);
+
+  // Validation functions
+  const validatePassword = (password: string) => {
+    if (!password) return 'Password is required';
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
+    if (!/[!@#$%^&*]/.test(password)) return 'Password must contain at least one special character (!@#$%^&*)';
+    return '';
+  };
+
+  const validateConfirmPassword = (confirmPassword: string, password: string) => {
+    if (!confirmPassword) return 'Please confirm your password';
+    if (confirmPassword !== password) return 'Passwords do not match';
+    return '';
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate all fields
+    const newErrors = {
+      password: validatePassword(formData.password),
+      confirmPassword: validateConfirmPassword(formData.confirmPassword, formData.password),
+    };
+
+    setErrors(newErrors);
+
+    // If any errors exist, stop submission
+    if (Object.values(newErrors).some(error => error !== '')) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await updatePassword(formData.password);
+
+      if (result.success) {
+        setResetComplete(true);
+        showToast('Password reset successfully!', 'success');
+
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          router.push('/login');
+        }, 3000);
+      } else {
+        setErrors({ ...errors, password: result.error || 'Failed to reset password' });
+        showToast(result.error || 'Failed to reset password', 'error');
+      }
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      setErrors({ ...errors, password: 'An unexpected error occurred. Please try again.' });
+      showToast('An unexpected error occurred. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center relative py-12"
+      style={{
+        backgroundImage: 'url(/municipal.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* Green Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#22A555]/90 to-[#1A7F3E]/90"></div>
+
+      {/* Dot Pattern Overlay */}
+      <div className="absolute inset-0 opacity-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px',
+          }}
+        ></div>
+      </div>
+
+      {/* Reset Password Card */}
+      <div className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 md:p-12 w-full max-w-md mx-4">
+        {!resetComplete ? (
+          <>
+            {/* Header */}
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                Reset Password
+              </h2>
+              <p className="text-gray-600 text-sm">
+                Enter your new password below to reset your account password.
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* New Password Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Password
+                </label>
+                <Input
+                  type="password"
+                  placeholder="Enter new password"
+                  value={formData.password}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors({ ...errors, password: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, password: validatePassword(e.target.value) })}
+                  error={errors.password}
+                  required
+                  disabled={isLoading}
+                />
+                {/* Password Requirements */}
+                <div className="mt-2 text-xs text-gray-500 space-y-1">
+                  <p>Password must contain:</p>
+                  <ul className="list-disc list-inside ml-2">
+                    <li>At least 8 characters</li>
+                    <li>One uppercase letter</li>
+                    <li>One lowercase letter</li>
+                    <li>One number</li>
+                    <li>One special character (!@#$%^&*)</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Confirm Password Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm New Password
+                </label>
+                <Input
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => {
+                    setFormData({ ...formData, confirmPassword: e.target.value });
+                    if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+                  }}
+                  onBlur={(e) => setErrors({ ...errors, confirmPassword: validateConfirmPassword(e.target.value, formData.password) })}
+                  error={errors.confirmPassword}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full bg-gradient-to-r from-[#22A555] to-[#1A7F3E] hover:from-[#1A7F3E] hover:to-[#22A555]"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Resetting Password...' : 'Reset Password'}
+              </Button>
+
+              {/* Back to Login */}
+              <div className="text-center pt-4">
+                <Link
+                  href="/login"
+                  className="text-sm text-[#22A555] hover:text-[#1A7F3E] font-medium inline-flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Login
+                </Link>
+              </div>
+            </form>
+          </>
+        ) : (
+          <>
+            {/* Success State */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-10 h-10 text-green-600" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                Password Reset Successful!
+              </h2>
+              <p className="text-gray-600 text-sm mb-6">
+                Your password has been reset successfully. You can now login with your new password.
+              </p>
+              <p className="text-gray-500 text-xs mb-6">
+                Redirecting to login page in 3 seconds...
+              </p>
+
+              {/* Action */}
+              <Link
+                href="/login"
+                className="w-full"
+              >
+                <Button
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-[#22A555] to-[#1A7F3E] hover:from-[#1A7F3E] hover:to-[#22A555]"
+                >
+                  Go to Login
+                </Button>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
