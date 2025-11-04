@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
         if (completion.completion_status === 'passed') {
           notifications.push({
             user_id: app.applicant_id,
-            type: 'training_completion',
+            type: 'training_status',
             title: 'Congratulations! Training Completed',
             message: `You have successfully completed "${programTitle}"${
               completion.training_hours_awarded
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
         } else if (completion.completion_status === 'failed') {
           notifications.push({
             user_id: app.applicant_id,
-            type: 'training_completion',
+            type: 'training_status',
             title: 'Training Completed',
             message: `Your training "${programTitle}" has been completed. Please review your results and contact us for feedback.`,
             related_entity_type: 'training_application',
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
           // Pending
           notifications.push({
             user_id: app.applicant_id,
-            type: 'training_completion',
+            type: 'training_status',
             title: 'Training Completion Under Review',
             message: `Your completion status for "${programTitle}" is being reviewed. You will be notified once finalized.`,
             related_entity_type: 'training_application',

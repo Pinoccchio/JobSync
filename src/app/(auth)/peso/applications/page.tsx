@@ -1104,18 +1104,47 @@ export default function PESOApplicationsPage() {
             variant: 'default' as const,
           });
         } else if (row.status === 'enrolled') {
-          menuItems.push({
-            label: 'Start Training',
-            icon: Play,
-            onClick: () => {
-              setSelectedApplication(row);
-              setStartTrainingModalOpen(true);
+          menuItems.push(
+            {
+              label: 'Start Training',
+              icon: Play,
+              onClick: () => {
+                setSelectedApplication(row);
+                setStartTrainingModalOpen(true);
+              },
+              variant: 'default' as const,
             },
-            variant: 'default' as const,
-          });
+            {
+              label: 'Mark Attendance',
+              icon: UserCheck,
+              onClick: () => {
+                // Individual operation - reuse bulk modal with single applicant
+                setSelectedProgramForBulk({
+                  id: row.training_programs?.id || '',
+                  title: row.training_programs?.title || '',
+                });
+                setProgramApplicationsForBulk([row]);
+                setShowAttendanceModal(true);
+              },
+              variant: 'primary' as const,
+            }
+          );
         } else if (row.status === 'in_progress') {
-          // Bulk operations (Mark Attendance, Award Completion) are handled in /peso/programs page
-          // Individual operations can be added here if needed in the future
+          menuItems.push({
+            label: 'Award Completion',
+            icon: Award,
+            onClick: () => {
+              // Individual operation - reuse bulk modal with single applicant
+              setSelectedProgramForBulk({
+                id: row.training_programs?.id || '',
+                title: row.training_programs?.title || '',
+                duration: row.training_programs?.duration || '0 hours',
+              });
+              setProgramApplicationsForBulk([row]);
+              setShowCompletionModal(true);
+            },
+            variant: 'success' as const,
+          });
         } else if (row.status === 'completed') {
           menuItems.push({
             label: 'Issue Certificate',

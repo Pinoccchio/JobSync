@@ -224,3 +224,40 @@ export async function notifyProgramApplicants(programId: string, notification: N
     return [];
   }
 }
+
+/**
+ * Notify all applicants in the system
+ * Used for system-wide announcements and general notifications
+ */
+export async function notifyAllApplicants(notification: NotificationData) {
+  try {
+    const supabase = await createClient();
+
+    // Get all active applicants
+    const { data: applicants, error: applicantError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'APPLICANT')
+      .eq('status', 'active');
+
+    if (applicantError) {
+      console.error('Error fetching applicants:', applicantError);
+      return [];
+    }
+
+    if (!applicants || applicants.length === 0) {
+      console.warn('No active applicants found to notify');
+      return [];
+    }
+
+    // Create notification for each applicant
+    const notifications = await Promise.all(
+      applicants.map((applicant) => createNotification(applicant.id, notification))
+    );
+
+    return notifications.filter((n) => n !== null);
+  } catch (error) {
+    console.error('Failed to notify all applicants:', error);
+    return [];
+  }
+}

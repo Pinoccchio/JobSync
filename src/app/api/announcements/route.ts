@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { notifyAdmins, notifyHR } from '@/lib/notifications';
+import { notifyAdmins, notifyHR, notifyAllApplicants } from '@/lib/notifications';
 
 /**
  * Announcements Management API Routes
@@ -232,6 +232,16 @@ export async function POST(request: NextRequest) {
         related_entity_type: 'announcement',
         related_entity_id: announcement.id,
         link_url: `/admin/user-management`,
+      });
+
+      // Notify all applicants about the new announcement
+      await notifyAllApplicants({
+        type: 'announcement',
+        title: 'New Announcement Posted',
+        message: announcement.title,
+        related_entity_type: 'announcement',
+        related_entity_id: announcement.id,
+        link_url: `/applicant/announcements`,
       });
     } catch (notifError) {
       console.error('Error sending announcement creation notifications:', notifError);

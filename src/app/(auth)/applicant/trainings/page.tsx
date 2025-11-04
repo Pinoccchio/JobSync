@@ -1230,21 +1230,19 @@ export default function TrainingsPage() {
                             Your certificate is ready for download. This certificate verifies your successful completion of the training program.
                           </p>
                           <div className="flex gap-2">
-                            <a
-                              href={app.certificate_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <Button
+                              variant="success"
+                              icon={Download}
                               className="flex-1"
+                              onClick={() => handleDownloadCertificate(app.certificate_url!, app.id)}
                             >
-                              <Button variant="success" icon={Download} className="w-full">
-                                Download Certificate
-                              </Button>
-                            </a>
+                              Download Certificate
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               icon={Eye}
-                              onClick={() => window.open(app.certificate_url, '_blank')}
+                              onClick={() => handleDownloadCertificate(app.certificate_url!, app.id)}
                             >
                               View
                             </Button>
