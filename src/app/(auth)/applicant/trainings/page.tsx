@@ -62,6 +62,14 @@ interface UserApplication {
     id: string;
     title: string;
     duration: string;
+    description?: string;
+    location?: string | null;
+    created_at?: string;
+    profiles?: {
+      id: string;
+      full_name: string;
+      role: string;
+    } | null;
   };
 }
 
@@ -282,6 +290,19 @@ export default function TrainingsPage() {
       icon: statusConfig.icon,
       label: statusConfig.label,
     };
+  };
+
+  // Get card gradient color based on index
+  const getCardGradient = (index: number) => {
+    const gradients = [
+      'from-blue-500/10 to-blue-600/5',
+      'from-purple-500/10 to-purple-600/5',
+      'from-teal-500/10 to-teal-600/5',
+      'from-orange-500/10 to-orange-600/5',
+      'from-pink-500/10 to-pink-600/5',
+      'from-green-500/10 to-green-600/5',
+    ];
+    return gradients[index % gradients.length];
   };
 
   // Handle view application details
@@ -741,11 +762,11 @@ export default function TrainingsPage() {
                                 {program.title}
                               </h2>
                               <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{program.description}</p>
-                              {/* Creator Info */}
+                              {/* Posted By Info */}
                               {program.profiles && (
                                 <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                                   <User className="w-3 h-3" />
-                                  Created by {program.profiles.full_name} • {formatRelativeDate(program.created_at)}
+                                  Posted by {program.profiles.full_name} • {formatShortDate(program.created_at)}
                                 </p>
                               )}
                             </div>
@@ -961,70 +982,127 @@ export default function TrainingsPage() {
               </Button>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {enrolledApplications.map((app) => {
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+              {enrolledApplications.map((app, index) => {
                 const statusConfig = getStatusConfig(app.status);
+                const canWithdraw = app.status === 'enrolled';
+
                 return (
-                  <Card key={app.id} variant="flat" className="hover:shadow-lg transition-shadow">
-                    <div className="p-6">
+                  <Card key={app.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
+                    {/* Gradient Top Border */}
+                    <div className={`h-3 bg-gradient-to-r ${getCardGradient(index)}`}></div>
+
+                    <div className="p-6 space-y-4">
+                      {/* Header with Icon and Title */}
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <GraduationCap className="w-6 h-6 text-[#22A555]" />
-                            <h3 className="text-lg font-bold text-gray-900">
-                              {app.training_programs?.title || 'Program'}
-                            </h3>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                            <div>
-                              <span className="text-gray-600">Status:</span>
-                              <Badge variant={statusConfig.variant as any} className="ml-2">
-                                {statusConfig.label}
-                              </Badge>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-3 mb-2">
+                            <div className="w-12 h-12 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <GraduationCap className="w-6 h-6 text-[#22A555]" />
                             </div>
-                            <div>
-                              <span className="text-gray-600">Applied:</span>
-                              <span className="ml-2 text-gray-900">{formatShortDate(app.submitted_at)}</span>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-1 line-clamp-2">
+                                {app.training_programs?.title || 'Program'}
+                              </h3>
+                              <p className="text-sm text-gray-500">PESO Training</p>
                             </div>
-                            {app.training_programs?.duration && (
-                              <div>
-                                <span className="text-gray-600">Duration:</span>
-                                <span className="ml-2 text-gray-900">{app.training_programs.duration}</span>
-                              </div>
-                            )}
                           </div>
-                          {app.next_steps && (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                              <p className="text-sm text-blue-900"><strong>Next Steps:</strong> {app.next_steps}</p>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex flex-col gap-2">
+                          <Badge variant={statusConfig.badgeVariant} size="lg" icon={statusConfig.icon}>
+                            {statusConfig.label}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Applied Date Badge */}
+                      <div className="flex items-center gap-2 -mt-2">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Applied {formatRelativeDate(app.submitted_at)}</span>
+                        </div>
+                      </div>
+
+                      {/* Posted By Information */}
+                      {app.training_programs?.profiles && app.training_programs?.created_at && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 -mt-2">
+                          <User className="w-3.5 h-3.5" />
+                          <span>Posted by <span className="font-medium text-gray-700">{app.training_programs.profiles.full_name}</span></span>
+                          <span className="text-gray-400">•</span>
+                          <span>{formatShortDate(app.training_programs.created_at)}</span>
+                        </div>
+                      )}
+
+                      {/* Next Steps Box (if applicable) */}
+                      {app.next_steps && (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Lightbulb className="w-4 h-4 text-blue-700" />
+                            <p className="font-semibold text-blue-800 text-sm">Next Steps:</p>
+                          </div>
+                          <p className="text-sm text-blue-700">{app.next_steps}</p>
+                        </div>
+                      )}
+
+                      {/* Training Description (if available) */}
+                      {app.training_programs?.description && (
+                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                          {app.training_programs.description}
+                        </p>
+                      )}
+
+                      {/* Footer Info */}
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          {app.training_programs?.location && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{app.training_programs.location}</span>
+                            </div>
+                          )}
+                          {app.training_programs?.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{app.training_programs.duration}</span>
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="text-xs text-gray-500">
+                          <Calendar className="w-3 h-3 inline mr-1" />
+                          Applied {formatRelativeDate(app.submitted_at)}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="info"
+                          size="sm"
+                          icon={History}
+                          onClick={() => {
+                            setSelectedApplicationForHistory(app);
+                            setStatusHistoryModalOpen(true);
+                          }}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          View History
+                        </Button>
+                        {canWithdraw && (
                           <Button
-                            variant="outline"
+                            variant="danger"
                             size="sm"
-                            icon={History}
+                            icon={Ban}
                             onClick={() => {
-                              setSelectedApplicationForHistory(app);
-                              setStatusHistoryModalOpen(true);
+                              setSelectedApplication(app);
+                              setWithdrawModalOpen(true);
                             }}
+                            className="flex-1"
                           >
-                            History
+                            Withdraw
                           </Button>
-                          {app.status === 'enrolled' && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              icon={Ban}
-                              onClick={() => {
-                                setSelectedApplication(app);
-                                setWithdrawModalOpen(true);
-                              }}
-                            >
-                              Withdraw
-                            </Button>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -1062,29 +1140,50 @@ export default function TrainingsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {completedApplications.map((app) => {
+              {completedApplications.map((app, index) => {
                 const statusConfig = getStatusConfig(app.status);
                 const isCertified = app.status === 'certified';
                 const isCompleted = app.status === 'completed';
                 const isFailed = app.status === 'failed';
 
+                // Status-specific gradient colors
+                const gradientColor = isCertified
+                  ? 'from-teal-500 to-green-500'
+                  : isCompleted
+                  ? 'from-blue-500 to-blue-600'
+                  : isFailed
+                  ? 'from-red-500 to-red-600'
+                  : getCardGradient(index);
+
                 return (
-                  <Card key={app.id} variant="flat" className={`hover:shadow-xl transition-shadow ${
-                    isCertified ? 'border-2 border-green-500' : ''
-                  }`}>
+                  <Card key={app.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
+                    {/* Status-specific Top Border */}
+                    <div className={`h-3 bg-gradient-to-r ${gradientColor}`}></div>
+
                     <div className="p-6 space-y-4">
-                      {/* Certificate Header */}
+                      {/* Header with Icon and Title */}
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            {isCertified && <Award className="w-6 h-6 text-green-600" />}
-                            {isCompleted && <CheckCircle2 className="w-6 h-6 text-blue-600" />}
-                            {isFailed && <XCircle className="w-6 h-6 text-red-600" />}
-                            <h3 className="text-lg font-bold text-gray-900">
-                              {app.training_programs?.title || 'Program'}
-                            </h3>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-3 mb-2">
+                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              isCertified ? 'bg-green-100' : isCompleted ? 'bg-blue-100' : isFailed ? 'bg-red-100' : 'bg-gray-100'
+                            }`}>
+                              {isCertified && <Award className="w-6 h-6 text-green-700" />}
+                              {isCompleted && <CheckCircle2 className="w-6 h-6 text-blue-700" />}
+                              {isFailed && <XCircle className="w-6 h-6 text-red-700" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-1 line-clamp-2">
+                                {app.training_programs?.title || 'Program'}
+                              </h3>
+                              <p className="text-sm text-gray-500">PESO Training</p>
+                            </div>
                           </div>
-                          <Badge variant={statusConfig.variant as any} size="lg">
+                        </div>
+
+                        {/* Large Status Badge */}
+                        <div className="flex flex-col gap-2">
+                          <Badge variant={statusConfig.badgeVariant} size="lg" icon={statusConfig.icon}>
                             {statusConfig.label}
                           </Badge>
                         </div>
@@ -1149,29 +1248,56 @@ export default function TrainingsPage() {
                         </div>
                       )}
 
-                      {/* Training Info */}
-                      <div className="grid grid-cols-2 gap-3 text-sm pt-3 border-t">
-                        <div>
-                          <span className="text-gray-600">Duration:</span>
-                          <p className="font-medium text-gray-900">{app.training_programs?.duration || 'N/A'}</p>
+                      {/* Posted By Information */}
+                      {app.training_programs?.profiles && app.training_programs?.created_at && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                          <User className="w-3.5 h-3.5" />
+                          <span>Posted by <span className="font-medium text-gray-700">{app.training_programs.profiles.full_name}</span></span>
+                          <span className="text-gray-400">•</span>
+                          <span>{formatShortDate(app.training_programs.created_at)}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-600">Completed:</span>
-                          <p className="font-medium text-gray-900">{formatShortDate(app.submitted_at)}</p>
+                      )}
+
+                      {/* Training Description (if available) */}
+                      {app.training_programs?.description && (
+                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                          {app.training_programs.description}
+                        </p>
+                      )}
+
+                      {/* Footer Info */}
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          {app.training_programs?.location && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{app.training_programs.location}</span>
+                            </div>
+                          )}
+                          {app.training_programs?.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{app.training_programs.duration}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          <Calendar className="w-3 h-3 inline mr-1" />
+                          Completed {formatRelativeDate(app.submitted_at)}
                         </div>
                       </div>
 
-                      {/* Actions */}
+                      {/* Action Buttons */}
                       <div className="flex gap-2 pt-2">
                         <Button
-                          variant="outline"
+                          variant="info"
                           size="sm"
                           icon={History}
                           onClick={() => {
                             setSelectedApplicationForHistory(app);
                             setStatusHistoryModalOpen(true);
                           }}
-                          className="flex-1"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           View History
                         </Button>

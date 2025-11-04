@@ -59,7 +59,15 @@ export async function GET(request: NextRequest) {
           id,
           title,
           duration,
-          start_date
+          start_date,
+          description,
+          location,
+          created_at,
+          profiles:created_by (
+            id,
+            full_name,
+            role
+          )
         )
       `)
       .order('submitted_at', { ascending: false});
@@ -126,7 +134,20 @@ export async function GET(request: NextRequest) {
         if (programIds.length > 0) {
           const { data: programs } = await supabase
             .from('training_programs')
-            .select('id, title, duration, start_date')
+            .select(`
+              id,
+              title,
+              duration,
+              start_date,
+              description,
+              location,
+              created_at,
+              profiles:created_by (
+                id,
+                full_name,
+                role
+              )
+            `)
             .in('id', programIds);
 
           if (programs) {
