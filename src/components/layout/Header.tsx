@@ -29,15 +29,15 @@ export function Header() {
 
           {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
+            <Link href="/#features" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
               Features
-            </a>
-            <a href="#how-it-works" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
+            </Link>
+            <Link href="/#how-it-works" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
               How It Works
-            </a>
-            <a href="#about" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
+            </Link>
+            <Link href="/#about" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
               About
-            </a>
+            </Link>
             <Link href="/login" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
               Admin Portal
             </Link>
@@ -69,27 +69,27 @@ export function Header() {
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
           <div className="md:hidden mt-4 pt-4 border-t border-gray-200 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <a
-              href="#features"
+            <Link
+              href="/#features"
               className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
               onClick={() => setMobileMenuOpen(false)}
             >
               Features
-            </a>
-            <a
-              href="#how-it-works"
+            </Link>
+            <Link
+              href="/#how-it-works"
               className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
               onClick={() => setMobileMenuOpen(false)}
             >
               How It Works
-            </a>
-            <a
-              href="#about"
+            </Link>
+            <Link
+              href="/#about"
               className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
               onClick={() => setMobileMenuOpen(false)}
             >
               About
-            </a>
+            </Link>
             <Link
               href="/login"
               className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
