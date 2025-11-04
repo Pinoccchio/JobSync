@@ -211,22 +211,25 @@ Expected output:
 
 ---
 
-### **Phase 3: Attendance Tracking** ⭐ NEW
+### **Phase 3: Start Training & Mark Attendance** ⭐ NEW
+
+> **📋 Note**: Marking attendance **officially starts training** for enrolled trainees. There is no separate "Start Training" action.
 
 #### **Step 3.1: Open Mark Attendance Modal**
 1. Click **Actions** (⋮) for Jan Miko's application
-2. Select **Mark Attendance**
+2. Select **Mark Attendance** (this will also start training)
 
 **✅ Expected Results:**
-- Modal opens: "Mark Attendance"
+- Modal opens: "Start Training & Mark Attendance"
 - Shows program info: Advanced Web Development Training
+- Description clarifies: "This will officially start training for selected applicants"
 - Lists all enrolled/in-progress applicants
 - Checkbox-style selection interface
 - Summary shows: "0 Present, 1 No Show"
 
 ---
 
-#### **Step 3.2: Mark Attendance**
+#### **Step 3.2: Mark Attendance & Start Training**
 1. Check the box for **Jan Miko Guevarra**
 2. Verify visual indicators:
    - Card background: Green (✅ Present)
@@ -238,9 +241,9 @@ Expected output:
 **✅ Expected Results:**
 - Success toast: "Successfully marked attendance for 1 applicant(s)"
 - Modal closes
-- Application status changes to: 🔵 **In Progress**
+- Application status changes to: 🔵 **In Progress** (training officially started)
 - `attendance_marked_at` timestamp is set
-- `training_started_at` timestamp is set
+- `training_started_at` timestamp is set (same timestamp)
 - Training program status auto-transitions to: **Ongoing**
 - Applicant receives notification: "Your attendance for Advanced Web Development Training has been recorded"
 - Statistics: **In Progress** count increases to 1

@@ -11,10 +11,11 @@ import { generateCertificatePreview, generateCertificateId } from '@/lib/certifi
 import type { CertificateData, CertificateLayoutParams } from '@/types/certificate.types';
 import { MarkAttendanceModal } from '@/components/peso/MarkAttendanceModal';
 import { AwardCompletionModal } from '@/components/peso/AwardCompletionModal';
+import BulkCertificateModal from '@/components/peso/BulkCertificateModal';
 import CertificatePreview from '@/components/peso/CertificatePreview';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText, Users, ExternalLink, CheckSquare, Square } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText, Users, ExternalLink, CheckSquare, Square, FileCheck } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -62,7 +63,6 @@ export default function PESOApplicationsPage() {
   const [denyModalOpen, setDenyModalOpen] = useState(false);
   const [underReviewModalOpen, setUnderReviewModalOpen] = useState(false);
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
-  const [startTrainingModalOpen, setStartTrainingModalOpen] = useState(false);
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const [certifyModalOpen, setCertifyModalOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<TrainingApplication | null>(null);
@@ -77,6 +77,7 @@ export default function PESOApplicationsPage() {
   // Bulk operations state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showBulkCertificateModal, setShowBulkCertificateModal] = useState(false);
   const [selectedProgramForBulk, setSelectedProgramForBulk] = useState<any | null>(null);
   const [programApplicationsForBulk, setProgramApplicationsForBulk] = useState<any[]>([]);
   const [loadingBulkApps, setLoadingBulkApps] = useState(false);
@@ -93,7 +94,6 @@ export default function PESOApplicationsPage() {
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [bulkDenyModalOpen, setBulkDenyModalOpen] = useState(false);
   const [bulkEnrollModalOpen, setBulkEnrollModalOpen] = useState(false);
-  const [bulkStartModalOpen, setBulkStartModalOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Fetch training applications function
@@ -485,10 +485,6 @@ export default function PESOApplicationsPage() {
     return getSelectedApplications().filter(a => a.status === 'approved');
   };
 
-  const getEligibleForStart = () => {
-    return getSelectedApplications().filter(a => a.status === 'enrolled');
-  };
-
   // Smart validation for bulk actions (DYNAMIC - allows mixed statuses)
   // SAFETY: Bulk actions are disabled when "All Programs" is selected to prevent
   // cross-program operations and capacity validation issues
@@ -511,11 +507,6 @@ export default function PESOApplicationsPage() {
   const canBulkEnroll = () => {
     if (programFilter === 'all') return false; // Prevent cross-program bulk actions
     return getEligibleForEnroll().length > 0; // Show if ANY are eligible
-  };
-
-  const canBulkStart = () => {
-    if (programFilter === 'all') return false; // Prevent cross-program bulk actions
-    return getEligibleForStart().length > 0; // Show if ANY are eligible
   };
 
   // Bulk operation handlers
@@ -728,58 +719,6 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  const handleBulkStartTraining = async () => {
-    // Filter only eligible applications (status: enrolled)
-    const eligible = getEligibleForStart();
-    const eligibleIds = eligible.map(a => a.id);
-
-    if (eligibleIds.length === 0) {
-      showToast('No eligible applications to start training', 'error');
-      return;
-    }
-
-    // Confirmation for large selections
-    if (eligibleIds.length > 10) {
-      const confirmed = window.confirm(
-        `You are about to start training for ${eligibleIds.length} enrolled applicants. This action cannot be undone. Do you want to continue?`
-      );
-      if (!confirmed) return;
-    }
-
-    try {
-      setBulkActionLoading(true);
-
-      const results = await Promise.all(
-        eligibleIds.map(id =>
-          fetch(`/api/training/applications/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'in_progress' }),
-          })
-        )
-      );
-
-      const succeeded = results.filter(r => r.ok).length;
-      const failed = results.length - succeeded;
-
-      if (succeeded > 0) {
-        showToast(`Started training for ${succeeded} of ${eligibleIds.length} applicants`, 'success');
-      }
-      if (failed > 0) {
-        showToast(`Failed to start training for ${failed} applicants`, 'error');
-      }
-
-      setBulkStartModalOpen(false);
-      setSelectedApplications(new Set());
-      fetchApplications();
-    } catch (error) {
-      console.error('Error bulk starting training:', error);
-      showToast('Failed to start training', 'error');
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
-
   // Calculate stats for filtered program
   const calculateProgramStats = useCallback((programTitle: string) => {
     const programApps = applications.filter(app =>
@@ -863,6 +802,47 @@ export default function PESOApplicationsPage() {
         });
         setProgramApplicationsForBulk(result.data || []);
         setShowCompletionModal(true);
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      showToast('Failed to fetch applications', 'error');
+    } finally {
+      setLoadingBulkApps(false);
+    }
+  };
+
+  // Handle Issue Certificates Click (Bulk Operation)
+  const handleBulkCertificateClick = async () => {
+    if (programFilter === 'all') return;
+
+    try {
+      setLoadingBulkApps(true);
+      const programId = applications.find(a =>
+        a.training_programs?.title === programFilter
+      )?.program_id;
+
+      if (!programId) {
+        showToast('Program not found', 'error');
+        return;
+      }
+
+      // Fetch completed applications (not yet certified)
+      const response = await fetch(
+        `/api/training/applications?program_id=${programId}&status=completed`
+      );
+      const result = await response.json();
+
+      if (result.success) {
+        if (!result.data || result.data.length === 0) {
+          showToast('No completed applications found for this program', 'info');
+          return;
+        }
+
+        setSelectedProgramForBulk({ id: programId, title: programFilter });
+        setProgramApplicationsForBulk(result.data || []);
+        setShowBulkCertificateModal(true);
       } else {
         showToast(getErrorMessage(result.error), 'error');
       }
@@ -1106,31 +1086,21 @@ export default function PESOApplicationsPage() {
             variant: 'default' as const,
           });
         } else if (row.status === 'enrolled') {
-          menuItems.push(
-            {
-              label: 'Start Training',
-              icon: Play,
-              onClick: () => {
-                setSelectedApplication(row);
-                setStartTrainingModalOpen(true);
-              },
-              variant: 'default' as const,
+          menuItems.push({
+            label: 'Mark Attendance',
+            icon: UserCheck,
+            onClick: () => {
+              // Individual operation - reuse bulk modal with single applicant
+              setSelectedProgramForBulk({
+                id: row.training_programs?.id || '',
+                title: row.training_programs?.title || '',
+              });
+              setProgramApplicationsForBulk([row]);
+              setShowAttendanceModal(true);
             },
-            {
-              label: 'Mark Attendance',
-              icon: UserCheck,
-              onClick: () => {
-                // Individual operation - reuse bulk modal with single applicant
-                setSelectedProgramForBulk({
-                  id: row.training_programs?.id || '',
-                  title: row.training_programs?.title || '',
-                });
-                setProgramApplicationsForBulk([row]);
-                setShowAttendanceModal(true);
-              },
-              variant: 'default' as const,
-            }
-          );
+            variant: 'default' as const,
+            tooltip: 'Mark attendance and officially start training for this trainee',
+          });
         } else if (row.status === 'in_progress') {
           menuItems.push({
             label: 'Award Completion',
@@ -1349,6 +1319,7 @@ export default function PESOApplicationsPage() {
             const stats = calculateProgramStats(programFilter);
             const canMarkAttendance = stats.enrolled > 0; // Only enrolled (not yet attended)
             const canAwardCompletion = stats.inProgress > 0;
+            const canIssueCertificates = stats.completed > 0;
 
             return (
               <Card variant="flat" className="bg-gradient-to-r from-teal-50 to-cyan-50 border-l-4 border-teal-500 mb-6">
@@ -1393,6 +1364,7 @@ export default function PESOApplicationsPage() {
                         onClick={handleBulkAttendanceClick}
                         disabled={loadingBulkApps}
                         className="whitespace-nowrap"
+                        title="Mark attendance and officially start training for enrolled trainees"
                       >
                         Mark Attendance ({stats.enrolled})
                       </Button>
@@ -1407,6 +1379,18 @@ export default function PESOApplicationsPage() {
                         className="whitespace-nowrap"
                       >
                         Award Completion ({stats.inProgress})
+                      </Button>
+                    )}
+                    {canIssueCertificates && (
+                      <Button
+                        variant="success"
+                        size="sm"
+                        icon={FileCheck}
+                        onClick={handleBulkCertificateClick}
+                        disabled={loadingBulkApps}
+                        className="whitespace-nowrap"
+                      >
+                        Issue Certificates ({stats.completed})
                       </Button>
                     )}
                     <Button
@@ -1498,18 +1482,6 @@ export default function PESOApplicationsPage() {
                       className="whitespace-nowrap"
                     >
                       Enroll All ({getEligibleForEnroll().length})
-                    </Button>
-                  )}
-                  {canBulkStart() && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      icon={Play}
-                      onClick={() => setBulkStartModalOpen(true)}
-                      disabled={bulkActionLoading}
-                      className="whitespace-nowrap"
-                    >
-                      Start Training ({getEligibleForStart().length})
                     </Button>
                   )}
                   <Button
@@ -2014,119 +1986,104 @@ export default function PESOApplicationsPage() {
           subtitle="Preview and customize before issuing"
           colorVariant="green"
           icon={Award}
+          size="md"
         >
           {selectedApplication && (
-            <div className="h-[calc(100vh-250px)]">
-              <PanelGroup direction="horizontal">
-                {/* LEFT: Certificate Preview (Resizable) */}
-                <Panel defaultSize={60} minSize={30}>
-                  <div className="h-full pr-3">
-                    <CertificatePreview
-                      applicationId={selectedApplication.id}
-                      includeSignature={includeSignature}
-                    />
+            <div className="space-y-4">
+              {/* Certificate Details */}
+              <div className="bg-gradient-to-br from-green-50 to-teal-50 border border-green-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-green-600" />
+                  Certificate Details
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Trainee:</span>
+                    <span className="font-semibold text-gray-900">{selectedApplication.full_name}</span>
                   </div>
-                </Panel>
-
-                {/* Draggable Divider */}
-                <PanelResizeHandle className="w-2 bg-gray-200 hover:bg-teal-500 transition-colors cursor-col-resize relative group">
-                  <div className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-gray-400 group-hover:bg-teal-600 transition-colors" />
-                </PanelResizeHandle>
-
-                {/* RIGHT: Controls (Resizable) */}
-                <Panel defaultSize={40} minSize={25}>
-                  <div className="h-full pl-3 flex flex-col">
-                <div className="flex-1 overflow-y-auto space-y-6">
-                  {/* Application Info */}
-                  <div className="bg-gradient-to-br from-green-50 to-teal-50 border border-green-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Award className="w-5 h-5 text-green-600" />
-                      Certificate Details
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Trainee:</span>
-                        <span className="font-semibold text-gray-900">{selectedApplication.full_name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Program:</span>
-                        <span className="font-semibold text-gray-900 text-right max-w-xs truncate" title={selectedApplication.training_programs?.title}>
-                          {selectedApplication.training_programs?.title}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Duration:</span>
-                        <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.duration}</span>
-                      </div>
-                    </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Program:</span>
+                    <span className="font-semibold text-gray-900 text-right max-w-[300px]" title={selectedApplication.training_programs?.title}>
+                      {selectedApplication.training_programs?.title}
+                    </span>
                   </div>
-
-                  {/* Digital Signature Option */}
-                  <div className={`${
-                    hasSignature ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
-                  } border rounded-lg p-4`}>
-                    <label className={`flex items-start gap-3 ${hasSignature ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          checked={includeSignature}
-                          onChange={(e) => setIncludeSignature(e.target.checked)}
-                          disabled={!hasSignature || signatureLoading}
-                          className={`w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ${
-                            hasSignature ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
-                          }`}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <span className={`text-sm font-medium ${hasSignature ? 'text-gray-900 group-hover:text-blue-700' : 'text-amber-900'}`}>
-                          Include my digital signature
-                        </span>
-                        <p className={`text-xs mt-0.5 ${hasSignature ? 'text-gray-600' : 'text-amber-700'}`}>
-                          {signatureLoading ? (
-                            <span className="flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 inline animate-spin" />
-                              Checking signature status...
-                            </span>
-                          ) : hasSignature ? (
-                            'Your signature will be embedded on the certificate'
-                          ) : (
-                            <>
-                              <AlertCircle className="w-3 h-3 inline mr-1" />
-                              Upload signature in Settings first
-                            </>
-                          )}
-                        </p>
-                      </div>
-                    </label>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Duration:</span>
+                    <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.duration}</span>
                   </div>
                 </div>
+              </div>
 
-                {/* Action Buttons (Fixed at bottom) */}
-                <div className="flex gap-3 pt-4 border-t mt-4">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setCertifyModalOpen(false);
-                      setSelectedApplication(null);
-                      setIncludeSignature(false);
-                    }}
-                    disabled={generateLoading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="success"
-                    icon={Award}
-                    onClick={handleGenerateCertificate}
-                    loading={generateLoading}
-                    className="flex-1"
-                  >
-                    Generate & Issue Certificate
-                  </Button>
-                </div>
+              {/* Signature Option */}
+              <div className={`${
+                hasSignature ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
+              } border rounded-lg p-4`}>
+                <label className={`flex items-start gap-3 ${hasSignature ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                  <input
+                    type="checkbox"
+                    checked={includeSignature}
+                    onChange={(e) => setIncludeSignature(e.target.checked)}
+                    disabled={!hasSignature || signatureLoading}
+                    className={`mt-0.5 w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ${
+                      hasSignature ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                    }`}
+                  />
+                  <div className="flex-1">
+                    <span className={`text-sm font-medium block ${hasSignature ? 'text-gray-900' : 'text-amber-900'}`}>
+                      Include digital signature
+                    </span>
+                    <p className={`text-xs mt-1 ${hasSignature ? 'text-gray-600' : 'text-amber-700'}`}>
+                      {signatureLoading ? (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 inline animate-spin" />
+                          Checking signature status...
+                        </span>
+                      ) : hasSignature ? (
+                        'Your signature will be embedded on the certificate'
+                      ) : (
+                        <>
+                          <AlertCircle className="w-3 h-3 inline mr-1" />
+                          Upload signature in Settings first
+                        </>
+                      )}
+                    </p>
                   </div>
-                </Panel>
-              </PanelGroup>
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <Button
+                  variant="primary"
+                  icon={Eye}
+                  onClick={handlePreviewCertificate}
+                  className="w-full"
+                >
+                  Preview in New Tab
+                </Button>
+                <Button
+                  variant="success"
+                  icon={Award}
+                  onClick={handleGenerateCertificate}
+                  loading={generateLoading}
+                  disabled={generateLoading}
+                  className="w-full"
+                >
+                  {generateLoading ? 'Generating...' : 'Generate & Issue Certificate'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setCertifyModalOpen(false);
+                    setSelectedApplication(null);
+                    setIncludeSignature(false);
+                  }}
+                  disabled={generateLoading}
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
         </ModernModal>
@@ -2199,6 +2156,23 @@ export default function PESOApplicationsPage() {
             }}
             applications={programApplicationsForBulk}
             onSubmit={handleAwardCompletion}
+          />
+        )}
+
+        {/* Issue Certificates Modal (Bulk Operation) */}
+        {selectedProgramForBulk && (
+          <BulkCertificateModal
+            isOpen={showBulkCertificateModal}
+            onClose={() => {
+              setShowBulkCertificateModal(false);
+              setSelectedProgramForBulk(null);
+              setProgramApplicationsForBulk([]);
+            }}
+            applications={programApplicationsForBulk}
+            programTitle={selectedProgramForBulk.title}
+            onComplete={() => {
+              fetchApplications();
+            }}
           />
         )}
 
@@ -2450,61 +2424,6 @@ export default function PESOApplicationsPage() {
           </div>
         </ModernModal>
 
-        {/* Bulk Start Training Modal */}
-        <ModernModal
-          isOpen={bulkStartModalOpen}
-          onClose={() => setBulkStartModalOpen(false)}
-          title="Start Training"
-          subtitle={`Start training for ${getEligibleForStart().length} eligible applicant${getEligibleForStart().length !== 1 ? 's' : ''}`}
-          colorVariant="blue"
-          icon={Play}
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-              <p className="text-sm text-blue-800">
-                Start training for <strong>{getEligibleForStart().length} applicant{getEligibleForStart().length !== 1 ? 's' : ''}</strong>.
-                {selectedApplications.size > getEligibleForStart().length && (
-                  <span className="block mt-1 text-xs text-blue-700">
-                    Note: Only enrolled applications will have training started.
-                  </span>
-                )}
-              </p>
-            </div>
-
-            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Enrolled):</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                {getEligibleForStart().map(app => (
-                  <li key={app.id} className="flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    {app.full_name}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setBulkStartModalOpen(false)}
-                className="flex-1"
-                disabled={bulkActionLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                icon={Play}
-                loading={bulkActionLoading}
-                onClick={handleBulkStartTraining}
-                className="flex-1"
-              >
-                {bulkActionLoading ? 'Starting...' : 'Start Training'}
-              </Button>
-            </div>
-          </div>
-        </ModernModal>
       </Container>
     </AdminLayout>
   );

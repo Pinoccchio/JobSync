@@ -132,10 +132,10 @@ export default function CertificatePreview({
       {/* PDF Viewer */}
       {pdfUrl && !error && (
         <iframe
-          src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+          src={`${pdfUrl}#toolbar=0&zoom=130`}
           className="w-full h-full"
           title="Certificate Preview"
-          style={{ border: 'none' }}
+          style={{ border: 'none', backgroundColor: '#1e293b' }}
         />
       )}
 

@@ -86,7 +86,7 @@ export const MarkAttendanceModal: React.FC<MarkAttendanceModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Mark Attendance"
+      title="Start Training & Mark Attendance"
       size="lg"
       showFooter={false}
     >
@@ -97,7 +97,8 @@ export const MarkAttendanceModal: React.FC<MarkAttendanceModalProps> = ({
             <span className="font-semibold">Training Program:</span> {program.title}
           </p>
           <p className="text-sm text-blue-700 mt-1">
-            Select all attendees below. Unselected applicants will be automatically marked as "No Show".
+            Select all attendees below. <strong>This will officially start training</strong> for selected applicants.
+            Unselected applicants will be marked as "No Show".
           </p>
         </div>
 
