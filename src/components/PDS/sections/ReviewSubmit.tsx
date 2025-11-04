@@ -117,7 +117,7 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             <div>
               <span className="font-medium text-gray-700">Children:</span>
               <p className="text-gray-900">
-                {pdsData.familyBackground.children.length > 0
+                {(pdsData.familyBackground?.children?.length || 0) > 0
                   ? `${pdsData.familyBackground.children.length} child(ren)`
                   : 'None'}
               </p>
@@ -125,15 +125,15 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             <div>
               <span className="font-medium text-gray-700">Father:</span>
               <p className="text-gray-900">
-                {pdsData.familyBackground.father.surname}, {pdsData.familyBackground.father.firstName}{' '}
-                {pdsData.familyBackground.father.middleName}
+                {pdsData.familyBackground.father?.surname || 'N/A'}, {pdsData.familyBackground.father?.firstName || ''}{' '}
+                {pdsData.familyBackground.father?.middleName || ''}
               </p>
             </div>
             <div>
               <span className="font-medium text-gray-700">Mother:</span>
               <p className="text-gray-900">
-                {pdsData.familyBackground.mother.surname}, {pdsData.familyBackground.mother.firstName}{' '}
-                {pdsData.familyBackground.mother.middleName}
+                {pdsData.familyBackground.mother?.surname || 'N/A'}, {pdsData.familyBackground.mother?.firstName || ''}{' '}
+                {pdsData.familyBackground.mother?.middleName || ''}
               </p>
             </div>
           </div>
@@ -290,7 +290,7 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             <div>
               <span className="font-medium text-gray-700">Skills:</span>
               <p className="text-gray-900">
-                {pdsData.otherInformation.skills.length > 0
+                {(pdsData.otherInformation.skills?.length || 0) > 0
                   ? pdsData.otherInformation.skills.join(', ')
                   : 'None'}
               </p>
@@ -403,13 +403,13 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             <div>
               <span className="font-medium text-gray-700">References:</span>
               <p className="text-gray-900">
-                {pdsData.otherInformation.references.length} reference(s) provided
+                {pdsData.otherInformation.references?.length || 0} reference(s) provided
               </p>
             </div>
             <div>
               <span className="font-medium text-gray-700">Declaration:</span>
               <p className="text-gray-900">
-                {pdsData.otherInformation.declaration.agreed ? (
+                {pdsData.otherInformation.declaration?.agreed ? (
                   <span className="text-[#22A555] flex items-center gap-1">
                     <CheckCircle className="w-4 h-4" />
                     Agreed

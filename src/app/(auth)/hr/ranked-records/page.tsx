@@ -1385,6 +1385,8 @@ export default function RankedRecordsPage() {
                 columns={columns}
                 data={sortedApplications}
                 searchable
+                paginated={true}
+                pageSize={10}
                 searchPlaceholder="Search by name, email, or position..."
               />
             )}

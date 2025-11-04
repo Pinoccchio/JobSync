@@ -454,6 +454,36 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
   lastSavedSection: undefined,
 };
 
+/**
+ * Normalizes PDS data to ensure all nested structures have proper defaults
+ * Prevents undefined errors when accessing nested properties
+ */
+const normalizePDSData = (data: any): Partial<PDSData> => ({
+  id: data.id,
+  userId: data.userId || data.user_id,
+  personalInfo: data.personalInfo || data.personal_info || {},
+  familyBackground: {
+    children: [],
+    father: { surname: '', firstName: '', middleName: '' },
+    mother: { surname: '', firstName: '', middleName: '' },
+    ...(data.familyBackground || data.family_background || {}),
+  },
+  educationalBackground: data.educationalBackground || data.educational_background || [],
+  eligibility: data.eligibility || [],
+  workExperience: data.workExperience || data.work_experience || [],
+  voluntaryWork: data.voluntaryWork || data.voluntary_work || [],
+  trainings: data.trainings || [],
+  otherInformation: {
+    skills: [],
+    references: [],
+    declaration: {},
+    ...(data.otherInformation || data.other_information || {}),
+  },
+  completionPercentage: data.completionPercentage || data.completion_percentage || 0,
+  isCompleted: data.isCompleted || data.is_completed || false,
+  lastSavedSection: data.lastSavedSection || data.last_saved_section,
+});
+
 export const PDSWizard: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [pdsData, setPdsData] = useState<Partial<PDSData>>({});
@@ -519,21 +549,8 @@ export const PDSWizard: React.FC = () => {
 
       if (result.success && result.data) {
         const data = result.data;
-        setPdsData({
-          id: data.id,
-          userId: data.user_id,
-          personalInfo: data.personal_info,
-          familyBackground: data.family_background,
-          educationalBackground: data.educational_background || [],
-          eligibility: data.eligibility || [],
-          workExperience: data.work_experience || [],
-          voluntaryWork: data.voluntary_work || [],
-          trainings: data.trainings || [],
-          otherInformation: data.other_information,
-          completionPercentage: data.completion_percentage || 0,
-          isCompleted: data.is_completed || false,
-          lastSavedSection: data.last_saved_section,
-        });
+        // Use normalizePDSData to ensure all nested structures have defaults
+        setPdsData(normalizePDSData(data));
 
         // Update step completion status
         updateStepCompletion(data);
@@ -546,21 +563,9 @@ export const PDSWizard: React.FC = () => {
           }
         }
       } else if (result.success && !result.data) {
-        // No PDS exists yet - initialize with empty state
+        // No PDS exists yet - initialize with empty state using normalizePDSData
         // Auto-save will create it on first change
-        setPdsData({
-          personalInfo: {} as any,
-          familyBackground: {} as any,
-          educationalBackground: [],
-          eligibility: [],
-          workExperience: [],
-          voluntaryWork: [],
-          trainings: [],
-          otherInformation: {} as any,
-          completionPercentage: 0,
-          isCompleted: false,
-          lastSavedSection: undefined,
-        });
+        setPdsData(normalizePDSData({}));
       }
     } catch (error) {
       console.error('Error loading PDS data:', error);
@@ -823,7 +828,7 @@ export const PDSWizard: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
-      {/* Debug Button - Development Only */}
+      {/* Debug Button - Disabled for production use
       {process.env.NODE_ENV === 'development' && (
         <div className="mb-4 flex justify-end">
           <Button
@@ -836,6 +841,7 @@ export const PDSWizard: React.FC = () => {
           </Button>
         </div>
       )}
+      */}
 
       {/* Progress Bar */}
       <ProgressBar
