@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout';
 import { Card, Container, Badge, RefreshButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { GraduationCap, Clock, User, Loader2 } from 'lucide-react';
+import { GraduationCap, Clock, User, Loader2, UserCheck, Play, CheckCircle, Award } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
 import { getStatusConfig } from '@/lib/config/statusConfig';
 
@@ -12,6 +12,9 @@ interface DashboardStats {
   totalApplications: number;
   pendingApplications: number;
   activePrograms: number;
+  enrolledCount: number;
+  inProgressCount: number;
+  completedCount: number;
 }
 
 interface RecentApplication {
@@ -32,6 +35,9 @@ export default function PESODashboard() {
     totalApplications: 0,
     pendingApplications: 0,
     activePrograms: 0,
+    enrolledCount: 0,
+    inProgressCount: 0,
+    completedCount: 0,
   });
   const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +77,24 @@ export default function PESODashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
 
+      // Fetch enrolled applications
+      const { count: enrolledCount } = await supabase
+        .from('training_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'enrolled');
+
+      // Fetch in-progress applications
+      const { count: inProgressCount } = await supabase
+        .from('training_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'in_progress');
+
+      // Fetch completed applications
+      const { count: completedCount } = await supabase
+        .from('training_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed');
+
       // Fetch recent applications (last 5)
       const { data: applications, error } = await supabase
         .from('training_applications')
@@ -97,6 +121,9 @@ export default function PESODashboard() {
           totalApplications: totalApplications || 0,
           pendingApplications: pendingApplications || 0,
           activePrograms: activePrograms || 0,
+          enrolledCount: enrolledCount || 0,
+          inProgressCount: inProgressCount || 0,
+          completedCount: completedCount || 0,
         });
 
         setRecentApplications(applications || []);
@@ -127,19 +154,49 @@ export default function PESODashboard() {
       title: 'Total Training Applications',
       value: loading ? '...' : stats.totalApplications.toString(),
       icon: User,
-      color: 'from-blue-500 to-blue-600'
+      color: 'from-blue-500 to-blue-600',
+      bgColor: 'from-blue-50 to-blue-100 border-blue-500',
+      iconBg: 'bg-blue-500'
     },
     {
       title: 'Pending Applications',
       value: loading ? '...' : stats.pendingApplications.toString(),
       icon: Clock,
-      color: 'from-orange-500 to-orange-600'
+      color: 'from-orange-500 to-orange-600',
+      bgColor: 'from-orange-50 to-orange-100 border-orange-500',
+      iconBg: 'bg-orange-500'
     },
     {
       title: 'Active Training Programs',
       value: loading ? '...' : stats.activePrograms.toString(),
       icon: GraduationCap,
-      color: 'from-purple-500 to-purple-600'
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'from-purple-50 to-purple-100 border-purple-500',
+      iconBg: 'bg-purple-500'
+    },
+    {
+      title: 'Enrolled',
+      value: loading ? '...' : stats.enrolledCount.toString(),
+      icon: UserCheck,
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'from-purple-50 to-purple-100 border-purple-500',
+      iconBg: 'bg-purple-500'
+    },
+    {
+      title: 'In Progress',
+      value: loading ? '...' : stats.inProgressCount.toString(),
+      icon: Play,
+      color: 'from-teal-500 to-teal-600',
+      bgColor: 'from-teal-50 to-teal-100 border-teal-500',
+      iconBg: 'bg-teal-500'
+    },
+    {
+      title: 'Completed',
+      value: loading ? '...' : stats.completedCount.toString(),
+      icon: CheckCircle,
+      color: 'from-gray-500 to-gray-600',
+      bgColor: 'from-gray-50 to-gray-100 border-gray-500',
+      iconBg: 'bg-gray-500'
     },
   ];
 
@@ -174,16 +231,9 @@ export default function PESODashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {tiles.map((tile, index) => {
               const Icon = tile.icon;
-              // Define gradient background and border colors based on tile color
-              const bgGradient = tile.color.includes('blue') ? 'from-blue-50 to-blue-100 border-blue-500' :
-                               tile.color.includes('orange') ? 'from-orange-50 to-orange-100 border-orange-500' :
-                               'from-purple-50 to-purple-100 border-purple-500';
-              const iconBg = tile.color.includes('blue') ? 'bg-blue-500' :
-                            tile.color.includes('orange') ? 'bg-orange-500' :
-                            'bg-purple-500';
 
               return (
-                <Card key={index} variant="flat" className={`bg-gradient-to-br ${bgGradient} border-l-4 hover:shadow-xl transition-all duration-300`}>
+                <Card key={index} variant="flat" className={`bg-gradient-to-br ${tile.bgColor} border-l-4 hover:shadow-xl transition-all duration-300`}>
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600 mb-1">{tile.title}</p>
@@ -195,7 +245,7 @@ export default function PESODashboard() {
                         )}
                       </p>
                     </div>
-                    <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center shadow-lg`}>
+                    <div className={`w-12 h-12 ${tile.iconBg} rounded-xl flex items-center justify-center shadow-lg`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
                   </div>

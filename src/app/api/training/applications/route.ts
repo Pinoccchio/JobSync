@@ -55,34 +55,57 @@ export async function GET(request: NextRequest) {
       .from('training_applications')
       .select(`
         *,
-        training_programs:program_id (
+        training_programs!inner (
           id,
           title,
           duration,
           start_date
         )
       `)
-      .order('submitted_at', { ascending: false });
+      .order('submitted_at', { ascending: false});
 
     // Role-based filtering
     if (profile.role === 'APPLICANT') {
       // Applicants can only see their own applications
       query = query.eq('applicant_id', user.id);
+      console.log('📊 [API] Filtering for APPLICANT:', {
+        applicant_id: user.id,
+        email: user.email,
+      });
     }
     // PESO and ADMIN can see all applications
 
     // Apply program filter
     if (programId) {
       query = query.eq('program_id', programId);
+      console.log('📊 [API] Program filter applied:', programId);
     }
 
-    // Apply status filter
+    // Apply status filter (supports single or comma-separated values)
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      // Check if comma-separated (multiple statuses)
+      if (status.includes(',')) {
+        const statusArray = status.split(',').map(s => s.trim());
+        query = query.in('status', statusArray);
+        console.log('📊 [API] Status filter (multiple):', statusArray);
+      } else {
+        // Single status
+        query = query.eq('status', status);
+        console.log('📊 [API] Status filter (single):', status);
+      }
+    } else {
+      console.log('📊 [API] No status filter - fetching ALL statuses');
     }
 
     // Execute query
-    const { data: applications, error } = await query;
+    console.log('📊 [API] Executing training applications query...');
+    let { data: applications, error } = await query;
+
+    console.log('📊 [API] Query Results:', {
+      success: !error,
+      count: applications?.length || 0,
+      error: error?.message,
+    });
 
     if (error) {
       console.error('Error fetching training applications:', error);
@@ -90,6 +113,35 @@ export async function GET(request: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // Debug: Check for missing training_programs relationships
+    if (applications && applications.length > 0) {
+      const missingPrograms = applications.filter(app => !app.training_programs);
+      if (missingPrograms.length > 0) {
+        console.warn(`⚠️ ${missingPrograms.length} applications missing training_programs relationship`);
+
+        // Fallback: Fetch programs separately
+        const programIds = [...new Set(applications.map(app => app.program_id).filter(Boolean))];
+        if (programIds.length > 0) {
+          const { data: programs } = await supabase
+            .from('training_programs')
+            .select('id, title, duration, start_date')
+            .in('id', programIds);
+
+          if (programs) {
+            const programMap = new Map(programs.map(p => [p.id, p]));
+
+            // Enrich applications with program data
+            applications = applications.map(app => ({
+              ...app,
+              training_programs: app.training_programs || programMap.get(app.program_id) || null
+            }));
+
+            console.log(`✅ Enriched ${missingPrograms.length} applications with program data`);
+          }
+        }
+      }
     }
 
     // Generate signed URLs for ID images
@@ -109,6 +161,35 @@ export async function GET(request: NextRequest) {
         return app;
       })
     );
+
+    // Log final applications being returned
+    console.log('📊 [API] Final Applications to Return:', applicationsWithSignedUrls.length);
+    applicationsWithSignedUrls.forEach((app, index) => {
+      console.log(`📊 [API] Application ${index + 1}:`, {
+        id: app.id,
+        status: app.status,
+        program_id: app.program_id,
+        program_title: app.training_programs?.title || 'MISSING PROGRAM',
+        applicant_id: app.applicant_id,
+        certificate_url: app.certificate_url ? 'Present' : 'None',
+        completion_status: app.completion_status,
+      });
+    });
+
+    // Specifically highlight certified applications
+    const certifiedApps = applicationsWithSignedUrls.filter(app => app.status === 'certified');
+    if (certifiedApps.length > 0) {
+      console.log('🎓 [API] Certified Applications Being Returned:', certifiedApps.length);
+      certifiedApps.forEach(app => {
+        console.log('🎓 [API] Certified App:', {
+          id: app.id,
+          program: app.training_programs?.title,
+          certificate: app.certificate_url ? 'Yes' : 'No',
+        });
+      });
+    } else {
+      console.log('⚠️ [API] NO certified applications found in results');
+    }
 
     return NextResponse.json({
       success: true,

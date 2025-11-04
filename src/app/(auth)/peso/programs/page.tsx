@@ -418,7 +418,7 @@ export default function PESOProgramsPage() {
         const isArchived = row.status === 'archived';
 
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {/* Non-archived programs: Edit + Archive */}
             {!isArchived && (
               <>

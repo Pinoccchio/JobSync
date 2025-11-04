@@ -9,8 +9,10 @@ import { StatusTimeline } from '@/components/peso/StatusTimeline';
 import { getStatusConfig } from '@/lib/config/statusConfig';
 import { generateCertificatePreview, generateCertificateId } from '@/lib/certificates/certificateGenerator';
 import type { CertificateData } from '@/types/certificate.types';
+import { MarkAttendanceModal } from '@/components/peso/MarkAttendanceModal';
+import { AwardCompletionModal } from '@/components/peso/AwardCompletionModal';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText, Users, ExternalLink, CheckSquare, Square } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -69,6 +71,28 @@ export default function PESOApplicationsPage() {
   const [hasSignature, setHasSignature] = useState<boolean>(false);
   const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
   const [generateLoading, setGenerateLoading] = useState(false);
+
+  // Bulk operations state
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [selectedProgramForBulk, setSelectedProgramForBulk] = useState<any | null>(null);
+  const [programApplicationsForBulk, setProgramApplicationsForBulk] = useState<any[]>([]);
+  const [loadingBulkApps, setLoadingBulkApps] = useState(false);
+  const [programStats, setProgramStats] = useState<{
+    total: number;
+    enrolled: number;
+    inProgress: number;
+    completed: number;
+  } | null>(null);
+
+  // Multi-select state for bulk status updates
+  const [selectedApplications, setSelectedApplications] = useState<Set<string>>(new Set());
+  const [bulkReviewModalOpen, setBulkReviewModalOpen] = useState(false);
+  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [bulkDenyModalOpen, setBulkDenyModalOpen] = useState(false);
+  const [bulkEnrollModalOpen, setBulkEnrollModalOpen] = useState(false);
+  const [bulkStartModalOpen, setBulkStartModalOpen] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Fetch training applications function
   const fetchApplications = useCallback(async () => {
@@ -414,7 +438,430 @@ export default function PESOApplicationsPage() {
     };
   };
 
+  // Multi-select handlers
+  const handleToggleSelect = (id: string) => {
+    const newSet = new Set(selectedApplications);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedApplications(newSet);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedApplications.size === filteredApplications.length && filteredApplications.length > 0) {
+      setSelectedApplications(new Set());
+    } else {
+      setSelectedApplications(new Set(filteredApplications.map(a => a.id)));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedApplications(new Set());
+  };
+
+  // Get selected applications
+  const getSelectedApplications = () => {
+    return filteredApplications.filter(a => selectedApplications.has(a.id));
+  };
+
+  // Smart validation for bulk actions
+  const canBulkReview = () => {
+    const selected = getSelectedApplications();
+    return selected.length > 0 && selected.every(a => a.status === 'pending');
+  };
+
+  const canBulkApprove = () => {
+    const selected = getSelectedApplications();
+    return selected.length > 0 && selected.every(a => a.status === 'under_review');
+  };
+
+  const canBulkDeny = () => {
+    const selected = getSelectedApplications();
+    return selected.length > 0 && selected.every(a => ['pending', 'under_review'].includes(a.status));
+  };
+
+  const canBulkEnroll = () => {
+    const selected = getSelectedApplications();
+    return selected.length > 0 && selected.every(a => a.status === 'approved');
+  };
+
+  const canBulkStart = () => {
+    const selected = getSelectedApplications();
+    return selected.length > 0 && selected.every(a => a.status === 'enrolled');
+  };
+
+  // Bulk operation handlers
+  const handleBulkReview = async () => {
+    try {
+      setBulkActionLoading(true);
+      const selected = Array.from(selectedApplications);
+
+      const results = await Promise.all(
+        selected.map(id =>
+          fetch(`/api/training/applications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'under_review' }),
+          })
+        )
+      );
+
+      const succeeded = results.filter(r => r.ok).length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0) {
+        showToast(`Marked ${succeeded} of ${selected.length} as under review`, 'success');
+      }
+      if (failed > 0) {
+        showToast(`Failed to update ${failed} applications`, 'error');
+      }
+
+      setBulkReviewModalOpen(false);
+      setSelectedApplications(new Set());
+      fetchApplications();
+    } catch (error) {
+      console.error('Error bulk updating:', error);
+      showToast('Failed to update applications', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkApprove = async (nextSteps?: string) => {
+    try {
+      setBulkActionLoading(true);
+      const selected = Array.from(selectedApplications);
+
+      const results = await Promise.all(
+        selected.map(id =>
+          fetch(`/api/training/applications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'approved',
+              next_steps: nextSteps || '',
+            }),
+          })
+        )
+      );
+
+      const succeeded = results.filter(r => r.ok).length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0) {
+        showToast(`Approved ${succeeded} of ${selected.length} applications`, 'success');
+      }
+      if (failed > 0) {
+        showToast(`Failed to approve ${failed} applications`, 'error');
+      }
+
+      setBulkApproveModalOpen(false);
+      setSelectedApplications(new Set());
+      fetchApplications();
+    } catch (error) {
+      console.error('Error bulk approving:', error);
+      showToast('Failed to approve applications', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDeny = async (denialReason?: string) => {
+    try {
+      setBulkActionLoading(true);
+      const selected = Array.from(selectedApplications);
+
+      const results = await Promise.all(
+        selected.map(id =>
+          fetch(`/api/training/applications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'denied',
+              denial_reason: denialReason || '',
+            }),
+          })
+        )
+      );
+
+      const succeeded = results.filter(r => r.ok).length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0) {
+        showToast(`Denied ${succeeded} of ${selected.length} applications`, 'success');
+      }
+      if (failed > 0) {
+        showToast(`Failed to deny ${failed} applications`, 'error');
+      }
+
+      setBulkDenyModalOpen(false);
+      setSelectedApplications(new Set());
+      fetchApplications();
+    } catch (error) {
+      console.error('Error bulk denying:', error);
+      showToast('Failed to deny applications', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkEnroll = async () => {
+    try {
+      setBulkActionLoading(true);
+      const selected = Array.from(selectedApplications);
+
+      const results = await Promise.all(
+        selected.map(id =>
+          fetch(`/api/training/applications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'enrolled' }),
+          })
+        )
+      );
+
+      const succeeded = results.filter(r => r.ok).length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0) {
+        showToast(`Enrolled ${succeeded} of ${selected.length} applicants`, 'success');
+      }
+      if (failed > 0) {
+        showToast(`Failed to enroll ${failed} applicants`, 'error');
+      }
+
+      setBulkEnrollModalOpen(false);
+      setSelectedApplications(new Set());
+      fetchApplications();
+    } catch (error) {
+      console.error('Error bulk enrolling:', error);
+      showToast('Failed to enroll applicants', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkStartTraining = async () => {
+    try {
+      setBulkActionLoading(true);
+      const selected = Array.from(selectedApplications);
+
+      const results = await Promise.all(
+        selected.map(id =>
+          fetch(`/api/training/applications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'in_progress' }),
+          })
+        )
+      );
+
+      const succeeded = results.filter(r => r.ok).length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0) {
+        showToast(`Started training for ${succeeded} of ${selected.length} applicants`, 'success');
+      }
+      if (failed > 0) {
+        showToast(`Failed to start training for ${failed} applicants`, 'error');
+      }
+
+      setBulkStartModalOpen(false);
+      setSelectedApplications(new Set());
+      fetchApplications();
+    } catch (error) {
+      console.error('Error bulk starting training:', error);
+      showToast('Failed to start training', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // Calculate stats for filtered program
+  const calculateProgramStats = useCallback((programTitle: string) => {
+    const programApps = applications.filter(app =>
+      app.training_programs?.title === programTitle
+    );
+
+    return {
+      total: programApps.length,
+      enrolled: programApps.filter(a => a.status === 'enrolled').length,
+      inProgress: programApps.filter(a => a.status === 'in_progress').length,
+      completed: programApps.filter(a => a.status === 'completed').length,
+    };
+  }, [applications]);
+
+  // Handle Mark Attendance Click (Bulk Operation)
+  const handleBulkAttendanceClick = async () => {
+    if (programFilter === 'all') return;
+
+    try {
+      setLoadingBulkApps(true);
+      const programId = applications.find(a =>
+        a.training_programs?.title === programFilter
+      )?.program_id;
+
+      if (!programId) {
+        showToast('Program not found', 'error');
+        return;
+      }
+
+      // Fetch enrolled + in_progress applications
+      const response = await fetch(
+        `/api/training/applications?program_id=${programId}&status=enrolled,in_progress`
+      );
+      const result = await response.json();
+
+      if (result.success) {
+        setSelectedProgramForBulk({ id: programId, title: programFilter });
+        setProgramApplicationsForBulk(result.data || []);
+        setShowAttendanceModal(true);
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      showToast('Failed to fetch applications', 'error');
+    } finally {
+      setLoadingBulkApps(false);
+    }
+  };
+
+  // Handle Award Completion Click (Bulk Operation)
+  const handleBulkCompletionClick = async () => {
+    if (programFilter === 'all') return;
+
+    try {
+      setLoadingBulkApps(true);
+      const programId = applications.find(a =>
+        a.training_programs?.title === programFilter
+      )?.program_id;
+
+      if (!programId) {
+        showToast('Program not found', 'error');
+        return;
+      }
+
+      // Fetch in_progress applications
+      const response = await fetch(
+        `/api/training/applications?program_id=${programId}&status=in_progress`
+      );
+      const result = await response.json();
+
+      if (result.success) {
+        const program = applications.find(a =>
+          a.training_programs?.title === programFilter
+        )?.training_programs;
+
+        setSelectedProgramForBulk({
+          id: programId,
+          title: programFilter,
+          duration: program?.duration
+        });
+        setProgramApplicationsForBulk(result.data || []);
+        setShowCompletionModal(true);
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      showToast('Failed to fetch applications', 'error');
+    } finally {
+      setLoadingBulkApps(false);
+    }
+  };
+
+  // Handle Mark Attendance Submit (Bulk Operation)
+  const handleMarkAttendance = async (selectedIds: string[]) => {
+    if (!selectedProgramForBulk) return;
+
+    try {
+      const response = await fetch('/api/training/applications/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          program_id: selectedProgramForBulk.id,
+          attended_ids: selectedIds,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(result.message || 'Attendance marked successfully', 'success');
+        setShowAttendanceModal(false);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error marking attendance:', error);
+      showToast('Failed to mark attendance', 'error');
+      throw error;
+    }
+  };
+
+  // Handle Award Completion Submit (Bulk Operation)
+  const handleAwardCompletion = async (completionData: any[]) => {
+    try {
+      const completions = completionData.map(data => ({
+        application_id: data.applicantId,
+        completion_status: data.completionStatus,
+        training_hours_awarded: data.hoursAwarded,
+        assessment_score: data.assessmentScore,
+        completion_notes: data.notes,
+      }));
+
+      const response = await fetch('/api/training/applications/completion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completions }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(result.message || 'Completion awarded successfully', 'success');
+        setShowCompletionModal(false);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error awarding completion:', error);
+      showToast('Failed to award completion', 'error');
+      throw error;
+    }
+  };
+
   const columns = [
+    {
+      header: (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={filteredApplications.length > 0 && selectedApplications.size === filteredApplications.length}
+            onChange={handleSelectAll}
+            className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
+          />
+        </div>
+      ),
+      accessor: 'select' as const,
+      render: (_: any, row: TrainingApplication) => (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={selectedApplications.has(row.id)}
+            onChange={() => handleToggleSelect(row.id)}
+            className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
+          />
+        </div>
+      )
+    },
     {
       header: 'Full Name',
       accessor: 'full_name' as const,
@@ -589,15 +1036,8 @@ export default function PESOApplicationsPage() {
             variant: 'default' as const,
           });
         } else if (row.status === 'in_progress') {
-          menuItems.push({
-            label: 'Mark as Completed',
-            icon: CheckCircle,
-            onClick: () => {
-              setSelectedApplication(row);
-              setCompleteModalOpen(true);
-            },
-            variant: 'default' as const,
-          });
+          // Bulk operations (Mark Attendance, Award Completion) are handled in /peso/programs page
+          // Individual operations can be added here if needed in the future
         } else if (row.status === 'completed') {
           menuItems.push({
             label: 'Issue Certificate',
@@ -627,6 +1067,7 @@ export default function PESOApplicationsPage() {
 
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Row 1: Application Status */}
             <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
@@ -644,9 +1085,9 @@ export default function PESOApplicationsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Pending</p>
+                  <p className="text-sm text-gray-600 mb-1">Pending Review</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {loading ? <Loader2 className="w-8 h-8 animate-spin text-gray-400" /> : applications.filter(a => a.status === 'pending').length}
+                    {loading ? <Loader2 className="w-8 h-8 animate-spin text-gray-400" /> : applications.filter(a => ['pending', 'under_review'].includes(a.status)).length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -682,6 +1123,63 @@ export default function PESOApplicationsPage() {
                 </div>
               </div>
             </Card>
+
+            {/* Row 2: Training Progress */}
+            <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500 hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Enrolled</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loading ? <Loader2 className="w-8 h-8 animate-spin text-gray-400" /> : applications.filter(a => a.status === 'enrolled').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <UserCheck className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-teal-50 to-teal-100 border-l-4 border-teal-500 hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">In Progress</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loading ? <Loader2 className="w-8 h-8 animate-spin text-gray-400" /> : applications.filter(a => a.status === 'in_progress').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Play className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-500 hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Completed</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loading ? <Loader2 className="w-8 h-8 animate-spin text-gray-400" /> : applications.filter(a => a.status === 'completed').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-gray-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-l-4 border-yellow-500 hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Certified</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loading ? <Loader2 className="w-8 h-8 animate-spin text-gray-400" /> : applications.filter(a => a.status === 'certified').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Award className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
           </div>
 
           {/* Program Filter */}
@@ -711,6 +1209,172 @@ export default function PESOApplicationsPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Contextual Bulk Actions Banner - Shows when program is filtered */}
+          {programFilter !== 'all' && (() => {
+            const stats = calculateProgramStats(programFilter);
+            const canMarkAttendance = stats.enrolled > 0 || stats.inProgress > 0;
+            const canAwardCompletion = stats.inProgress > 0;
+
+            return (
+              <Card variant="flat" className="bg-gradient-to-r from-teal-50 to-cyan-50 border-l-4 border-teal-500 mb-6">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex-1 min-w-[300px]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <GraduationCap className="w-5 h-5 text-teal-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">{programFilter}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+                      <span className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        {stats.total} Total
+                      </span>
+                      {stats.enrolled > 0 && (
+                        <span className="flex items-center gap-1">
+                          <UserCheck className="w-4 h-4 text-purple-600" />
+                          {stats.enrolled} Enrolled
+                        </span>
+                      )}
+                      {stats.inProgress > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Play className="w-4 h-4 text-teal-600" />
+                          {stats.inProgress} In Progress
+                        </span>
+                      )}
+                      {stats.completed > 0 && (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle className="w-4 h-4 text-gray-600" />
+                          {stats.completed} Completed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 flex-wrap">
+                    {canMarkAttendance && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={UserCheck}
+                        onClick={handleBulkAttendanceClick}
+                        disabled={loadingBulkApps}
+                        className="whitespace-nowrap"
+                      >
+                        Mark Attendance ({stats.enrolled + stats.inProgress})
+                      </Button>
+                    )}
+                    {canAwardCompletion && (
+                      <Button
+                        variant="success"
+                        size="sm"
+                        icon={Award}
+                        onClick={handleBulkCompletionClick}
+                        disabled={loadingBulkApps}
+                        className="whitespace-nowrap"
+                      >
+                        Award Completion ({stats.inProgress})
+                      </Button>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={ExternalLink}
+                      onClick={() => window.open('/peso/programs', '_blank')}
+                      className="whitespace-nowrap"
+                    >
+                      View Program
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })()}
+
+          {/* Bulk Action Toolbar - Shows when applications are selected */}
+          {selectedApplications.size > 0 && (
+            <Card variant="flat" className="bg-blue-50 border-l-4 border-blue-500 mb-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <CheckSquare className="w-5 h-5 text-blue-600" />
+                  <span className="font-semibold text-gray-900">
+                    {selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  {canBulkReview() && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={Eye}
+                      onClick={() => setBulkReviewModalOpen(true)}
+                      disabled={bulkActionLoading}
+                      className="whitespace-nowrap"
+                    >
+                      Mark as Under Review ({selectedApplications.size})
+                    </Button>
+                  )}
+                  {canBulkApprove() && (
+                    <Button
+                      variant="success"
+                      size="sm"
+                      icon={CheckCircle}
+                      onClick={() => setBulkApproveModalOpen(true)}
+                      disabled={bulkActionLoading}
+                      className="whitespace-nowrap"
+                    >
+                      Approve All ({selectedApplications.size})
+                    </Button>
+                  )}
+                  {canBulkDeny() && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={XCircle}
+                      onClick={() => setBulkDenyModalOpen(true)}
+                      disabled={bulkActionLoading}
+                      className="whitespace-nowrap"
+                    >
+                      Deny All ({selectedApplications.size})
+                    </Button>
+                  )}
+                  {canBulkEnroll() && (
+                    <Button
+                      variant="teal"
+                      size="sm"
+                      icon={UserCheck}
+                      onClick={() => setBulkEnrollModalOpen(true)}
+                      disabled={bulkActionLoading}
+                      className="whitespace-nowrap"
+                    >
+                      Enroll All ({selectedApplications.size})
+                    </Button>
+                  )}
+                  {canBulkStart() && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={Play}
+                      onClick={() => setBulkStartModalOpen(true)}
+                      disabled={bulkActionLoading}
+                      className="whitespace-nowrap"
+                    >
+                      Start Training ({selectedApplications.size})
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleClearSelection}
+                    disabled={bulkActionLoading}
+                    className="whitespace-nowrap"
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+              </div>
+            </Card>
           )}
 
           {/* Applications Table */}
@@ -1349,6 +2013,328 @@ export default function PESOApplicationsPage() {
               )}
             </div>
           )}
+        </ModernModal>
+
+        {/* Mark Attendance Modal (Bulk Operation) */}
+        {selectedProgramForBulk && (
+          <MarkAttendanceModal
+            isOpen={showAttendanceModal}
+            onClose={() => {
+              setShowAttendanceModal(false);
+              setSelectedProgramForBulk(null);
+              setProgramApplicationsForBulk([]);
+            }}
+            program={{
+              id: selectedProgramForBulk.id,
+              title: selectedProgramForBulk.title,
+            }}
+            applications={programApplicationsForBulk}
+            onSubmit={handleMarkAttendance}
+          />
+        )}
+
+        {/* Award Completion Modal (Bulk Operation) */}
+        {selectedProgramForBulk && (
+          <AwardCompletionModal
+            isOpen={showCompletionModal}
+            onClose={() => {
+              setShowCompletionModal(false);
+              setSelectedProgramForBulk(null);
+              setProgramApplicationsForBulk([]);
+            }}
+            program={{
+              id: selectedProgramForBulk.id,
+              title: selectedProgramForBulk.title,
+              duration: selectedProgramForBulk.duration || 'N/A',
+            }}
+            applications={programApplicationsForBulk}
+            onSubmit={handleAwardCompletion}
+          />
+        )}
+
+        {/* Bulk Mark as Under Review Modal */}
+        <ModernModal
+          isOpen={bulkReviewModalOpen}
+          onClose={() => setBulkReviewModalOpen(false)}
+          title="Mark as Under Review"
+          subtitle={`Update ${selectedApplications.size} application${selectedApplications.size !== 1 ? 's' : ''}`}
+          colorVariant="blue"
+          icon={Eye}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+              <p className="text-sm text-blue-800">
+                Are you sure you want to mark <strong>{selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''}</strong> as under review?
+              </p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                {getSelectedApplications().map(app => (
+                  <li key={app.id} className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {app.full_name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => setBulkReviewModalOpen(false)}
+                className="flex-1"
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                icon={Eye}
+                loading={bulkActionLoading}
+                onClick={handleBulkReview}
+                className="flex-1"
+              >
+                {bulkActionLoading ? 'Updating...' : 'Confirm'}
+              </Button>
+            </div>
+          </div>
+        </ModernModal>
+
+        {/* Bulk Approve Modal */}
+        <ModernModal
+          isOpen={bulkApproveModalOpen}
+          onClose={() => setBulkApproveModalOpen(false)}
+          title="Approve Applications"
+          subtitle={`Approve ${selectedApplications.size} application${selectedApplications.size !== 1 ? 's' : ''}`}
+          colorVariant="green"
+          icon={CheckCircle}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-green-50 border-l-4 border-green-600 p-4 rounded">
+              <p className="text-sm text-green-800">
+                Approve <strong>{selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''}</strong> and notify applicants.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Next Steps (Optional - applies to all)
+              </label>
+              <Textarea
+                value={nextSteps}
+                onChange={(e) => setNextSteps(e.target.value)}
+                placeholder="e.g., Please wait for enrollment confirmation email..."
+                rows={3}
+              />
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                {getSelectedApplications().map(app => (
+                  <li key={app.id} className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {app.full_name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setBulkApproveModalOpen(false);
+                  setNextSteps('');
+                }}
+                className="flex-1"
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="success"
+                icon={CheckCircle}
+                loading={bulkActionLoading}
+                onClick={() => handleBulkApprove(nextSteps)}
+                className="flex-1"
+              >
+                {bulkActionLoading ? 'Approving...' : 'Approve All'}
+              </Button>
+            </div>
+          </div>
+        </ModernModal>
+
+        {/* Bulk Deny Modal */}
+        <ModernModal
+          isOpen={bulkDenyModalOpen}
+          onClose={() => setBulkDenyModalOpen(false)}
+          title="Deny Applications"
+          subtitle={`Deny ${selectedApplications.size} application${selectedApplications.size !== 1 ? 's' : ''}`}
+          colorVariant="red"
+          icon={XCircle}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded">
+              <p className="text-sm text-red-800">
+                Deny <strong>{selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''}</strong> and notify applicants.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Denial Reason (Optional - applies to all)
+              </label>
+              <Textarea
+                value={denialReason}
+                onChange={(e) => setDenialReason(e.target.value)}
+                placeholder="e.g., Does not meet minimum educational requirements..."
+                rows={3}
+              />
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                {getSelectedApplications().map(app => (
+                  <li key={app.id} className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {app.full_name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setBulkDenyModalOpen(false);
+                  setDenialReason('');
+                }}
+                className="flex-1"
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                icon={XCircle}
+                loading={bulkActionLoading}
+                onClick={() => handleBulkDeny(denialReason)}
+                className="flex-1"
+              >
+                {bulkActionLoading ? 'Denying...' : 'Deny All'}
+              </Button>
+            </div>
+          </div>
+        </ModernModal>
+
+        {/* Bulk Enroll Modal */}
+        <ModernModal
+          isOpen={bulkEnrollModalOpen}
+          onClose={() => setBulkEnrollModalOpen(false)}
+          title="Enroll Applicants"
+          subtitle={`Enroll ${selectedApplications.size} applicant${selectedApplications.size !== 1 ? 's' : ''}`}
+          colorVariant="teal"
+          icon={UserCheck}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-teal-50 border-l-4 border-teal-600 p-4 rounded">
+              <p className="text-sm text-teal-800">
+                Enroll <strong>{selectedApplications.size} applicant{selectedApplications.size !== 1 ? 's' : ''}</strong> in their selected training programs.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                {getSelectedApplications().map(app => (
+                  <li key={app.id} className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {app.full_name} - {app.training_programs?.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => setBulkEnrollModalOpen(false)}
+                className="flex-1"
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="teal"
+                icon={UserCheck}
+                loading={bulkActionLoading}
+                onClick={handleBulkEnroll}
+                className="flex-1"
+              >
+                {bulkActionLoading ? 'Enrolling...' : 'Enroll All'}
+              </Button>
+            </div>
+          </div>
+        </ModernModal>
+
+        {/* Bulk Start Training Modal */}
+        <ModernModal
+          isOpen={bulkStartModalOpen}
+          onClose={() => setBulkStartModalOpen(false)}
+          title="Start Training"
+          subtitle={`Start training for ${selectedApplications.size} applicant${selectedApplications.size !== 1 ? 's' : ''}`}
+          colorVariant="blue"
+          icon={Play}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+              <p className="text-sm text-blue-800">
+                Start training for <strong>{selectedApplications.size} applicant{selectedApplications.size !== 1 ? 's' : ''}</strong>.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                {getSelectedApplications().map(app => (
+                  <li key={app.id} className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {app.full_name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => setBulkStartModalOpen(false)}
+                className="flex-1"
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                icon={Play}
+                loading={bulkActionLoading}
+                onClick={handleBulkStartTraining}
+                className="flex-1"
+              >
+                {bulkActionLoading ? 'Starting...' : 'Start Training'}
+              </Button>
+            </div>
+          </div>
         </ModernModal>
       </Container>
     </AdminLayout>

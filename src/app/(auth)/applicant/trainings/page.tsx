@@ -85,6 +85,9 @@ export default function TrainingsPage() {
   const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<UserApplication | null>(null);
   const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
 
+  // Tab state for organizing view
+  const [activeTab, setActiveTab] = useState<'available' | 'enrolled' | 'completed'>('available');
+
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -119,14 +122,50 @@ export default function TrainingsPage() {
   // Fetch user's applications
   const fetchUserApplications = useCallback(async () => {
     try {
+      console.log('📊 [Trainings Page] Fetching user training applications...');
       const response = await fetch('/api/training/applications');
       const result = await response.json();
 
+      console.log('📊 [Trainings Page] API Response:', {
+        status: response.status,
+        ok: response.ok,
+        resultSuccess: result.success,
+        count: result.count,
+        dataLength: result.data?.length,
+      });
+
       if (response.ok) {
-        setUserApplications(result.data || []);
+        const applications = result.data || [];
+        console.log('📊 [Trainings Page] Total Applications:', applications.length);
+
+        // Log each application with key details
+        applications.forEach((app: any, index: number) => {
+          console.log(`📊 [Trainings Page] Application ${index + 1}:`, {
+            id: app.id,
+            status: app.status,
+            program_title: app.training_programs?.title,
+            certificate_url: app.certificate_url,
+            completion_status: app.completion_status,
+            submitted_at: app.submitted_at,
+          });
+        });
+
+        // Specifically look for certified applications
+        const certifiedApps = applications.filter((app: any) => app.status === 'certified');
+        console.log('🎓 [Trainings Page] Certified Applications:', certifiedApps.length);
+        if (certifiedApps.length > 0) {
+          console.log('🎓 [Trainings Page] Certified Apps Details:', certifiedApps.map((app: any) => ({
+            title: app.training_programs?.title,
+            has_certificate: !!app.certificate_url,
+          })));
+        }
+
+        setUserApplications(applications);
+      } else {
+        console.error('❌ [Trainings Page] API Error:', result.error);
       }
     } catch (error: any) {
-      console.error('Error fetching user applications:', error);
+      console.error('❌ [Trainings Page] Error fetching user applications:', error);
     }
   }, []);
 
@@ -430,6 +469,15 @@ export default function TrainingsPage() {
     return iconMap[key] || GraduationCap;
   };
 
+  // Filter applications by tab
+  const enrolledApplications = userApplications.filter(app =>
+    ['pending', 'under_review', 'approved', 'enrolled', 'in_progress'].includes(app.status)
+  );
+
+  const completedApplications = userApplications.filter(app =>
+    ['completed', 'certified', 'failed'].includes(app.status)
+  );
+
   // Calculate stats
   const stats = {
     totalPrograms: programs.length,
@@ -514,7 +562,64 @@ export default function TrainingsPage() {
             </Card>
           </div>
 
-          {/* Search and Filters */}
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200">
+            <nav className="flex gap-8" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('available')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'available'
+                    ? 'border-[#22A555] text-[#22A555]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-5 h-5" />
+                  <span>Available Programs</span>
+                  <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-purple-100 text-purple-800">
+                    {filteredPrograms.length}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('enrolled')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'enrolled'
+                    ? 'border-[#22A555] text-[#22A555]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Play className="w-5 h-5" />
+                  <span>My Enrollments</span>
+                  <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-green-100 text-green-800">
+                    {enrolledApplications.length}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'completed'
+                    ? 'border-[#22A555] text-[#22A555]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5" />
+                  <span>Completed & Certified</span>
+                  <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-orange-100 text-orange-800">
+                    {completedApplications.length}
+                  </span>
+                </div>
+              </button>
+            </nav>
+          </div>
+
+          {/* Search and Filters - Only show on Available tab */}
+          {activeTab === 'available' && (
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search Bar */}
             <div className="flex-1 relative">
@@ -575,8 +680,10 @@ export default function TrainingsPage() {
               )}
             </div>
           </div>
+          )}
 
-        {/* Training Content - Card View */}
+        {/* Available Programs Tab */}
+        {activeTab === 'available' && (
         <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">
@@ -808,25 +915,287 @@ export default function TrainingsPage() {
                   })}
                 </div>
               )}
-        </div>
 
-          {/* Info Card */}
-          <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <GraduationCap className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900 mb-1">About PESO Training Programs</p>
-                <p className="text-sm text-gray-600">
-                  Our training programs are designed to equip job seekers with in-demand skills. All programs
-                  are completely free and include certificates upon completion. Limited slots are available,
-                  so apply early to secure your spot!
-                </p>
-              </div>
+              {/* Info Card */}
+              <Card variant="flat" className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <GraduationCap className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 mb-1">About PESO Training Programs</p>
+                    <p className="text-sm text-gray-600">
+                      Our training programs are designed to equip job seekers with in-demand skills. All programs
+                      are completely free and include certificates upon completion. Limited slots are available,
+                      so apply early to secure your spot!
+                    </p>
+                  </div>
+                </div>
+              </Card>
             </div>
-          </Card>
+        )}
+
+        {/* My Enrollments Tab */}
+        {activeTab === 'enrolled' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              My Enrollments ({enrolledApplications.length})
+            </h2>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+              <span className="ml-3 text-gray-600">Loading enrollments...</span>
+            </div>
+          ) : enrolledApplications.length === 0 ? (
+            <Card className="text-center py-16">
+              <Play className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No active enrollments</h3>
+              <p className="text-gray-600 mb-4">
+                You haven't enrolled in any training programs yet. Browse available programs and apply!
+              </p>
+              <Button variant="primary" onClick={() => setActiveTab('available')}>
+                Browse Programs
+              </Button>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {enrolledApplications.map((app) => {
+                const statusConfig = getStatusConfig(app.status);
+                return (
+                  <Card key={app.id} variant="flat" className="hover:shadow-lg transition-shadow">
+                    <div className="p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <GraduationCap className="w-6 h-6 text-[#22A555]" />
+                            <h3 className="text-lg font-bold text-gray-900">
+                              {app.training_programs?.title || 'Program'}
+                            </h3>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                            <div>
+                              <span className="text-gray-600">Status:</span>
+                              <Badge variant={statusConfig.variant as any} className="ml-2">
+                                {statusConfig.label}
+                              </Badge>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Applied:</span>
+                              <span className="ml-2 text-gray-900">{formatShortDate(app.submitted_at)}</span>
+                            </div>
+                            {app.training_programs?.duration && (
+                              <div>
+                                <span className="text-gray-600">Duration:</span>
+                                <span className="ml-2 text-gray-900">{app.training_programs.duration}</span>
+                              </div>
+                            )}
+                          </div>
+                          {app.next_steps && (
+                            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                              <p className="text-sm text-blue-900"><strong>Next Steps:</strong> {app.next_steps}</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={History}
+                            onClick={() => {
+                              setSelectedApplicationForHistory(app);
+                              setStatusHistoryModalOpen(true);
+                            }}
+                          >
+                            History
+                          </Button>
+                          {app.status === 'enrolled' && (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              icon={Ban}
+                              onClick={() => {
+                                setSelectedApplication(app);
+                                setWithdrawModalOpen(true);
+                              }}
+                            >
+                              Withdraw
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
+        )}
+
+        {/* Completed & Certified Tab */}
+        {activeTab === 'completed' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              Completed & Certified ({completedApplications.length})
+            </h2>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+              <span className="ml-3 text-gray-600">Loading certificates...</span>
+            </div>
+          ) : completedApplications.length === 0 ? (
+            <Card className="text-center py-16">
+              <Award className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No completed trainings yet</h3>
+              <p className="text-gray-600 mb-4">
+                Complete your enrolled trainings to receive certificates!
+              </p>
+              <Button variant="primary" onClick={() => setActiveTab('enrolled')}>
+                View My Enrollments
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {completedApplications.map((app) => {
+                const statusConfig = getStatusConfig(app.status);
+                const isCertified = app.status === 'certified';
+                const isCompleted = app.status === 'completed';
+                const isFailed = app.status === 'failed';
+
+                return (
+                  <Card key={app.id} variant="flat" className={`hover:shadow-xl transition-shadow ${
+                    isCertified ? 'border-2 border-green-500' : ''
+                  }`}>
+                    <div className="p-6 space-y-4">
+                      {/* Certificate Header */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {isCertified && <Award className="w-6 h-6 text-green-600" />}
+                            {isCompleted && <CheckCircle2 className="w-6 h-6 text-blue-600" />}
+                            {isFailed && <XCircle className="w-6 h-6 text-red-600" />}
+                            <h3 className="text-lg font-bold text-gray-900">
+                              {app.training_programs?.title || 'Program'}
+                            </h3>
+                          </div>
+                          <Badge variant={statusConfig.variant as any} size="lg">
+                            {statusConfig.label}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Certificate Details */}
+                      {isCertified && app.certificate_url && (
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+                          <div className="flex items-center gap-2 text-green-800">
+                            <Award className="w-5 h-5" />
+                            <span className="font-semibold">Certificate Available</span>
+                          </div>
+                          <p className="text-sm text-green-700">
+                            Your certificate is ready for download. This certificate verifies your successful completion of the training program.
+                          </p>
+                          <div className="flex gap-2">
+                            <a
+                              href={app.certificate_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                            >
+                              <Button variant="success" icon={Download} className="w-full">
+                                Download Certificate
+                              </Button>
+                            </a>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              icon={Eye}
+                              onClick={() => window.open(app.certificate_url, '_blank')}
+                            >
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Completed (pending certificate) */}
+                      {isCompleted && (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-blue-800 mb-2">
+                            <Clock className="w-5 h-5" />
+                            <span className="font-semibold">Certificate Pending</span>
+                          </div>
+                          <p className="text-sm text-blue-700">
+                            Congratulations on completing the training! Your certificate is being processed and will be available soon.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Failed */}
+                      {isFailed && (
+                        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-red-800 mb-2">
+                            <AlertCircle className="w-5 h-5" />
+                            <span className="font-semibold">Training Not Completed</span>
+                          </div>
+                          <p className="text-sm text-red-700">
+                            Unfortunately, you did not meet the requirements to complete this training. Please contact PESO for more information.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Training Info */}
+                      <div className="grid grid-cols-2 gap-3 text-sm pt-3 border-t">
+                        <div>
+                          <span className="text-gray-600">Duration:</span>
+                          <p className="font-medium text-gray-900">{app.training_programs?.duration || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Completed:</span>
+                          <p className="font-medium text-gray-900">{formatShortDate(app.submitted_at)}</p>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={History}
+                          onClick={() => {
+                            setSelectedApplicationForHistory(app);
+                            setStatusHistoryModalOpen(true);
+                          }}
+                          className="flex-1"
+                        >
+                          View History
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={FileText}
+                          onClick={() => {
+                            setSelectedApplication(app);
+                            setViewDetailsModalOpen(true);
+                          }}
+                          className="flex-1"
+                        >
+                          Details
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        )}
 
         {/* Application Modal */}
         <ModernModal
@@ -1274,6 +1643,7 @@ export default function TrainingsPage() {
             </div>
           )}
         </ModernModal>
+        </div>
       </Container>
     </AdminLayout>
   );

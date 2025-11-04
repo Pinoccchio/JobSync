@@ -60,14 +60,43 @@ export default function MyApplicationsPage() {
       const jobApplications = jobAppsData.data || [];
 
       // Fetch training applications
+      console.log('📊 [Applications Page] Fetching training applications...');
       const trainingAppsResponse = await fetch('/api/training/applications');
       const trainingAppsData = await trainingAppsResponse.json();
 
+      console.log('📊 [Applications Page] Training API Response:', {
+        status: trainingAppsResponse.status,
+        ok: trainingAppsResponse.ok,
+        resultSuccess: trainingAppsData.success,
+        count: trainingAppsData.count,
+        dataLength: trainingAppsData.data?.length,
+      });
+
       if (!trainingAppsResponse.ok) {
+        console.error('❌ [Applications Page] Training API Error:', trainingAppsData.error);
         throw new Error(trainingAppsData.error || 'Failed to fetch training applications');
       }
 
       const trainingApplications = trainingAppsData.data || [];
+      console.log('📊 [Applications Page] Total Training Applications:', trainingApplications.length);
+
+      // Log each training application
+      trainingApplications.forEach((app: any, index: number) => {
+        console.log(`📊 [Applications Page] Training App ${index + 1}:`, {
+          id: app.id,
+          status: app.status,
+          program_title: app.training_programs?.title,
+          submitted_at: app.submitted_at,
+          completion_status: app.completion_status,
+        });
+      });
+
+      // Specifically look for certified applications
+      const certifiedTrainingApps = trainingApplications.filter((app: any) => app.status === 'certified');
+      console.log('🎓 [Applications Page] Certified Training Applications:', certifiedTrainingApps.length);
+      if (certifiedTrainingApps.length > 0) {
+        console.log('🎓 [Applications Page] Certified Details:', certifiedTrainingApps);
+      }
 
       // Combine and format applications
       const allApplications: Application[] = [

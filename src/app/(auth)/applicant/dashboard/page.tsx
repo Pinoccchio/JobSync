@@ -118,7 +118,7 @@ export default function ApplicantDashboard() {
       const pendingApplications = jobApplications.filter((app: any) => app.status === 'pending').length +
         trainingApplications.filter((app: any) => app.status === 'pending').length;
       const approvedApplications = jobApplications.filter((app: any) => app.status === 'approved').length +
-        trainingApplications.filter((app: any) => app.status === 'approved').length;
+        trainingApplications.filter((app: any) => ['approved', 'certified', 'completed'].includes(app.status)).length;
 
       // Combine and format recent applications (last 5)
       const allApplications = [
