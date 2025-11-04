@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, ModernModal, Input, Textarea, DropdownMenu } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
@@ -466,40 +466,75 @@ export default function PESOApplicationsPage() {
     return filteredApplications.filter(a => selectedApplications.has(a.id));
   };
 
-  // Smart validation for bulk actions
+  // Helper functions to get eligible applications for each bulk action
+  const getEligibleForReview = () => {
+    return getSelectedApplications().filter(a => a.status === 'pending');
+  };
+
+  const getEligibleForApprove = () => {
+    return getSelectedApplications().filter(a => a.status === 'under_review');
+  };
+
+  const getEligibleForDeny = () => {
+    return getSelectedApplications().filter(a => ['pending', 'under_review'].includes(a.status));
+  };
+
+  const getEligibleForEnroll = () => {
+    return getSelectedApplications().filter(a => a.status === 'approved');
+  };
+
+  const getEligibleForStart = () => {
+    return getSelectedApplications().filter(a => a.status === 'enrolled');
+  };
+
+  // Smart validation for bulk actions (DYNAMIC - allows mixed statuses)
+  // SAFETY: Bulk actions are disabled when "All Programs" is selected to prevent
+  // cross-program operations and capacity validation issues
+  // NEW: Shows buttons if ANY selected apps are eligible (not ALL)
   const canBulkReview = () => {
-    const selected = getSelectedApplications();
-    return selected.length > 0 && selected.every(a => a.status === 'pending');
+    if (programFilter === 'all') return false; // Prevent cross-program bulk actions
+    return getEligibleForReview().length > 0; // Show if ANY are eligible
   };
 
   const canBulkApprove = () => {
-    const selected = getSelectedApplications();
-    return selected.length > 0 && selected.every(a => a.status === 'under_review');
+    if (programFilter === 'all') return false; // Prevent cross-program bulk actions
+    return getEligibleForApprove().length > 0; // Show if ANY are eligible
   };
 
   const canBulkDeny = () => {
-    const selected = getSelectedApplications();
-    return selected.length > 0 && selected.every(a => ['pending', 'under_review'].includes(a.status));
+    if (programFilter === 'all') return false; // Prevent cross-program bulk actions
+    return getEligibleForDeny().length > 0; // Show if ANY are eligible
   };
 
   const canBulkEnroll = () => {
-    const selected = getSelectedApplications();
-    return selected.length > 0 && selected.every(a => a.status === 'approved');
+    if (programFilter === 'all') return false; // Prevent cross-program bulk actions
+    return getEligibleForEnroll().length > 0; // Show if ANY are eligible
   };
 
   const canBulkStart = () => {
-    const selected = getSelectedApplications();
-    return selected.length > 0 && selected.every(a => a.status === 'enrolled');
+    if (programFilter === 'all') return false; // Prevent cross-program bulk actions
+    return getEligibleForStart().length > 0; // Show if ANY are eligible
   };
 
   // Bulk operation handlers
   const handleBulkReview = async () => {
+    // Filter only eligible applications (status: pending)
+    const eligible = getEligibleForReview();
+    const eligibleIds = eligible.map(a => a.id);
+
+    // Confirmation for large selections
+    if (eligible.length > 10) {
+      const confirmed = window.confirm(
+        `You are about to mark ${eligible.length} pending applications as under review. Do you want to continue?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setBulkActionLoading(true);
-      const selected = Array.from(selectedApplications);
 
       const results = await Promise.all(
-        selected.map(id =>
+        eligibleIds.map(id =>
           fetch(`/api/training/applications/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -512,7 +547,7 @@ export default function PESOApplicationsPage() {
       const failed = results.length - succeeded;
 
       if (succeeded > 0) {
-        showToast(`Marked ${succeeded} of ${selected.length} as under review`, 'success');
+        showToast(`Marked ${succeeded} of ${eligible.length} applications as under review`, 'success');
       }
       if (failed > 0) {
         showToast(`Failed to update ${failed} applications`, 'error');
@@ -529,19 +564,35 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  const handleBulkApprove = async (nextSteps?: string) => {
+  const handleBulkApprove = async () => {
+    // Filter only eligible applications (status: under_review)
+    const eligible = getEligibleForApprove();
+    const eligibleIds = eligible.map(a => a.id);
+
+    if (eligibleIds.length === 0) {
+      showToast('No eligible applications to approve', 'error');
+      return;
+    }
+
+    // Confirmation for large selections
+    if (eligible.length > 10) {
+      const confirmed = window.confirm(
+        `You are about to approve ${eligible.length} applications under review. This action cannot be undone. Do you want to continue?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setBulkActionLoading(true);
-      const selected = Array.from(selectedApplications);
 
+      // Send status update without optional next_steps field (API will use default message)
       const results = await Promise.all(
-        selected.map(id =>
+        eligibleIds.map(id =>
           fetch(`/api/training/applications/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               status: 'approved',
-              next_steps: nextSteps || '',
             }),
           })
         )
@@ -551,7 +602,7 @@ export default function PESOApplicationsPage() {
       const failed = results.length - succeeded;
 
       if (succeeded > 0) {
-        showToast(`Approved ${succeeded} of ${selected.length} applications`, 'success');
+        showToast(`Approved ${succeeded} of ${eligible.length} applications`, 'success');
       }
       if (failed > 0) {
         showToast(`Failed to approve ${failed} applications`, 'error');
@@ -568,19 +619,35 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  const handleBulkDeny = async (denialReason?: string) => {
+  const handleBulkDeny = async () => {
+    // Filter only eligible applications (status: pending or under_review)
+    const eligible = getEligibleForDeny();
+    const eligibleIds = eligible.map(a => a.id);
+
+    if (eligibleIds.length === 0) {
+      showToast('No eligible applications to deny', 'error');
+      return;
+    }
+
+    // Confirmation for large selections
+    if (eligible.length > 10) {
+      const confirmed = window.confirm(
+        `You are about to deny ${eligible.length} applications. This action cannot be undone. Do you want to continue?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setBulkActionLoading(true);
-      const selected = Array.from(selectedApplications);
 
+      // Send status update without optional denial_reason field (API will use default message)
       const results = await Promise.all(
-        selected.map(id =>
+        eligibleIds.map(id =>
           fetch(`/api/training/applications/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               status: 'denied',
-              denial_reason: denialReason || '',
             }),
           })
         )
@@ -590,7 +657,7 @@ export default function PESOApplicationsPage() {
       const failed = results.length - succeeded;
 
       if (succeeded > 0) {
-        showToast(`Denied ${succeeded} of ${selected.length} applications`, 'success');
+        showToast(`Denied ${succeeded} of ${eligible.length} applications`, 'success');
       }
       if (failed > 0) {
         showToast(`Failed to deny ${failed} applications`, 'error');
@@ -608,12 +675,28 @@ export default function PESOApplicationsPage() {
   };
 
   const handleBulkEnroll = async () => {
+    // Filter only eligible applications (status: approved)
+    const eligible = getEligibleForEnroll();
+    const eligibleIds = eligible.map(a => a.id);
+
+    if (eligibleIds.length === 0) {
+      showToast('No eligible applications to enroll', 'error');
+      return;
+    }
+
+    // Confirmation for large selections
+    if (eligibleIds.length > 10) {
+      const confirmed = window.confirm(
+        `You are about to enroll ${eligibleIds.length} approved applicants. This action cannot be undone. Do you want to continue?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setBulkActionLoading(true);
-      const selected = Array.from(selectedApplications);
 
       const results = await Promise.all(
-        selected.map(id =>
+        eligibleIds.map(id =>
           fetch(`/api/training/applications/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -626,7 +709,7 @@ export default function PESOApplicationsPage() {
       const failed = results.length - succeeded;
 
       if (succeeded > 0) {
-        showToast(`Enrolled ${succeeded} of ${selected.length} applicants`, 'success');
+        showToast(`Enrolled ${succeeded} of ${eligibleIds.length} applicants`, 'success');
       }
       if (failed > 0) {
         showToast(`Failed to enroll ${failed} applicants`, 'error');
@@ -644,12 +727,28 @@ export default function PESOApplicationsPage() {
   };
 
   const handleBulkStartTraining = async () => {
+    // Filter only eligible applications (status: enrolled)
+    const eligible = getEligibleForStart();
+    const eligibleIds = eligible.map(a => a.id);
+
+    if (eligibleIds.length === 0) {
+      showToast('No eligible applications to start training', 'error');
+      return;
+    }
+
+    // Confirmation for large selections
+    if (eligibleIds.length > 10) {
+      const confirmed = window.confirm(
+        `You are about to start training for ${eligibleIds.length} enrolled applicants. This action cannot be undone. Do you want to continue?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setBulkActionLoading(true);
-      const selected = Array.from(selectedApplications);
 
       const results = await Promise.all(
-        selected.map(id =>
+        eligibleIds.map(id =>
           fetch(`/api/training/applications/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -662,7 +761,7 @@ export default function PESOApplicationsPage() {
       const failed = results.length - succeeded;
 
       if (succeeded > 0) {
-        showToast(`Started training for ${succeeded} of ${selected.length} applicants`, 'success');
+        showToast(`Started training for ${succeeded} of ${eligibleIds.length} applicants`, 'success');
       }
       if (failed > 0) {
         showToast(`Failed to start training for ${failed} applicants`, 'error');
@@ -708,9 +807,9 @@ export default function PESOApplicationsPage() {
         return;
       }
 
-      // Fetch enrolled + in_progress applications
+      // Fetch only enrolled applications (not yet attended)
       const response = await fetch(
-        `/api/training/applications?program_id=${programId}&status=enrolled,in_progress`
+        `/api/training/applications?program_id=${programId}&status=enrolled`
       );
       const result = await response.json();
 
@@ -838,30 +937,9 @@ export default function PESOApplicationsPage() {
     }
   };
 
-  const columns = [
-    {
-      header: (
-        <div className="flex items-center justify-center">
-          <input
-            type="checkbox"
-            checked={filteredApplications.length > 0 && selectedApplications.size === filteredApplications.length}
-            onChange={handleSelectAll}
-            className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
-          />
-        </div>
-      ),
-      accessor: 'select' as const,
-      render: (_: any, row: TrainingApplication) => (
-        <div className="flex items-center justify-center">
-          <input
-            type="checkbox"
-            checked={selectedApplications.has(row.id)}
-            onChange={() => handleToggleSelect(row.id)}
-            className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
-          />
-        </div>
-      )
-    },
+  // Build columns dynamically - hide checkboxes when "All Programs" is selected
+  const columns = useMemo(() => {
+    const baseColumns = [
     {
       header: 'Full Name',
       accessor: 'full_name' as const,
@@ -1054,7 +1132,40 @@ export default function PESOApplicationsPage() {
         return <DropdownMenu items={menuItems} />;
       },
     },
-  ];
+    ];
+
+    // Only show checkbox column when a specific program is selected (not "all")
+    if (programFilter !== 'all') {
+      return [
+        {
+          header: (
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={filteredApplications.length > 0 && selectedApplications.size === filteredApplications.length}
+                onChange={handleSelectAll}
+                className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
+              />
+            </div>
+          ),
+          accessor: 'select' as const,
+          render: (_: any, row: TrainingApplication) => (
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={selectedApplications.has(row.id)}
+                onChange={() => handleToggleSelect(row.id)}
+                className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
+              />
+            </div>
+          )
+        },
+        ...baseColumns,
+      ];
+    }
+
+    return baseColumns;
+  }, [programFilter, selectedApplications, filteredApplications, handleSelectAll, handleToggleSelect]);
 
   return (
     <AdminLayout role="PESO" userName={user?.fullName || 'PESO Admin'} pageTitle="Training Applications" pageDescription="Manage and review training program applications">
@@ -1214,7 +1325,7 @@ export default function PESOApplicationsPage() {
           {/* Contextual Bulk Actions Banner - Shows when program is filtered */}
           {programFilter !== 'all' && (() => {
             const stats = calculateProgramStats(programFilter);
-            const canMarkAttendance = stats.enrolled > 0 || stats.inProgress > 0;
+            const canMarkAttendance = stats.enrolled > 0; // Only enrolled (not yet attended)
             const canAwardCompletion = stats.inProgress > 0;
 
             return (
@@ -1261,7 +1372,7 @@ export default function PESOApplicationsPage() {
                         disabled={loadingBulkApps}
                         className="whitespace-nowrap"
                       >
-                        Mark Attendance ({stats.enrolled + stats.inProgress})
+                        Mark Attendance ({stats.enrolled})
                       </Button>
                     )}
                     {canAwardCompletion && (
@@ -1291,6 +1402,22 @@ export default function PESOApplicationsPage() {
             );
           })()}
 
+          {/* Warning Banner - Bulk actions disabled when "All Programs" selected */}
+          {selectedApplications.size > 0 && programFilter === 'all' && (
+            <Card variant="flat" className="bg-amber-50 border-l-4 border-amber-500 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900">Bulk Actions Disabled</p>
+                  <p className="text-sm text-amber-800 mt-1">
+                    Bulk operations are disabled when viewing all programs to prevent accidental cross-program actions
+                    and capacity issues. Please select a specific program from the filter above to enable bulk operations.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Bulk Action Toolbar - Shows when applications are selected */}
           {selectedApplications.size > 0 && (
             <Card variant="flat" className="bg-blue-50 border-l-4 border-blue-500 mb-4">
@@ -1312,7 +1439,7 @@ export default function PESOApplicationsPage() {
                       disabled={bulkActionLoading}
                       className="whitespace-nowrap"
                     >
-                      Mark as Under Review ({selectedApplications.size})
+                      Mark as Under Review ({getEligibleForReview().length})
                     </Button>
                   )}
                   {canBulkApprove() && (
@@ -1324,7 +1451,7 @@ export default function PESOApplicationsPage() {
                       disabled={bulkActionLoading}
                       className="whitespace-nowrap"
                     >
-                      Approve All ({selectedApplications.size})
+                      Approve All ({getEligibleForApprove().length})
                     </Button>
                   )}
                   {canBulkDeny() && (
@@ -1336,7 +1463,7 @@ export default function PESOApplicationsPage() {
                       disabled={bulkActionLoading}
                       className="whitespace-nowrap"
                     >
-                      Deny All ({selectedApplications.size})
+                      Deny All ({getEligibleForDeny().length})
                     </Button>
                   )}
                   {canBulkEnroll() && (
@@ -1348,7 +1475,7 @@ export default function PESOApplicationsPage() {
                       disabled={bulkActionLoading}
                       className="whitespace-nowrap"
                     >
-                      Enroll All ({selectedApplications.size})
+                      Enroll All ({getEligibleForEnroll().length})
                     </Button>
                   )}
                   {canBulkStart() && (
@@ -1360,7 +1487,7 @@ export default function PESOApplicationsPage() {
                       disabled={bulkActionLoading}
                       className="whitespace-nowrap"
                     >
-                      Start Training ({selectedApplications.size})
+                      Start Training ({getEligibleForStart().length})
                     </Button>
                   )}
                   <Button
@@ -2057,7 +2184,7 @@ export default function PESOApplicationsPage() {
           isOpen={bulkReviewModalOpen}
           onClose={() => setBulkReviewModalOpen(false)}
           title="Mark as Under Review"
-          subtitle={`Update ${selectedApplications.size} application${selectedApplications.size !== 1 ? 's' : ''}`}
+          subtitle={`Update ${getEligibleForReview().length} eligible application${getEligibleForReview().length !== 1 ? 's' : ''}`}
           colorVariant="blue"
           icon={Eye}
           size="md"
@@ -2065,14 +2192,19 @@ export default function PESOApplicationsPage() {
           <div className="space-y-4">
             <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
               <p className="text-sm text-blue-800">
-                Are you sure you want to mark <strong>{selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''}</strong> as under review?
+                Are you sure you want to mark <strong>{getEligibleForReview().length} application{getEligibleForReview().length !== 1 ? 's' : ''}</strong> as under review?
+                {selectedApplications.size > getEligibleForReview().length && (
+                  <span className="block mt-1 text-xs text-blue-700">
+                    Note: Only pending applications will be affected.
+                  </span>
+                )}
               </p>
             </div>
 
             <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Pending):</p>
               <ul className="text-sm text-gray-600 space-y-1">
-                {getSelectedApplications().map(app => (
+                {getEligibleForReview().map(app => (
                   <li key={app.id} className="flex items-center gap-2">
                     <User className="w-3 h-3" />
                     {app.full_name}
@@ -2108,7 +2240,7 @@ export default function PESOApplicationsPage() {
           isOpen={bulkApproveModalOpen}
           onClose={() => setBulkApproveModalOpen(false)}
           title="Approve Applications"
-          subtitle={`Approve ${selectedApplications.size} application${selectedApplications.size !== 1 ? 's' : ''}`}
+          subtitle={`Approve ${getEligibleForApprove().length} eligible application${getEligibleForApprove().length !== 1 ? 's' : ''}`}
           colorVariant="green"
           icon={CheckCircle}
           size="md"
@@ -2116,26 +2248,31 @@ export default function PESOApplicationsPage() {
           <div className="space-y-4">
             <div className="bg-green-50 border-l-4 border-green-600 p-4 rounded">
               <p className="text-sm text-green-800">
-                Approve <strong>{selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''}</strong> and notify applicants.
+                Approve <strong>{getEligibleForApprove().length} application{getEligibleForApprove().length !== 1 ? 's' : ''}</strong> and notify applicants.
+                {selectedApplications.size > getEligibleForApprove().length && (
+                  <span className="block mt-1 text-xs text-green-700">
+                    Note: Only applications under review will be approved.
+                  </span>
+                )}
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Next Steps (Optional - applies to all)
-              </label>
-              <Textarea
-                value={nextSteps}
-                onChange={(e) => setNextSteps(e.target.value)}
-                placeholder="e.g., Please wait for enrollment confirmation email..."
-                rows={3}
-              />
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+              <p className="text-sm text-blue-800">
+                <strong>Standard notification message will be sent:</strong>
+              </p>
+              <p className="text-xs text-blue-700 mt-1 italic">
+                "Your application has been approved. We will contact you soon with the next steps."
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                💡 Need a custom message? Update applications individually instead.
+              </p>
             </div>
 
             <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Under Review):</p>
               <ul className="text-sm text-gray-600 space-y-1">
-                {getSelectedApplications().map(app => (
+                {getEligibleForApprove().map(app => (
                   <li key={app.id} className="flex items-center gap-2">
                     <User className="w-3 h-3" />
                     {app.full_name}
@@ -2147,10 +2284,7 @@ export default function PESOApplicationsPage() {
             <div className="flex gap-3 pt-2">
               <Button
                 variant="secondary"
-                onClick={() => {
-                  setBulkApproveModalOpen(false);
-                  setNextSteps('');
-                }}
+                onClick={() => setBulkApproveModalOpen(false)}
                 className="flex-1"
                 disabled={bulkActionLoading}
               >
@@ -2160,7 +2294,7 @@ export default function PESOApplicationsPage() {
                 variant="success"
                 icon={CheckCircle}
                 loading={bulkActionLoading}
-                onClick={() => handleBulkApprove(nextSteps)}
+                onClick={() => handleBulkApprove()}
                 className="flex-1"
               >
                 {bulkActionLoading ? 'Approving...' : 'Approve All'}
@@ -2174,7 +2308,7 @@ export default function PESOApplicationsPage() {
           isOpen={bulkDenyModalOpen}
           onClose={() => setBulkDenyModalOpen(false)}
           title="Deny Applications"
-          subtitle={`Deny ${selectedApplications.size} application${selectedApplications.size !== 1 ? 's' : ''}`}
+          subtitle={`Deny ${getEligibleForDeny().length} eligible application${getEligibleForDeny().length !== 1 ? 's' : ''}`}
           colorVariant="red"
           icon={XCircle}
           size="md"
@@ -2182,26 +2316,31 @@ export default function PESOApplicationsPage() {
           <div className="space-y-4">
             <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded">
               <p className="text-sm text-red-800">
-                Deny <strong>{selectedApplications.size} application{selectedApplications.size !== 1 ? 's' : ''}</strong> and notify applicants.
+                Deny <strong>{getEligibleForDeny().length} application{getEligibleForDeny().length !== 1 ? 's' : ''}</strong> and notify applicants.
+                {selectedApplications.size > getEligibleForDeny().length && (
+                  <span className="block mt-1 text-xs text-red-700">
+                    Note: Only pending or under review applications will be denied.
+                  </span>
+                )}
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Denial Reason (Optional - applies to all)
-              </label>
-              <Textarea
-                value={denialReason}
-                onChange={(e) => setDenialReason(e.target.value)}
-                placeholder="e.g., Does not meet minimum educational requirements..."
-                rows={3}
-              />
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+              <p className="text-sm text-blue-800">
+                <strong>Standard notification message will be sent:</strong>
+              </p>
+              <p className="text-xs text-blue-700 mt-1 italic">
+                "Your application was reviewed. Please check your application details for more information. We encourage you to apply again in the future."
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                💡 Need a specific denial reason? Update applications individually instead.
+              </p>
             </div>
 
             <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Pending/Under Review):</p>
               <ul className="text-sm text-gray-600 space-y-1">
-                {getSelectedApplications().map(app => (
+                {getEligibleForDeny().map(app => (
                   <li key={app.id} className="flex items-center gap-2">
                     <User className="w-3 h-3" />
                     {app.full_name}
@@ -2213,10 +2352,7 @@ export default function PESOApplicationsPage() {
             <div className="flex gap-3 pt-2">
               <Button
                 variant="secondary"
-                onClick={() => {
-                  setBulkDenyModalOpen(false);
-                  setDenialReason('');
-                }}
+                onClick={() => setBulkDenyModalOpen(false)}
                 className="flex-1"
                 disabled={bulkActionLoading}
               >
@@ -2226,7 +2362,7 @@ export default function PESOApplicationsPage() {
                 variant="danger"
                 icon={XCircle}
                 loading={bulkActionLoading}
-                onClick={() => handleBulkDeny(denialReason)}
+                onClick={() => handleBulkDeny()}
                 className="flex-1"
               >
                 {bulkActionLoading ? 'Denying...' : 'Deny All'}
@@ -2240,7 +2376,7 @@ export default function PESOApplicationsPage() {
           isOpen={bulkEnrollModalOpen}
           onClose={() => setBulkEnrollModalOpen(false)}
           title="Enroll Applicants"
-          subtitle={`Enroll ${selectedApplications.size} applicant${selectedApplications.size !== 1 ? 's' : ''}`}
+          subtitle={`Enroll ${getEligibleForEnroll().length} eligible applicant${getEligibleForEnroll().length !== 1 ? 's' : ''}`}
           colorVariant="teal"
           icon={UserCheck}
           size="md"
@@ -2248,14 +2384,19 @@ export default function PESOApplicationsPage() {
           <div className="space-y-4">
             <div className="bg-teal-50 border-l-4 border-teal-600 p-4 rounded">
               <p className="text-sm text-teal-800">
-                Enroll <strong>{selectedApplications.size} applicant{selectedApplications.size !== 1 ? 's' : ''}</strong> in their selected training programs.
+                Enroll <strong>{getEligibleForEnroll().length} applicant{getEligibleForEnroll().length !== 1 ? 's' : ''}</strong> in their selected training programs.
+                {selectedApplications.size > getEligibleForEnroll().length && (
+                  <span className="block mt-1 text-xs text-teal-700">
+                    Note: Only approved applications will be enrolled.
+                  </span>
+                )}
               </p>
             </div>
 
             <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Approved):</p>
               <ul className="text-sm text-gray-600 space-y-1">
-                {getSelectedApplications().map(app => (
+                {getEligibleForEnroll().map(app => (
                   <li key={app.id} className="flex items-center gap-2">
                     <User className="w-3 h-3" />
                     {app.full_name} - {app.training_programs?.title}
@@ -2291,7 +2432,7 @@ export default function PESOApplicationsPage() {
           isOpen={bulkStartModalOpen}
           onClose={() => setBulkStartModalOpen(false)}
           title="Start Training"
-          subtitle={`Start training for ${selectedApplications.size} applicant${selectedApplications.size !== 1 ? 's' : ''}`}
+          subtitle={`Start training for ${getEligibleForStart().length} eligible applicant${getEligibleForStart().length !== 1 ? 's' : ''}`}
           colorVariant="blue"
           icon={Play}
           size="md"
@@ -2299,14 +2440,19 @@ export default function PESOApplicationsPage() {
           <div className="space-y-4">
             <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
               <p className="text-sm text-blue-800">
-                Start training for <strong>{selectedApplications.size} applicant{selectedApplications.size !== 1 ? 's' : ''}</strong>.
+                Start training for <strong>{getEligibleForStart().length} applicant{getEligibleForStart().length !== 1 ? 's' : ''}</strong>.
+                {selectedApplications.size > getEligibleForStart().length && (
+                  <span className="block mt-1 text-xs text-blue-700">
+                    Note: Only enrolled applications will have training started.
+                  </span>
+                )}
               </p>
             </div>
 
             <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Selected Applicants:</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Enrolled):</p>
               <ul className="text-sm text-gray-600 space-y-1">
-                {getSelectedApplications().map(app => (
+                {getEligibleForStart().map(app => (
                   <li key={app.id} className="flex items-center gap-2">
                     <User className="w-3 h-3" />
                     {app.full_name}

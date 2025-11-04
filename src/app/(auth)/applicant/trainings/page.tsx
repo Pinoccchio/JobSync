@@ -9,7 +9,7 @@ import { formatPhilippinePhone } from '@/lib/utils/phoneFormatter';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { AdminLayout } from '@/components/layout';
 import { StatusTimeline } from '@/components/peso/StatusTimeline';
-import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, Filter, Loader2, Award, Star, TrendingUp, User, Laptop, Briefcase, BarChart3, Palette, Wrench, BookOpen, Code, Lightbulb, Eye, XCircle, UserCheck, Play, Ban, AlertCircle, Archive, Download, FileText, History, X } from 'lucide-react';
+import { GraduationCap, Clock, Calendar, Users, MapPin, CheckCircle2, Upload, Filter, Loader2, Award, Star, TrendingUp, User, Laptop, Briefcase, BarChart3, Palette, Wrench, BookOpen, Code, Lightbulb, Eye, XCircle, UserCheck, Play, Ban, AlertCircle, Archive, Download, FileText, History, X, ArrowRight } from 'lucide-react';
 import { FileUploadWithProgress } from '@/components/ui';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 import { getStatusConfig } from '@/lib/config/statusConfig';
@@ -92,6 +92,9 @@ export default function TrainingsPage() {
   const [statusHistoryModalOpen, setStatusHistoryModalOpen] = useState(false);
   const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<UserApplication | null>(null);
   const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
+
+  // Description expansion state
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
 
   // Tab state for organizing view
   const [activeTab, setActiveTab] = useState<'available' | 'enrolled' | 'completed'>('available');
@@ -393,6 +396,19 @@ export default function TrainingsPage() {
     });
   };
 
+  // Handle Toggle Description Expansion
+  const toggleDescriptionExpansion = (programId: string) => {
+    setExpandedDescriptions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(programId)) {
+        newSet.delete(programId);
+      } else {
+        newSet.add(programId);
+      }
+      return newSet;
+    });
+  };
+
   // Helper function to check if program is new (created within last 7 days)
   const isNewProgram = (createdAt: string) => {
     const programDate = new Date(createdAt);
@@ -496,7 +512,7 @@ export default function TrainingsPage() {
   );
 
   const completedApplications = userApplications.filter(app =>
-    ['completed', 'certified', 'failed'].includes(app.status)
+    ['completed', 'certified', 'failed', 'withdrawn', 'denied', 'archived'].includes(app.status)
   );
 
   // Calculate stats
@@ -630,7 +646,7 @@ export default function TrainingsPage() {
               >
                 <div className="flex items-center gap-2">
                   <Award className="w-5 h-5" />
-                  <span>Completed & Certified</span>
+                  <span>Training History</span>
                   <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-orange-100 text-orange-800">
                     {completedApplications.length}
                   </span>
@@ -761,7 +777,19 @@ export default function TrainingsPage() {
                               <h2 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-2 line-clamp-2">
                                 {program.title}
                               </h2>
-                              <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{program.description}</p>
+                              <div className="space-y-1">
+                                <p className={`text-sm text-gray-600 leading-relaxed ${expandedDescriptions.has(program.id) ? '' : 'line-clamp-2'}`}>
+                                  {program.description}
+                                </p>
+                                {program.description && program.description.length > 150 && (
+                                  <button
+                                    onClick={() => toggleDescriptionExpansion(program.id)}
+                                    className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                                  >
+                                    {expandedDescriptions.has(program.id) ? 'Show less' : 'Show more'}
+                                  </button>
+                                )}
+                              </div>
                               {/* Posted By Info */}
                               {program.profiles && (
                                 <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
@@ -985,7 +1013,8 @@ export default function TrainingsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
               {enrolledApplications.map((app, index) => {
                 const statusConfig = getStatusConfig(app.status);
-                const canWithdraw = app.status === 'enrolled';
+                // Allow withdrawal for applications that haven't started training yet
+                const canWithdraw = ['pending', 'under_review', 'approved', 'enrolled'].includes(app.status);
 
                 return (
                   <Card key={app.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
@@ -1032,17 +1061,6 @@ export default function TrainingsPage() {
                           <span>Posted by <span className="font-medium text-gray-700">{app.training_programs.profiles.full_name}</span></span>
                           <span className="text-gray-400">•</span>
                           <span>{formatShortDate(app.training_programs.created_at)}</span>
-                        </div>
-                      )}
-
-                      {/* Next Steps Box (if applicable) */}
-                      {app.next_steps && (
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Lightbulb className="w-4 h-4 text-blue-700" />
-                            <p className="font-semibold text-blue-800 text-sm">Next Steps:</p>
-                          </div>
-                          <p className="text-sm text-blue-700">{app.next_steps}</p>
                         </div>
                       )}
 
@@ -1113,12 +1131,12 @@ export default function TrainingsPage() {
         </div>
         )}
 
-        {/* Completed & Certified Tab */}
+        {/* Training History Tab */}
         {activeTab === 'completed' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              Completed & Certified ({completedApplications.length})
+              Training History ({completedApplications.length})
             </h2>
           </div>
 
@@ -1145,6 +1163,9 @@ export default function TrainingsPage() {
                 const isCertified = app.status === 'certified';
                 const isCompleted = app.status === 'completed';
                 const isFailed = app.status === 'failed';
+                const isDenied = app.status === 'denied';
+                const isWithdrawn = app.status === 'withdrawn';
+                const isArchived = app.status === 'archived';
 
                 // Status-specific gradient colors
                 const gradientColor = isCertified
@@ -1153,6 +1174,12 @@ export default function TrainingsPage() {
                   ? 'from-blue-500 to-blue-600'
                   : isFailed
                   ? 'from-red-500 to-red-600'
+                  : isDenied
+                  ? 'from-red-600 to-red-700'
+                  : isWithdrawn
+                  ? 'from-gray-500 to-gray-600'
+                  : isArchived
+                  ? 'from-gray-600 to-gray-700'
                   : getCardGradient(index);
 
                 return (
@@ -1166,11 +1193,14 @@ export default function TrainingsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start gap-3 mb-2">
                             <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              isCertified ? 'bg-green-100' : isCompleted ? 'bg-blue-100' : isFailed ? 'bg-red-100' : 'bg-gray-100'
+                              isCertified ? 'bg-green-100' : isCompleted ? 'bg-blue-100' : isFailed ? 'bg-red-100' : isDenied ? 'bg-red-100' : isWithdrawn ? 'bg-gray-100' : isArchived ? 'bg-gray-100' : 'bg-gray-100'
                             }`}>
                               {isCertified && <Award className="w-6 h-6 text-green-700" />}
                               {isCompleted && <CheckCircle2 className="w-6 h-6 text-blue-700" />}
                               {isFailed && <XCircle className="w-6 h-6 text-red-700" />}
+                              {isDenied && <AlertCircle className="w-6 h-6 text-red-700" />}
+                              {isWithdrawn && <Ban className="w-6 h-6 text-gray-600" />}
+                              {isArchived && <Archive className="w-6 h-6 text-gray-600" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-1 line-clamp-2">
@@ -1248,6 +1278,43 @@ export default function TrainingsPage() {
                         </div>
                       )}
 
+                      {/* Denied */}
+                      {isDenied && (
+                        <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-5 h-5 text-red-600" />
+                            <p className="font-semibold text-red-800">Application Denied</p>
+                          </div>
+                          <p className="text-sm text-red-700">
+                            Your application was not approved. You may reapply after improving your qualifications or when new slots become available.
+                          </p>
+                        </div>
+                      )}
+
+                      {isWithdrawn && (
+                        <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Ban className="w-5 h-5 text-gray-600" />
+                            <p className="font-semibold text-gray-800">Application Withdrawn</p>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            You withdrew this application on {formatShortDate(app.updated_at)}. You may reapply if slots are still available.
+                          </p>
+                        </div>
+                      )}
+
+                      {isArchived && (
+                        <div className="p-4 bg-gray-50 border-l-4 border-gray-500 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Archive className="w-5 h-5 text-gray-600" />
+                            <p className="font-semibold text-gray-800">Application Archived</p>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            This application was archived because the training program has been closed or all slots have been filled.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Posted By Information */}
                       {app.training_programs?.profiles && app.training_programs?.created_at && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -1301,6 +1368,20 @@ export default function TrainingsPage() {
                         >
                           View History
                         </Button>
+                        {(isDenied || isWithdrawn) && (
+                          <Button
+                            variant="success"
+                            size="sm"
+                            icon={ArrowRight}
+                            className="flex-1"
+                            onClick={() => {
+                              const program = programs.find(p => p.id === app.program_id);
+                              if (program) handleApplyClick(program);
+                            }}
+                          >
+                            Reapply
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"

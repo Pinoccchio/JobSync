@@ -170,10 +170,12 @@ export async function PATCH(
         );
       }
 
-      // Can only withdraw if status is pending, under_review, or approved
-      if (!['pending', 'under_review', 'approved'].includes(application.status)) {
+      // Can only withdraw if training hasn't started yet
+      // Allow: pending, under_review, approved, enrolled
+      // Block: in_progress, completed, certified (training started/finished)
+      if (!['pending', 'under_review', 'approved', 'enrolled'].includes(application.status)) {
         return NextResponse.json(
-          { success: false, error: `Cannot withdraw application with status: ${application.status}` },
+          { success: false, error: `Cannot withdraw application with status: ${application.status}. You can only withdraw before training starts.` },
           { status: 400 }
         );
       }
@@ -238,14 +240,24 @@ export async function PATCH(
       );
     }
 
-    // 6. Check if program is full (if approving)
-    if (status === 'approved' && existingApplication.training_programs) {
-      const program = existingApplication.training_programs as any;
-      if (program.enrolled_count >= program.capacity) {
-        return NextResponse.json(
-          { success: false, error: 'Cannot approve - training program is full' },
-          { status: 400 }
-        );
+    // 6. Check if program is full (if changing to enrolled status)
+    // These statuses count towards enrollment: approved, enrolled, in_progress
+    if (['approved', 'enrolled', 'in_progress'].includes(status)) {
+      const currentlyEnrolled = ['approved', 'enrolled', 'in_progress'].includes(existingApplication.status);
+
+      // Only check capacity if transitioning FROM a non-enrolled status TO an enrolled status
+      if (!currentlyEnrolled && existingApplication.training_programs) {
+        const program = existingApplication.training_programs as any;
+        if (program.enrolled_count >= program.capacity) {
+          const actionVerb = status === 'approved' ? 'approve' : status === 'enrolled' ? 'enroll' : 'start training for';
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Cannot ${actionVerb} - "${program.title}" is at full capacity (${program.enrolled_count}/${program.capacity})`
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -297,45 +309,12 @@ export async function PATCH(
       );
     }
 
-    // 8. If approved, increment enrolled_count
-    if (status === 'approved' && existingApplication.status !== 'approved') {
-      // Fetch current enrolled_count
-      const { data: program } = await supabase
-        .from('training_programs')
-        .select('enrolled_count')
-        .eq('id', existingApplication.program_id)
-        .single();
+    // NOTE: enrolled_count is automatically managed by the database trigger
+    // 'update_training_enrolled_count_trigger' which increments/decrements the count
+    // when application status changes to/from 'approved', 'enrolled', or 'in_progress'.
+    // DO NOT manually update enrolled_count here to avoid double counting.
 
-      // Increment the count
-      await supabase
-        .from('training_programs')
-        .update({
-          enrolled_count: (program?.enrolled_count || 0) + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingApplication.program_id);
-    }
-
-    // 9. If denied (from approved), decrement enrolled_count
-    if (status === 'denied' && existingApplication.status === 'approved') {
-      // Fetch current enrolled_count
-      const { data: program } = await supabase
-        .from('training_programs')
-        .select('enrolled_count')
-        .eq('id', existingApplication.program_id)
-        .single();
-
-      // Decrement the count (prevent negative values)
-      await supabase
-        .from('training_programs')
-        .update({
-          enrolled_count: Math.max((program?.enrolled_count || 0) - 1, 0),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingApplication.program_id);
-    }
-
-    // 10. Create notifications with user-friendly messages
+    // 8. Create notifications with user-friendly messages
     const program = updatedApplication.training_programs as any;
 
     // Generate status-specific notification title and message

@@ -103,6 +103,9 @@ export default function AuthenticatedJobsPage() {
   // Skills expansion state
   const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
 
+  // Description expansion state
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
+
   // Fetch jobs function
   const fetchJobs = useCallback(async () => {
     try {
@@ -230,6 +233,19 @@ export default function AuthenticatedJobsPage() {
   // Handle Toggle Skills Expansion
   const toggleSkillsExpansion = (jobId: string) => {
     setExpandedSkillsCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle Toggle Description Expansion
+  const toggleDescriptionExpansion = (jobId: string) => {
+    setExpandedDescriptions(prev => {
       const newSet = new Set(prev);
       if (newSet.has(jobId)) {
         newSet.delete(jobId);
@@ -615,9 +631,19 @@ export default function AuthenticatedJobsPage() {
                           )}
 
                           {/* Description */}
-                          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
-                            {job.description}
-                          </p>
+                          <div className="space-y-2">
+                            <p className={`text-sm text-gray-600 leading-relaxed ${expandedDescriptions.has(job.id) ? '' : 'line-clamp-2'}`}>
+                              {job.description}
+                            </p>
+                            {job.description && job.description.length > 150 && (
+                              <button
+                                onClick={() => toggleDescriptionExpansion(job.id)}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                              >
+                                {expandedDescriptions.has(job.id) ? 'Show less' : 'Show more'}
+                              </button>
+                            )}
+                          </div>
 
                           {/* Creator Info */}
                           {job.profiles && (
@@ -633,7 +659,7 @@ export default function AuthenticatedJobsPage() {
                               <GraduationCap className="w-4 h-4 text-[#22A555] mt-0.5 flex-shrink-0" />
                               <div className="min-w-0 flex-1">
                                 <p className="text-xs text-gray-500 mb-0.5">Degree Requirement</p>
-                                <p className="text-sm font-medium text-gray-900 truncate">
+                                <p className="text-sm font-medium text-gray-900 line-clamp-2">
                                   {job.degree_requirement}
                                 </p>
                               </div>
@@ -844,17 +870,6 @@ export default function AuthenticatedJobsPage() {
                             </div>
                           )}
 
-                          {/* Next Steps Box (if applicable) */}
-                          {app.next_steps && (
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <div className="flex items-center gap-2 mb-1">
-                                <ArrowRight className="w-4 h-4 text-blue-700" />
-                                <p className="font-semibold text-blue-800 text-sm">Next Steps:</p>
-                              </div>
-                              <p className="text-sm text-blue-700">{app.next_steps}</p>
-                            </div>
-                          )}
-
                           {/* Job Description (if available) */}
                           {app.jobs?.description && (
                             <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
@@ -1010,15 +1025,6 @@ export default function AuthenticatedJobsPage() {
 
                           {isDenied && (
                             <div className="space-y-3">
-                              {app.denial_reason && (
-                                <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <AlertCircle className="w-4 h-4 text-red-600" />
-                                    <p className="text-sm font-bold text-red-800">Reason for Denial:</p>
-                                  </div>
-                                  <p className="text-sm text-red-700 mt-1">{app.denial_reason}</p>
-                                </div>
-                              )}
                               <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
                                 <p className="text-sm font-bold text-blue-800 mb-2">💡 Ways to Improve:</p>
                                 <ul className="text-sm text-blue-700 space-y-1.5 ml-4">
