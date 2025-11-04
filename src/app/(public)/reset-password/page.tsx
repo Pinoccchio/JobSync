@@ -76,10 +76,6 @@ function ResetPasswordForm() {
   const validatePassword = (password: string) => {
     if (!password) return 'Password is required';
     if (password.length < 8) return 'Password must be at least 8 characters';
-    if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
-    if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
-    if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
-    if (!/[!@#$%^&*]/.test(password)) return 'Password must contain at least one special character (!@#$%^&*)';
     return '';
   };
 
@@ -192,15 +188,8 @@ function ResetPasswordForm() {
                   disabled={isLoading}
                 />
                 {/* Password Requirements */}
-                <div className="mt-2 text-xs text-gray-500 space-y-1">
-                  <p>Password must contain:</p>
-                  <ul className="list-disc list-inside ml-2">
-                    <li>At least 8 characters</li>
-                    <li>One uppercase letter</li>
-                    <li>One lowercase letter</li>
-                    <li>One number</li>
-                    <li>One special character (!@#$%^&*)</li>
-                  </ul>
+                <div className="mt-2 text-xs text-gray-500">
+                  <p>Password must be at least 8 characters</p>
                 </div>
               </div>
 
