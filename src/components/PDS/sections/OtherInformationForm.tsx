@@ -588,12 +588,27 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
                   )}
                 />
                 {watchedData.criminallyCharged && (
-                  <Input
-                    value={watchedData.criminallyChargedDetails || ''}
-                    onChange={(e) => setValue('criminallyChargedDetails', e.target.value)}
-                    placeholder="If YES, give details..."
-                    className="mt-3 w-full"
-                  />
+                  <div className="mt-3 space-y-3">
+                    <Input
+                      value={watchedData.criminallyChargedDetails || ''}
+                      onChange={(e) => setValue('criminallyChargedDetails', e.target.value)}
+                      placeholder="Give details (case number, charges, etc.)"
+                      className="w-full"
+                    />
+                    <Input
+                      type="date"
+                      value={watchedData.criminallyChargedDateFiled || ''}
+                      onChange={(e) => setValue('criminallyChargedDateFiled', e.target.value)}
+                      placeholder="Date Filed"
+                      className="w-full"
+                    />
+                    <Input
+                      value={watchedData.criminallyChargedStatus || ''}
+                      onChange={(e) => setValue('criminallyChargedStatus', e.target.value)}
+                      placeholder="Status of case (e.g., Pending, Dismissed, Convicted)"
+                      className="w-full"
+                    />
+                  </div>
                 )}
               </div>
             </div>

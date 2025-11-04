@@ -266,7 +266,10 @@ export const PersonalInformationForm: React.FC<PersonalInformationFormProps> = (
                 name="height"
                 type="number"
                 value={field.value || ''}
-                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  field.onChange(isNaN(val) ? undefined : val);
+                }}
                 onBlur={field.onBlur}
                 error={errors.height?.message}
                 placeholder="1.75"
@@ -286,7 +289,10 @@ export const PersonalInformationForm: React.FC<PersonalInformationFormProps> = (
                 name="weight"
                 type="number"
                 value={field.value || ''}
-                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  field.onChange(isNaN(val) ? undefined : val);
+                }}
                 onBlur={field.onBlur}
                 error={errors.weight?.message}
                 placeholder="70"

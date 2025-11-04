@@ -117,7 +117,10 @@ export const WorkExperienceForm: React.FC<WorkExperienceFormProps> = ({
                     name={`items.${index}.monthlySalary`}
                     type="number"
                     value={field.value || ''}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      field.onChange(isNaN(val) ? undefined : val);
+                    }}
                     placeholder="e.g., 25000"
                   />
                 )}

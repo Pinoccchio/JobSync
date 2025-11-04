@@ -5,6 +5,22 @@
 
 import { z } from 'zod';
 
+// Custom validator for dates that can be either ISO date (YYYY-MM-DD) or "Present"
+const dateOrPresentSchema = z.string().refine(
+  (val) => {
+    if (val === 'Present') return true;
+    // Check if it's a valid ISO date format (YYYY-MM-DD)
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isoDateRegex.test(val)) return false;
+    // Verify it's an actual valid date
+    const date = new Date(val);
+    return !isNaN(date.getTime());
+  },
+  {
+    message: 'Must be a valid date (YYYY-MM-DD) or "Present"',
+  }
+);
+
 // Section I: Personal Information Validation
 export const personalInformationSchema = z.object({
   // Name
@@ -139,7 +155,7 @@ export const workExperienceSchema = z.object({
   governmentService: z.boolean(),
   periodOfService: z.object({
     from: z.string().min(1, 'Start date is required'),
-    to: z.string().min(1, 'End date is required'),
+    to: dateOrPresentSchema,
   }),
 });
 
@@ -149,7 +165,7 @@ export const voluntaryWorkSchema = z.object({
   organizationAddress: z.string().optional(),
   periodOfInvolvement: z.object({
     from: z.string().min(1, 'Start date is required'),
-    to: z.string().min(1, 'End date is required'),
+    to: dateOrPresentSchema,
   }),
   numberOfHours: z.number().optional(),
   positionNatureOfWork: z.string().min(1, 'Position/Nature of work is required'),
@@ -184,6 +200,58 @@ export const otherInformationSchema = z.object({
     idNumber: z.string().optional(),
     dateIssued: z.string().optional(),
   }).optional(),
+
+  // Questions 34-40 (CS Form No. 212, Revised 2025)
+  // Q34a: Related within third degree
+  relatedThirdDegree: z.boolean().optional(),
+  relatedThirdDegreeDetails: z.string().optional(),
+
+  // Q34b: Related within fourth degree (LGU)
+  relatedFourthDegree: z.boolean().optional(),
+  relatedFourthDegreeDetails: z.string().optional(),
+
+  // Q35a: Guilty of administrative offense
+  guiltyAdministrativeOffense: z.boolean().optional(),
+  guiltyAdministrativeOffenseDetails: z.string().optional(),
+
+  // Q35b: Criminally charged
+  criminallyCharged: z.boolean().optional(),
+  criminallyChargedDetails: z.string().optional(),
+  criminallyChargedDateFiled: z.string().optional(),
+  criminallyChargedStatus: z.string().optional(),
+
+  // Q36: Convicted of any crime or violation
+  convicted: z.boolean().optional(),
+  convictedDetails: z.string().optional(),
+
+  // Q37: Separated from service
+  separatedFromService: z.boolean().optional(),
+  separatedFromServiceDetails: z.string().optional(),
+
+  // Q38a: Election candidate
+  candidateNationalLocal: z.boolean().optional(),
+  candidateNationalLocalDetails: z.string().optional(),
+
+  // Q38b: Resigned for candidacy
+  resignedForCandidacy: z.boolean().optional(),
+  resignedForCandidacyDetails: z.string().optional(),
+
+  // Q39: Immigrant or permanent resident
+  immigrantOrPermanentResident: z.boolean().optional(),
+  immigrantOrPermanentResidentCountry: z.string().optional(),
+
+  // Q40a: Indigenous group member
+  indigenousGroupMember: z.boolean().optional(),
+  indigenousGroupName: z.string().optional(),
+
+  // Q40b: Person with disability
+  personWithDisability: z.boolean().optional(),
+  pwdIdNumber: z.string().optional(),
+
+  // Q40c: Solo parent
+  soloParent: z.boolean().optional(),
+  soloParentIdNumber: z.string().optional(),
+
   declaration: z.object({
     agreed: z.boolean().refine((val) => val === true, {
       message: 'You must agree to the declaration',

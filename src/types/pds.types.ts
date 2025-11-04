@@ -215,27 +215,27 @@ export interface OtherInformation {
   separatedFromService?: boolean;
   separatedFromServiceDetails?: string;
 
-  // Q40a: Candidate in a national or local election (except Barangay)?
+  // Q38a: Candidate in a national or local election (except Barangay)?
   candidateNationalLocal?: boolean;
   candidateNationalLocalDetails?: string;
 
-  // Q40b: Resigned from government service during candidacy?
+  // Q38b: Resigned from government service during candidacy?
   resignedForCandidacy?: boolean;
   resignedForCandidacyDetails?: string;
 
-  // Q41: Immigrant or permanent resident of another country?
+  // Q39: Immigrant or permanent resident of another country?
   immigrantOrPermanentResident?: boolean;
   immigrantOrPermanentResidentCountry?: string;
 
-  // Q42: Member of any indigenous group?
+  // Q40a: Member of any indigenous group?
   indigenousGroupMember?: boolean;
   indigenousGroupName?: string;
 
-  // Q43: Person with disability (PWD)?
+  // Q40b: Person with disability (PWD)?
   personWithDisability?: boolean;
   pwdIdNumber?: string;
 
-  // Q44: Solo parent?
+  // Q40c: Solo parent?
   soloParent?: boolean;
   soloParentIdNumber?: string;
 

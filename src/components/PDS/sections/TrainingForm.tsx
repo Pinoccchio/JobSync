@@ -135,7 +135,10 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({
                     name={`items.${index}.numberOfHours`}
                     type="number"
                     value={field.value || ''}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      field.onChange(isNaN(val) ? undefined : val);
+                    }}
                     onBlur={field.onBlur}
                     error={errors.items?.[index]?.numberOfHours?.message}
                     placeholder="e.g., 40"

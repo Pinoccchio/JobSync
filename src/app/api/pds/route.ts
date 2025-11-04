@@ -49,9 +49,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Ensure all array fields have defaults to prevent undefined errors
     return NextResponse.json({
       success: true,
-      data: pds,
+      data: {
+        ...pds,
+        educational_background: pds.educational_background || [],
+        eligibility: pds.eligibility || [],
+        work_experience: pds.work_experience || [],
+        voluntary_work: pds.voluntary_work || [],
+        trainings: pds.trainings || [],
+        // Ensure nested objects have array defaults
+        family_background: {
+          children: [],
+          ...(pds.family_background || {}),
+        },
+        other_information: {
+          skills: [],
+          references: [],
+          recognitions: [],
+          memberships: [],
+          ...(pds.other_information || {}),
+        },
+      },
     });
 
   } catch (error) {
