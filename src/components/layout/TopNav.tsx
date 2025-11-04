@@ -278,7 +278,7 @@ export const TopNav: React.FC<TopNavProps> = ({
       {/* Right Section */}
       <div className="flex items-center gap-3">
         {/* Notifications - Hidden for ADMIN role (they use Activity Logs & Audit Trail) */}
-        {userRole !== 'Admin' && (
+        {userRole !== 'System Admin' && (
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
