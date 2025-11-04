@@ -58,6 +58,21 @@ export interface CertificateData {
 }
 
 /**
+ * Certificate layout parameters for customization
+ */
+export interface CertificateLayoutParams {
+  topMargin?: number;        // Top margin in mm (default: 10, range: 5-20)
+  sectionSpacing?: number;   // Spacing between sections in mm (default: 8, range: 5-15)
+  titleFontSize?: number;    // Title font size in pt (default: 28, range: 20-36)
+  nameFontSize?: number;     // Trainee name font size in pt (default: 20, range: 16-28)
+  bodyFontSize?: number;     // Body text font size in pt (default: 12, range: 10-16)
+  programFontSize?: number;  // Program title font size in pt (default: 16, range: 12-20)
+  signatureWidth?: number;   // Signature width in mm (default: 35, range: 25-50)
+  signatureHeight?: number;  // Signature height in mm (default: 10, range: 5-20)
+  signatureGap?: number;     // Gap above signature line in mm (default: 5, range: 2-10)
+}
+
+/**
  * API Request for certificate generation
  */
 export interface GenerateCertificateRequest {
@@ -65,6 +80,7 @@ export interface GenerateCertificateRequest {
   notes?: string;
   include_qr_code?: boolean;
   include_signature?: boolean;
+  layoutParams?: CertificateLayoutParams;
 }
 
 /**

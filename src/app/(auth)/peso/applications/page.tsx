@@ -8,9 +8,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { StatusTimeline } from '@/components/peso/StatusTimeline';
 import { getStatusConfig } from '@/lib/config/statusConfig';
 import { generateCertificatePreview, generateCertificateId } from '@/lib/certificates/certificateGenerator';
-import type { CertificateData } from '@/types/certificate.types';
+import type { CertificateData, CertificateLayoutParams } from '@/types/certificate.types';
 import { MarkAttendanceModal } from '@/components/peso/MarkAttendanceModal';
 import { AwardCompletionModal } from '@/components/peso/AwardCompletionModal';
+import CertificatePresetSelector from '@/components/peso/CertificatePresetSelector';
+import CertificatePreview from '@/components/peso/CertificatePreview';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { LAYOUT_PRESETS, calculateAutoFitLayout, type LayoutPresetType } from '@/lib/certificates/layoutPresets';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText, Users, ExternalLink, CheckSquare, Square } from 'lucide-react';
 
@@ -71,6 +75,27 @@ export default function PESOApplicationsPage() {
   const [hasSignature, setHasSignature] = useState<boolean>(false);
   const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
   const [generateLoading, setGenerateLoading] = useState(false);
+
+  // Certificate layout preset (default: auto-fit)
+  const [selectedPreset, setSelectedPreset] = useState<LayoutPresetType>('auto');
+
+  // Compute layout parameters based on selected preset
+  const layoutParams = useMemo(() => {
+    if (selectedPreset === 'auto' && selectedApplication) {
+      // Auto-fit: analyze content and calculate optimal layout
+      const contentAnalysis = {
+        nameLength: selectedApplication.full_name?.length || 0,
+        programTitleLength: selectedApplication.training_programs?.title?.length || 0,
+        skillsCount: 0, // We'll get this from the program when available
+        hasDuration: !!selectedApplication.training_programs?.duration,
+        hasSkills: false,
+      };
+      return calculateAutoFitLayout(contentAnalysis);
+    } else {
+      // Use selected preset
+      return LAYOUT_PRESETS[selectedPreset].params;
+    }
+  }, [selectedPreset, selectedApplication]);
 
   // Bulk operations state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -340,6 +365,7 @@ export default function PESOApplicationsPage() {
         body: JSON.stringify({
           application_id: selectedApplication.id,
           include_signature: includeSignature,
+          layoutParams,
         }),
       });
 
@@ -415,6 +441,11 @@ export default function PESOApplicationsPage() {
     } finally {
       setSignatureLoading(false);
     }
+  };
+
+  // Handle preset selection
+  const handlePresetChange = (presetId: LayoutPresetType) => {
+    setSelectedPreset(presetId);
   };
 
   // Get unique programs for filter
@@ -2016,48 +2047,58 @@ export default function PESOApplicationsPage() {
           onClose={() => {
             setCertifyModalOpen(false);
             setSelectedApplication(null);
+            setIncludeSignature(false);
+            setSelectedPreset('auto');
           }}
           title="Generate Training Certificate"
-          subtitle="Grant certificate of completion"
+          subtitle="Preview and customize before issuing"
           colorVariant="green"
           icon={Award}
-          size="md"
+          size="full"
         >
           {selectedApplication && (
-            <div className="space-y-4">
-                  {/* Certificate Preview */}
-                  <div className="bg-gradient-to-br from-green-50 to-teal-50 border-2 border-dashed border-green-300 rounded-lg p-6">
-                    <div className="flex items-center justify-center mb-4">
-                      <Award className="w-12 h-12 text-green-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 text-center mb-3">
-                      Auto-Generated Certificate
+            <div className="h-[calc(100vh-250px)]">
+              <PanelGroup direction="horizontal">
+                {/* LEFT: Certificate Preview (Resizable) */}
+                <Panel defaultSize={60} minSize={30}>
+                  <div className="h-full pr-3">
+                    <CertificatePreview
+                      applicationId={selectedApplication.id}
+                      layoutParams={layoutParams}
+                      includeSignature={includeSignature}
+                    />
+                  </div>
+                </Panel>
+
+                {/* Draggable Divider */}
+                <PanelResizeHandle className="w-2 bg-gray-200 hover:bg-teal-500 transition-colors cursor-col-resize relative group">
+                  <div className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-gray-400 group-hover:bg-teal-600 transition-colors" />
+                </PanelResizeHandle>
+
+                {/* RIGHT: Controls (Resizable) */}
+                <Panel defaultSize={40} minSize={25}>
+                  <div className="h-full pl-3 flex flex-col">
+                <div className="flex-1 overflow-y-auto space-y-6">
+                  {/* Application Info */}
+                  <div className="bg-gradient-to-br from-green-50 to-teal-50 border border-green-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Award className="w-5 h-5 text-green-600" />
+                      Certificate Details
                     </h3>
-                    <p className="text-sm text-gray-600 text-center mb-4">
-                      A professional certificate will be generated with the following details:
-                    </p>
-                    <div className="bg-white rounded-lg p-4 space-y-2 text-sm">
+                    <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Trainee:</span>
                         <span className="font-semibold text-gray-900">{selectedApplication.full_name}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Program:</span>
-                        <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.title}</span>
+                        <span className="font-semibold text-gray-900 text-right max-w-xs truncate" title={selectedApplication.training_programs?.title}>
+                          {selectedApplication.training_programs?.title}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Duration:</span>
                         <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.duration}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Completion:</span>
-                        <span className="font-semibold text-gray-900">
-                          {new Date().toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -2089,11 +2130,11 @@ export default function PESOApplicationsPage() {
                               Checking signature status...
                             </span>
                           ) : hasSignature ? (
-                            'Your signature will be embedded on the certificate above your printed name for authenticity'
+                            'Your signature will be embedded on the certificate'
                           ) : (
                             <>
                               <AlertCircle className="w-3 h-3 inline mr-1" />
-                              You haven't uploaded your digital signature yet. Go to Settings page.
+                              Upload signature in Settings first
                             </>
                           )}
                         </p>
@@ -2101,38 +2142,42 @@ export default function PESOApplicationsPage() {
                     </label>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4 border-t">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setCertifyModalOpen(false);
-                        setSelectedApplication(null);
-                        setIncludeSignature(false);
-                        setHasSignature(false);
-                        setSignatureLoading(false);
-                      }}
-                      disabled={generateLoading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="primary"
-                      icon={Eye}
-                      onClick={handlePreviewCertificate}
-                      disabled={generateLoading}
-                    >
-                      Preview PDF
-                    </Button>
-                    <Button
-                      variant="success"
-                      icon={Award}
-                      onClick={handleGenerateCertificate}
-                      loading={generateLoading}
-                    >
-                      Generate & Issue
-                    </Button>
+                  {/* Preset Selector */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <CertificatePresetSelector
+                      selectedPreset={selectedPreset}
+                      onSelectPreset={handlePresetChange}
+                    />
                   </div>
+                </div>
+
+                {/* Action Buttons (Fixed at bottom) */}
+                <div className="flex gap-3 pt-4 border-t mt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setCertifyModalOpen(false);
+                      setSelectedApplication(null);
+                      setIncludeSignature(false);
+                      setSelectedPreset('auto');
+                    }}
+                    disabled={generateLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="success"
+                    icon={Award}
+                    onClick={handleGenerateCertificate}
+                    loading={generateLoading}
+                    className="flex-1"
+                  >
+                    Generate & Issue Certificate
+                  </Button>
+                </div>
+                  </div>
+                </Panel>
+              </PanelGroup>
             </div>
           )}
         </ModernModal>

@@ -12,6 +12,8 @@ import type { GenerateCertificateRequest, GenerateCertificateResponse, Certifica
  * - application_id: string (required) - Training application ID
  * - notes: string (optional) - Additional notes to include on certificate
  * - include_qr_code: boolean (optional) - Whether to include QR code for verification
+ * - include_signature: boolean (optional) - Whether to include PESO officer signature
+ * - layoutParams: CertificateLayoutParams (optional) - Custom layout parameters for spacing/fonts
  *
  * Response:
  * - success: boolean
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Parse request body
     const body: GenerateCertificateRequest = await request.json();
-    const { application_id, notes, include_qr_code, include_signature } = body;
+    const { application_id, notes, include_qr_code, include_signature, layoutParams } = body;
 
     if (!application_id) {
       return NextResponse.json(
@@ -187,7 +189,7 @@ export async function POST(request: NextRequest) {
     // 9. Generate PDF
     let pdfBytes: Uint8Array;
     try {
-      pdfBytes = await generateCertificatePDF(certificateData);
+      pdfBytes = await generateCertificatePDF(certificateData, layoutParams);
     } catch (pdfError: any) {
       console.error('Error generating PDF:', pdfError);
       return NextResponse.json(

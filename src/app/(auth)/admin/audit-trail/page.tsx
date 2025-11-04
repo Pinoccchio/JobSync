@@ -88,7 +88,7 @@ export default function AuditTrailPage() {
 
   // Get unique values for filters
   const uniqueTables = Array.from(new Set(auditRecords.map(r => r.table_name))).sort();
-  const uniqueUsers = Array.from(new Set(auditRecords.map(r => r.user_email).filter(Boolean))).sort();
+  const uniqueUsers = Array.from(new Set(auditRecords.map(r => r.user_email))).sort();
 
   const getOperationBadge = (operation: string) => {
     switch (operation) {
@@ -270,8 +270,8 @@ export default function AuditTrailPage() {
               >
                 <option value="all">All Users</option>
                 {uniqueUsers.map((userEmail) => (
-                  <option key={userEmail} value={userEmail}>
-                    {userEmail}
+                  <option key={userEmail || 'system'} value={userEmail || ''}>
+                    {userEmail || '(System)'}
                   </option>
                 ))}
               </select>
