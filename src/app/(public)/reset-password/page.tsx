@@ -23,14 +23,37 @@ function ResetPasswordForm() {
     confirmPassword: '',
   });
 
-  // Check if we have the required parameters
+  // Check if we have the required parameters or Supabase errors
   useEffect(() => {
+    // Check for Supabase error parameters (from failed email link validation)
+    const error = searchParams.get('error');
+    const errorCode = searchParams.get('error_code');
+    const errorDescription = searchParams.get('error_description');
+
+    if (error || errorCode) {
+      // Handle Supabase authentication errors
+      let errorMessage = 'Invalid or expired password reset link';
+
+      if (errorCode === 'otp_expired') {
+        errorMessage = 'This password reset link has expired. Please request a new one.';
+      } else if (errorCode === 'access_denied') {
+        errorMessage = 'Access denied. This password reset link is invalid.';
+      } else if (errorDescription) {
+        errorMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+      }
+
+      showToast(errorMessage, 'error');
+      setTimeout(() => router.push('/forgot-password'), 3000);
+      return;
+    }
+
+    // Check for valid token_hash and type parameters
     const tokenHash = searchParams.get('token_hash');
     const type = searchParams.get('type');
 
     if (!tokenHash || type !== 'recovery') {
-      showToast('Invalid or expired password reset link', 'error');
-      setTimeout(() => router.push('/forgot-password'), 2000);
+      showToast('Missing authentication parameters. Please use the link from your email.', 'error');
+      setTimeout(() => router.push('/forgot-password'), 3000);
     }
   }, [searchParams, router, showToast]);
 
