@@ -84,7 +84,13 @@ export async function GET(request: NextRequest) {
           years_of_experience,
           location,
           employment_type,
-          status
+          status,
+          created_at,
+          profiles:created_by (
+            id,
+            full_name,
+            role
+          )
         ),
         applicant_profiles:applicant_profile_id (
           id,

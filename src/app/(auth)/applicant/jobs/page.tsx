@@ -1,15 +1,16 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, Card, ApplicationModal, Container, Badge, RefreshButton } from '@/components/ui';
+import { Button, Card, ApplicationModal, Container, Badge, RefreshButton, ModernModal } from '@/components/ui';
 import { AdminLayout } from '@/components/layout';
 import { ApplicationStatusBadge, AppliedBadge } from '@/components/ApplicationStatusBadge';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
+import { getStatusConfig } from '@/lib/config/statusConfig';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
-import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye, History, X } from 'lucide-react';
+import { Briefcase, MapPin, Clock, CheckCircle2, GraduationCap, Building, FileText, Filter, Loader2, Star, Award, Calendar, TrendingUp, User, CheckCircle, Eye, History, X, Ban, AlertCircle, Search, Mail, Phone, Archive, ArrowRight } from 'lucide-react';
 import { formatShortDate, formatRelativeDate, getCreatorTooltip } from '@/lib/utils/dateFormatters';
 
 interface Job {
@@ -51,6 +52,23 @@ interface Application {
   created_at: string;
   updated_at: string;
   status_history?: StatusHistoryItem[];
+  denial_reason?: string;
+  next_steps?: string;
+  interview_date?: string;
+  hr_notes?: string;
+  jobs?: {
+    id: string;
+    title: string;
+    description: string;
+    location: string | null;
+    employment_type: string | null;
+    created_at?: string;
+    profiles?: {
+      id: string;
+      full_name: string;
+      role: string;
+    } | null;
+  };
 }
 
 interface JobWithApplication extends Job {
@@ -65,13 +83,17 @@ export default function AuthenticatedJobsPage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
-  const [filterApplicationStatus, setFilterApplicationStatus] = useState<string>('all'); // all, applied, not-applied
-  const [filterStatus, setFilterStatus] = useState<string>('all'); // all, pending, approved, denied
   const [jobs, setJobs] = useState<Job[]>([]);
   const [userApplications, setUserApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingApplications, setLoadingApplications] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [selectedApplicationToWithdraw, setSelectedApplicationToWithdraw] = useState<Application | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  // Tab state for organizing view (like trainings page)
+  const [activeTab, setActiveTab] = useState<'available' | 'applications' | 'history'>('available');
 
   // Status History Modal state
   const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
@@ -116,7 +138,6 @@ export default function AuthenticatedJobsPage() {
       setUserApplications(result.data || []);
     } catch (error: any) {
       console.error('Error fetching applications:', error);
-      // Don't show error toast - this is non-critical data
       setUserApplications([]);
     } finally {
       setLoadingApplications(false);
@@ -130,10 +151,6 @@ export default function AuthenticatedJobsPage() {
   }, [fetchJobs, fetchUserApplications]);
 
   // REMOVED: Real-time subscription disabled for performance
-  // useTableRealtime('jobs', ['INSERT', 'UPDATE', 'DELETE'], null, () => {
-  //   showToast('Job listings updated', 'info');
-  //   fetchJobs();
-  // });
 
   const handleApplyClick = (job: Job) => {
     setSelectedJob(job);
@@ -146,9 +163,42 @@ export default function AuthenticatedJobsPage() {
   };
 
   const handleApplicationSuccess = () => {
-    // Refresh applications list after successful application
-    // Toast is already shown by ApplicationModal, just refresh data
     fetchUserApplications();
+  };
+
+  // Handle withdraw application
+  const handleWithdrawClick = (application: Application) => {
+    setSelectedApplicationToWithdraw(application);
+    setWithdrawModalOpen(true);
+  };
+
+  const handleWithdrawConfirm = async () => {
+    if (!selectedApplicationToWithdraw) return;
+
+    try {
+      setWithdrawing(true);
+      const response = await fetch(`/api/applications/${selectedApplicationToWithdraw.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'withdrawn' }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to withdraw application');
+      }
+
+      showToast('Application withdrawn successfully', 'success');
+      setWithdrawModalOpen(false);
+      setSelectedApplicationToWithdraw(null);
+      fetchUserApplications();
+    } catch (error: any) {
+      console.error('Error withdrawing application:', error);
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   // Handle View Status History
@@ -197,7 +247,6 @@ export default function AuthenticatedJobsPage() {
 
   const hasAppliedToJob = (jobId: string): boolean => {
     const application = getApplicationForJob(jobId);
-    // Don't count withdrawn applications as "applied"
     return !!application && application.status !== 'withdrawn';
   };
 
@@ -208,7 +257,16 @@ export default function AuthenticatedJobsPage() {
     hasApplied: hasAppliedToJob(job.id),
   }));
 
-  // Filter jobs with search and application status
+  // Filter applications by tab
+  const activeApplications = userApplications.filter(app =>
+    ['pending', 'under_review', 'shortlisted', 'interviewed', 'approved'].includes(app.status)
+  );
+
+  const historyApplications = userApplications.filter(app =>
+    ['hired', 'denied', 'withdrawn', 'archived'].includes(app.status)
+  );
+
+  // Filter jobs for Available Jobs tab
   const filteredJobs = jobsWithApplicationStatus.filter(job => {
     const matchesType = filterType === 'all' || job.employment_type === filterType;
     const matchesLocation = filterLocation === 'all' ||
@@ -218,18 +276,7 @@ export default function AuthenticatedJobsPage() {
       job.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.degree_requirement.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Application status filter
-    const matchesApplicationStatus =
-      filterApplicationStatus === 'all' ||
-      (filterApplicationStatus === 'applied' && job.hasApplied) ||
-      (filterApplicationStatus === 'not-applied' && !job.hasApplied);
-
-    // Status filter (for applied jobs only)
-    const matchesStatus =
-      filterStatus === 'all' ||
-      (job.userApplication && job.userApplication.status === filterStatus);
-
-    return matchesType && matchesLocation && matchesSearch && matchesApplicationStatus && matchesStatus;
+    return matchesType && matchesLocation && matchesSearch;
   });
 
   // Helper function to get card gradient color
@@ -271,10 +318,10 @@ export default function AuthenticatedJobsPage() {
   // Calculate stats
   const stats = {
     totalJobs: jobs.length,
-    fullTime: jobs.filter(j => j.employment_type === 'Full-time').length,
-    partTime: jobs.filter(j => j.employment_type === 'Part-time').length,
-    remote: jobs.filter(j => j.remote).length,
-    applied: userApplications.length,
+    myApplications: userApplications.length,
+    activeApplications: activeApplications.length,
+    pendingReview: userApplications.filter(a => ['pending', 'under_review'].includes(a.status)).length,
+    shortlisted: userApplications.filter(a => a.status === 'shortlisted').length,
   };
 
   // Get unique employment types and locations for filters
@@ -318,11 +365,11 @@ export default function AuthenticatedJobsPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">My Applications</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {loadingApplications ? '...' : stats.applied}
+                    {loadingApplications ? '...' : stats.myApplications}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <CheckCircle className="w-6 h-6 text-white" />
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -330,12 +377,26 @@ export default function AuthenticatedJobsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Full-Time</p>
+                  <p className="text-sm text-gray-600 mb-1">Active</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {loading ? '...' : stats.fullTime}
+                    {loadingApplications ? '...' : stats.activeApplications}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending Review</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {loadingApplications ? '...' : stats.pendingReview}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -344,472 +405,735 @@ export default function AuthenticatedJobsPage() {
             <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Part-Time</p>
+                  <p className="text-sm text-gray-600 mb-1">Shortlisted</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {loading ? '...' : stats.partTime}
+                    {loadingApplications ? '...' : stats.shortlisted}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-
-            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Remote Available</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {loading ? '...' : stats.remote}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Building className="w-6 h-6 text-white" />
+                  <Star className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
           </div>
 
-          {/* Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                placeholder="Search jobs by title, description, or requirements..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-5 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] transition-colors"
-              />
-              <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Filters */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <Filter className="w-5 h-5 text-gray-600 hidden md:block" />
-
-              <select
-                value={filterApplicationStatus}
-                onChange={(e) => setFilterApplicationStatus(e.target.value)}
-                className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[150px]"
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200">
+            <nav className="flex gap-8" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('available')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'available'
+                    ? 'border-[#22A555] text-[#22A555]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                <option value="all">All Jobs</option>
-                <option value="not-applied">Not Applied</option>
-                <option value="applied">Applied</option>
-              </select>
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-5 h-5" />
+                  <span>Available Jobs</span>
+                  <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-blue-100 text-blue-800">
+                    {filteredJobs.length}
+                  </span>
+                </div>
+              </button>
 
-              {filterApplicationStatus === 'applied' && userApplications.length > 0 && (
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[180px]"
-                >
-                  <option value="all">Any Status</option>
-                  <option value="pending">Pending Review</option>
-                  <option value="under_review">Under Review</option>
-                  <option value="shortlisted">Shortlisted</option>
-                  <option value="interviewed">Interviewed</option>
-                  <option value="approved">Approved</option>
-                  <option value="denied">Not Approved</option>
-                  <option value="hired">Hired</option>
-                  <option value="archived">Archived</option>
-                  <option value="withdrawn">Withdrawn</option>
-                </select>
-              )}
-
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[140px]"
+              <button
+                onClick={() => setActiveTab('applications')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'applications'
+                    ? 'border-[#22A555] text-[#22A555]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                <option value="all">All Types</option>
-                {employmentTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  <span>My Applications</span>
+                  <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-green-100 text-green-800">
+                    {activeApplications.length}
+                  </span>
+                </div>
+              </button>
 
-              <select
-                value={filterLocation}
-                onChange={(e) => setFilterLocation(e.target.value)}
-                className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[160px]"
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'history'
+                    ? 'border-[#22A555] text-[#22A555]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                <option value="all">All Locations</option>
-                {locations.map(loc => (
-                  <option key={loc} value={loc}>{loc}</option>
-                ))}
-                <option value="Remote">Remote</option>
-              </select>
-
-              {(filterType !== 'all' || filterLocation !== 'all' || filterApplicationStatus !== 'all' || filterStatus !== 'all' || searchQuery) && (
-                <button
-                  onClick={() => {
-                    setFilterType('all');
-                    setFilterLocation('all');
-                    setFilterApplicationStatus('all');
-                    setFilterStatus('all');
-                    setSearchQuery('');
-                  }}
-                  className="px-4 py-2.5 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  <span>Application History</span>
+                  <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-gray-100 text-gray-800">
+                    {historyApplications.length}
+                  </span>
+                </div>
+              </button>
+            </nav>
           </div>
 
-          {/* Jobs Content - Card View */}
-          <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Available Positions ({filteredJobs.length})
-                </h2>
-              </div>
-
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
-                  <span className="ml-3 text-gray-600">Loading jobs...</span>
+          {/* TAB 1: AVAILABLE JOBS */}
+          {activeTab === 'available' && (
+            <div className="space-y-6">
+              {/* Search and Filters */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    placeholder="Search jobs by title, description, or requirements..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-5 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] transition-colors"
+                  />
+                  <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-              ) : filteredJobs.length === 0 ? (
-                <Card className="text-center py-16">
-                  <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No jobs found</h3>
-                  <p className="text-gray-600 mb-4">
-                    {jobs.length === 0 ? 'No active job postings at the moment. Check back soon!' : 'Try adjusting your search or filters'}
-                  </p>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Filter className="w-5 h-5 text-gray-600 hidden md:block" />
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[140px]"
+                  >
+                    <option value="all">All Types</option>
+                    {employmentTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                    className="px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white min-w-[160px]"
+                  >
+                    <option value="all">All Locations</option>
+                    {locations.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                    <option value="Remote">Remote</option>
+                  </select>
+
                   {(filterType !== 'all' || filterLocation !== 'all' || searchQuery) && (
-                    <Button
-                      variant="outline"
+                    <button
                       onClick={() => {
                         setFilterType('all');
                         setFilterLocation('all');
                         setSearchQuery('');
                       }}
+                      className="px-4 py-2.5 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
                     >
-                      Clear All Filters
-                    </Button>
+                      Clear All
+                    </button>
                   )}
-                </Card>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-                  {filteredJobs.map((job, index) => (
-                    <Card key={job.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
-                      {/* Colored Top Border */}
-                      <div className={`h-3 bg-gradient-to-r ${getCardGradient(index)}`}></div>
+                </div>
+              </div>
 
-                      <div className="p-6 space-y-4">
-                        {/* Header */}
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start gap-3 mb-2">
-                              <div className="w-12 h-12 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <Briefcase className="w-6 h-6 text-[#22A555]" />
+              {/* Jobs Grid */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Available Positions ({filteredJobs.length})
+                  </h2>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+                    <span className="ml-3 text-gray-600">Loading jobs...</span>
+                  </div>
+                ) : filteredJobs.length === 0 ? (
+                  <Card className="text-center py-16">
+                    <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No jobs found</h3>
+                    <p className="text-gray-600 mb-4">
+                      {jobs.length === 0 ? 'No active job postings at the moment. Check back soon!' : 'Try adjusting your search or filters'}
+                    </p>
+                    {(filterType !== 'all' || filterLocation !== 'all' || searchQuery) && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setFilterType('all');
+                          setFilterLocation('all');
+                          setSearchQuery('');
+                        }}
+                      >
+                        Clear All Filters
+                      </Button>
+                    )}
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+                    {filteredJobs.map((job, index) => (
+                      <Card key={job.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
+                        <div className={`h-3 bg-gradient-to-r ${getCardGradient(index)}`}></div>
+                        <div className="p-6 space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-3 mb-2">
+                                <div className="w-12 h-12 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <Briefcase className="w-6 h-6 text-[#22A555]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-1 line-clamp-2">
+                                    {job.title}
+                                  </h3>
+                                  <p className="text-sm text-gray-500">Municipality of Asuncion</p>
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-1 line-clamp-2">
-                                  {job.title}
-                                </h3>
-                                <p className="text-sm text-gray-500">Municipality of Asuncion</p>
-                              </div>
+                            </div>
+
+                            {/* Badges */}
+                            <div className="flex flex-col gap-2">
+                              {isNewJob(job.created_at) && !job.hasApplied && (
+                                <Badge variant="success" size="sm" className="whitespace-nowrap">
+                                  🆕 New
+                                </Badge>
+                              )}
+                              {job.remote && (
+                                <Badge variant="info" size="sm" className="whitespace-nowrap">
+                                  🌐 Remote
+                                </Badge>
+                              )}
                             </div>
                           </div>
 
-                          {/* Badges */}
-                          <div className="flex flex-col gap-2">
-                            {isNewJob(job.created_at) && !job.hasApplied && (
-                              <Badge variant="success" size="sm" className="whitespace-nowrap">
-                                🆕 New
-                              </Badge>
-                            )}
-                            {job.remote && (
-                              <Badge variant="info" size="sm" className="whitespace-nowrap">
-                                🌐 Remote
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
+                          {/* Applied Badge */}
+                          {job.hasApplied && job.userApplication && (
+                            <div className="flex items-center gap-2 -mt-2">
+                              <AppliedBadge createdAt={job.userApplication.created_at} />
+                            </div>
+                          )}
 
-                        {/* Applied Badge - Inline below title */}
-                        {job.hasApplied && job.userApplication && (
-                          <div className="flex items-center gap-2 -mt-2">
-                            <AppliedBadge createdAt={job.userApplication.created_at} />
-                          </div>
-                        )}
-
-                        {/* Description */}
-                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
-                          {job.description}
-                        </p>
-
-                        {/* Creator Info */}
-                        {job.profiles && (
-                          <p className="text-xs text-gray-500 flex items-center gap-1">
-                            <User className="w-3 h-3" />
-                            Posted by {job.profiles.full_name} • {formatRelativeDate(job.created_at)}
+                          {/* Description */}
+                          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                            {job.description}
                           </p>
-                        )}
 
-                        {/* Key Requirements */}
-                        <div className="grid grid-cols-1 gap-3 bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-start gap-2">
-                            <GraduationCap className="w-4 h-4 text-[#22A555] mt-0.5 flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs text-gray-500 mb-0.5">Degree Requirement</p>
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {job.degree_requirement}
-                              </p>
-                            </div>
-                          </div>
+                          {/* Creator Info */}
+                          {job.profiles && (
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              Posted by {job.profiles.full_name} • {formatRelativeDate(job.created_at)}
+                            </p>
+                          )}
 
-                          {job.years_of_experience > 0 && (
+                          {/* Key Requirements */}
+                          <div className="grid grid-cols-1 gap-3 bg-gray-50 rounded-lg p-3">
                             <div className="flex items-start gap-2">
-                              <Award className="w-4 h-4 text-[#22A555] mt-0.5 flex-shrink-0" />
+                              <GraduationCap className="w-4 h-4 text-[#22A555] mt-0.5 flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs text-gray-500 mb-0.5">Experience Required</p>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {job.years_of_experience} {job.years_of_experience === 1 ? 'year' : 'years'}
+                                <p className="text-xs text-gray-500 mb-0.5">Degree Requirement</p>
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {job.degree_requirement}
                                 </p>
                               </div>
                             </div>
-                          )}
-                        </div>
 
-                        {/* Skills & Eligibilities */}
-                        {((job.skills && job.skills.length > 0) || (job.eligibilities && job.eligibilities.length > 0)) && (
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-2">
-                              {(() => {
-                                const isExpanded = expandedSkillsCards.has(job.id);
-                                const totalCount = (job.skills?.length || 0) + (job.eligibilities?.length || 0);
-                                const showAll = isExpanded || totalCount <= 5;
-
-                                const skillsToShow = showAll ? (job.skills || []) : (job.skills || []).slice(0, 3);
-                                const eligsToShow = showAll ? (job.eligibilities || []) : (job.eligibilities || []).slice(0, 2);
-                                const shownCount = skillsToShow.length + eligsToShow.length;
-
-                                return (
-                                  <>
-                                    {skillsToShow.map((skill, idx) => (
-                                      <Badge key={`skill-${idx}`} size="sm" variant="default">
-                                        {skill}
-                                      </Badge>
-                                    ))}
-                                    {eligsToShow.map((elig, idx) => (
-                                      <Badge key={`elig-${idx}`} size="sm" variant="default">
-                                        {elig}
-                                      </Badge>
-                                    ))}
-                                    {totalCount > 5 && (
-                                      <button
-                                        onClick={() => toggleSkillsExpansion(job.id)}
-                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
-                                        title={isExpanded ? "Click to show less" : "Click to view all requirements"}
-                                      >
-                                        {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
-                                      </button>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Footer Info */}
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>{job.location || 'Not specified'}</span>
-                            </div>
-                            {job.employment_type && (
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                <span>{job.employment_type}</span>
+                            {job.years_of_experience > 0 && (
+                              <div className="flex items-start gap-2">
+                                <Award className="w-4 h-4 text-[#22A555] mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs text-gray-500 mb-0.5">Experience Required</p>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {job.years_of_experience} {job.years_of_experience === 1 ? 'year' : 'years'}
+                                  </p>
+                                </div>
                               </div>
                             )}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            <Calendar className="w-3 h-3 inline mr-1" />
-                            {formatPostedDate(job.created_at)}
+
+                          {/* Skills & Eligibilities */}
+                          {((job.skills && job.skills.length > 0) || (job.eligibilities && job.eligibilities.length > 0)) && (
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap gap-2">
+                                {(() => {
+                                  const isExpanded = expandedSkillsCards.has(job.id);
+                                  const totalCount = (job.skills?.length || 0) + (job.eligibilities?.length || 0);
+                                  const showAll = isExpanded || totalCount <= 5;
+
+                                  const skillsToShow = showAll ? (job.skills || []) : (job.skills || []).slice(0, 3);
+                                  const eligsToShow = showAll ? (job.eligibilities || []) : (job.eligibilities || []).slice(0, 2);
+                                  const shownCount = skillsToShow.length + eligsToShow.length;
+
+                                  return (
+                                    <>
+                                      {skillsToShow.map((skill, idx) => (
+                                        <Badge key={`skill-${idx}`} size="sm" variant="default">
+                                          {skill}
+                                        </Badge>
+                                      ))}
+                                      {eligsToShow.map((elig, idx) => (
+                                        <Badge key={`elig-${idx}`} size="sm" variant="default">
+                                          {elig}
+                                        </Badge>
+                                      ))}
+                                      {totalCount > 5 && (
+                                        <button
+                                          onClick={() => toggleSkillsExpansion(job.id)}
+                                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
+                                          title={isExpanded ? "Click to show less" : "Click to view all requirements"}
+                                        >
+                                          {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
+                                        </button>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Footer Info */}
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{job.location || 'Not specified'}</span>
+                              </div>
+                              {job.employment_type && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{job.employment_type}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              <Calendar className="w-3 h-3 inline mr-1" />
+                              {formatPostedDate(job.created_at)}
+                            </div>
+                          </div>
+
+                          {/* Application Button/Status */}
+                          {job.userApplication ? (
+                            <div className="space-y-3">
+                              <ApplicationStatusBadge
+                                status={job.userApplication.status}
+                                createdAt={job.userApplication.created_at}
+                                className="w-full justify-center py-2"
+                              />
+                              <Button
+                                variant="info"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                                size="sm"
+                                icon={History}
+                                onClick={() => handleViewStatusHistory(job.userApplication!)}
+                              >
+                                View Status History
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="success"
+                              className="w-full shadow-md hover:shadow-lg transition-shadow"
+                              size="lg"
+                              icon={CheckCircle2}
+                              onClick={() => handleApplyClick(job)}
+                            >
+                              Apply Now
+                            </Button>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: MY APPLICATIONS (ACTIVE) */}
+          {activeTab === 'applications' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  My Applications ({activeApplications.length})
+                </h2>
+              </div>
+
+              {loadingApplications ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+                  <span className="ml-3 text-gray-600">Loading applications...</span>
+                </div>
+              ) : activeApplications.length === 0 ? (
+                <Card className="text-center py-16">
+                  <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No active applications</h3>
+                  <p className="text-gray-600 mb-4">
+                    You haven't applied to any jobs yet. Browse available positions and apply!
+                  </p>
+                  <Button variant="primary" onClick={() => setActiveTab('available')}>
+                    Browse Jobs
+                  </Button>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+                  {activeApplications.map((app, index) => {
+                    const statusConfig = getStatusConfig(app.status);
+                    const canWithdraw = app.status === 'pending' || app.status === 'under_review';
+
+                    return (
+                      <Card key={app.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
+                        {/* Colored Top Border */}
+                        <div className={`h-3 bg-gradient-to-r ${getCardGradient(index)}`}></div>
+
+                        <div className="p-6 space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-3 mb-2">
+                                <div className="w-12 h-12 bg-[#22A555]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <Briefcase className="w-6 h-6 text-[#22A555]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#22A555] transition-colors mb-1 line-clamp-2">
+                                    {app.jobs?.title || 'Position'}
+                                  </h3>
+                                  <p className="text-sm text-gray-500">Municipality of Asuncion</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex flex-col gap-2">
+                              <Badge variant={statusConfig.badgeVariant} size="lg" icon={statusConfig.icon}>
+                                {statusConfig.label}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Applied Badge & Posted By */}
+                          <div className="flex items-center gap-2 -mt-2">
+                            <AppliedBadge createdAt={app.created_at} />
+                          </div>
+                          {app.jobs?.profiles && app.jobs?.created_at && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 -mt-2">
+                              <User className="w-3.5 h-3.5" />
+                              <span>Posted by <span className="font-medium text-gray-700">{app.jobs.profiles.full_name}</span></span>
+                              <span className="text-gray-400">•</span>
+                              <span>{formatShortDate(app.jobs.created_at)}</span>
+                            </div>
+                          )}
+
+                          {/* Interview Scheduled Box (if applicable) */}
+                          {app.interview_date && (
+                            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Calendar className="w-5 h-5 text-green-700" />
+                                <p className="font-bold text-green-900">Interview Scheduled! 📅</p>
+                              </div>
+                              <p className="text-sm text-green-700">
+                                {new Date(app.interview_date).toLocaleDateString('en-US', {
+                                  weekday: 'long',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Next Steps Box (if applicable) */}
+                          {app.next_steps && (
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-center gap-2 mb-1">
+                                <ArrowRight className="w-4 h-4 text-blue-700" />
+                                <p className="font-semibold text-blue-800 text-sm">Next Steps:</p>
+                              </div>
+                              <p className="text-sm text-blue-700">{app.next_steps}</p>
+                            </div>
+                          )}
+
+                          {/* Job Description (if available) */}
+                          {app.jobs?.description && (
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                              {app.jobs.description}
+                            </p>
+                          )}
+
+                          {/* Footer Info */}
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{app.jobs?.location || 'Not specified'}</span>
+                              </div>
+                              {app.jobs?.employment_type && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{app.jobs.employment_type}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              <Calendar className="w-3 h-3 inline mr-1" />
+                              Applied {formatRelativeDate(app.created_at)}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="info"
+                              size="sm"
+                              icon={History}
+                              onClick={() => handleViewStatusHistory(app)}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              View History
+                            </Button>
+                            {canWithdraw && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                icon={Ban}
+                                onClick={() => handleWithdrawClick(app)}
+                                className="flex-1"
+                              >
+                                Withdraw
+                              </Button>
+                            )}
                           </div>
                         </div>
-
-                        {/* Application Status & Apply Button */}
-                        {job.userApplication ? (
-                          (() => {
-                            const status = job.userApplication.status;
-
-                            // WITHDRAWN: Allow reapply immediately
-                            if (status === 'withdrawn') {
-                              return (
-                                <div className="space-y-3">
-                                  <ApplicationStatusBadge
-                                    status="withdrawn"
-                                    createdAt={job.userApplication.created_at}
-                                    className="w-full justify-center py-2"
-                                  />
-                                  <Button
-                                    variant="success"
-                                    className="w-full shadow-md hover:shadow-lg transition-shadow"
-                                    size="lg"
-                                    icon={CheckCircle2}
-                                    onClick={() => handleApplyClick(job)}
-                                  >
-                                    Reapply Now
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    className="w-full"
-                                    size="sm"
-                                    icon={History}
-                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
-                                  >
-                                    View Status History
-                                  </Button>
-                                </div>
-                              );
-                            }
-
-                            // DENIED: Allow reapply immediately
-                            if (status === 'denied') {
-                              return (
-                                <div className="space-y-3">
-                                  <ApplicationStatusBadge
-                                    status="denied"
-                                    createdAt={job.userApplication.created_at}
-                                    className="w-full justify-center py-2"
-                                  />
-                                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                    <p className="text-xs text-yellow-800 text-center">
-                                      💡 Consider improving your qualifications before reapplying
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="success"
-                                    className="w-full shadow-md hover:shadow-lg transition-shadow"
-                                    size="lg"
-                                    icon={CheckCircle2}
-                                    onClick={() => handleApplyClick(job)}
-                                  >
-                                    Reapply Now
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    className="w-full"
-                                    size="sm"
-                                    icon={History}
-                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
-                                  >
-                                    View Status History
-                                  </Button>
-                                </div>
-                              );
-                            }
-
-                            // HIRED: Show celebration + onboarding link
-                            if (status === 'hired') {
-                              return (
-                                <div className="space-y-3">
-                                  <ApplicationStatusBadge
-                                    status="hired"
-                                    createdAt={job.userApplication.created_at}
-                                    className="w-full justify-center py-2"
-                                  />
-                                  <div className="bg-gradient-to-r from-teal-50 to-green-50 border-2 border-teal-300 rounded-lg p-3">
-                                    <p className="text-sm font-semibold text-teal-900 text-center">
-                                      🎉 Congratulations! You've been hired!
-                                    </p>
-                                    <p className="text-xs text-teal-700 text-center mt-1">
-                                      Check your applications page for next steps
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="info"
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-shadow"
-                                    size="lg"
-                                    icon={History}
-                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
-                                  >
-                                    View Application Details
-                                  </Button>
-                                </div>
-                              );
-                            }
-
-                            // ARCHIVED: Show explanation + browse jobs
-                            if (status === 'archived') {
-                              return (
-                                <div className="space-y-3">
-                                  <ApplicationStatusBadge
-                                    status="archived"
-                                    createdAt={job.userApplication.created_at}
-                                    className="w-full justify-center py-2"
-                                  />
-                                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                                    <p className="text-xs text-gray-700 text-center">
-                                      This job posting has been closed. Your application has been archived.
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="secondary"
-                                    className="w-full"
-                                    size="sm"
-                                    icon={History}
-                                    onClick={() => handleViewStatusHistory(job.userApplication!)}
-                                  >
-                                    View Status History
-                                  </Button>
-                                </div>
-                              );
-                            }
-
-                            // ACTIVE STATUSES (pending, under_review, shortlisted, interviewed, approved):
-                            // Keep as view-only since these are in active hiring pipeline
-                            return (
-                              <div className="space-y-3">
-                                <ApplicationStatusBadge
-                                  status={status}
-                                  createdAt={job.userApplication.created_at}
-                                  className="w-full justify-center py-2"
-                                />
-                                <Button
-                                  variant="info"
-                                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-shadow"
-                                  size="lg"
-                                  icon={History}
-                                  onClick={() => handleViewStatusHistory(job.userApplication!)}
-                                >
-                                  View Status History
-                                </Button>
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          <Button
-                            variant="success"
-                            className="w-full shadow-md hover:shadow-lg transition-shadow"
-                            size="lg"
-                            icon={CheckCircle2}
-                            onClick={() => handleApplyClick(job)}
-                          >
-                            Apply Now
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
-          </div>
+            </div>
+          )}
+
+          {/* TAB 3: APPLICATION HISTORY (COMPLETED) */}
+          {activeTab === 'history' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Application History ({historyApplications.length})
+                </h2>
+              </div>
+
+              {loadingApplications ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-[#22A555] animate-spin" />
+                  <span className="ml-3 text-gray-600">Loading history...</span>
+                </div>
+              ) : historyApplications.length === 0 ? (
+                <Card className="text-center py-16">
+                  <History className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No application history yet</h3>
+                  <p className="text-gray-600 mb-4">
+                    Your completed applications will appear here
+                  </p>
+                  <Button variant="primary" onClick={() => setActiveTab('available')}>
+                    Browse Jobs
+                  </Button>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {historyApplications.map((app, index) => {
+                    const statusConfig = getStatusConfig(app.status);
+                    const isHired = app.status === 'hired';
+                    const isDenied = app.status === 'denied';
+                    const isWithdrawn = app.status === 'withdrawn';
+                    const isArchived = app.status === 'archived';
+
+                    // Choose gradient color based on status
+                    const gradientColor = isHired
+                      ? 'from-teal-500 to-green-500'
+                      : isDenied
+                      ? 'from-red-500 to-red-600'
+                      : isWithdrawn
+                      ? 'from-gray-400 to-gray-500'
+                      : isArchived
+                      ? 'from-gray-500 to-gray-600'
+                      : getCardGradient(index);
+
+                    return (
+                      <Card key={app.id} variant="interactive" noPadding className="group hover:shadow-xl transition-all duration-300">
+                        {/* Colored Top Border (status-specific) */}
+                        <div className={`h-3 bg-gradient-to-r ${gradientColor}`}></div>
+
+                        <div className="p-6 space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-3 mb-2">
+                                <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                  isHired ? 'bg-teal-100' : isDenied ? 'bg-red-100' : 'bg-gray-100'
+                                }`}>
+                                  <Briefcase className={`w-6 h-6 ${
+                                    isHired ? 'text-teal-700' : isDenied ? 'text-red-700' : 'text-gray-600'
+                                  }`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-2">
+                                    {app.jobs?.title || 'Position'}
+                                  </h3>
+                                  <p className="text-sm text-gray-500">Municipality of Asuncion</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Large Status Badge */}
+                            <div className="flex flex-col gap-2">
+                              <Badge variant={statusConfig.badgeVariant} size="lg" icon={statusConfig.icon}>
+                                {statusConfig.label}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Status-specific Hero Sections */}
+                          {isHired && (
+                            <div className="p-5 bg-gradient-to-r from-teal-50 to-green-50 border-2 border-teal-300 rounded-xl shadow-sm">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center">
+                                  <CheckCircle className="w-6 h-6 text-white" />
+                                </div>
+                                <p className="text-lg font-bold text-teal-900">Congratulations! 🎉</p>
+                              </div>
+                              <p className="text-sm text-teal-700 ml-13">
+                                You've been hired for this position! Check with HR for onboarding details.
+                              </p>
+                            </div>
+                          )}
+
+                          {isDenied && (
+                            <div className="space-y-3">
+                              {app.denial_reason && (
+                                <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle className="w-4 h-4 text-red-600" />
+                                    <p className="text-sm font-bold text-red-800">Reason for Denial:</p>
+                                  </div>
+                                  <p className="text-sm text-red-700 mt-1">{app.denial_reason}</p>
+                                </div>
+                              )}
+                              <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+                                <p className="text-sm font-bold text-blue-800 mb-2">💡 Ways to Improve:</p>
+                                <ul className="text-sm text-blue-700 space-y-1.5 ml-4">
+                                  <li className="flex items-start gap-2">
+                                    <span className="text-blue-500 mt-0.5">•</span>
+                                    <span>Complete relevant training programs</span>
+                                  </li>
+                                  <li className="flex items-start gap-2">
+                                    <span className="text-blue-500 mt-0.5">•</span>
+                                    <span>Gain more work experience in the field</span>
+                                  </li>
+                                  <li className="flex items-start gap-2">
+                                    <span className="text-blue-500 mt-0.5">•</span>
+                                    <span>Obtain required certifications or licenses</span>
+                                  </li>
+                                </ul>
+                              </div>
+                            </div>
+                          )}
+
+                          {isWithdrawn && (
+                            <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Ban className="w-5 h-5 text-gray-600" />
+                                <p className="font-semibold text-gray-800">Application Withdrawn</p>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                You withdrew this application on {formatShortDate(app.updated_at)}. You can reapply anytime.
+                              </p>
+                            </div>
+                          )}
+
+                          {isArchived && (
+                            <div className="p-4 bg-gray-50 border-l-4 border-gray-500 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Archive className="w-5 h-5 text-gray-600" />
+                                <p className="font-semibold text-gray-800">Application Archived</p>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                This application was archived because the job posting has been closed or the position has been filled.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Posted By Information */}
+                          {app.jobs?.profiles && app.jobs?.created_at && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <User className="w-3.5 h-3.5" />
+                              <span>Posted by <span className="font-medium text-gray-700">{app.jobs.profiles.full_name}</span></span>
+                              <span className="text-gray-400">•</span>
+                              <span>{formatShortDate(app.jobs.created_at)}</span>
+                            </div>
+                          )}
+
+                          {/* Job Description (if available) */}
+                          {app.jobs?.description && (
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                              {app.jobs.description}
+                            </p>
+                          )}
+
+                          {/* Application Details */}
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{app.jobs?.location || 'Not specified'}</span>
+                              </div>
+                              {app.jobs?.employment_type && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{app.jobs.employment_type}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              <Calendar className="w-3 h-3 inline mr-1" />
+                              Applied {formatRelativeDate(app.created_at)}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              icon={History}
+                              onClick={() => handleViewStatusHistory(app)}
+                              className="flex-1"
+                            >
+                              View History
+                            </Button>
+                            {(isDenied || isWithdrawn) && (
+                              <Button
+                                variant="success"
+                                size="sm"
+                                icon={ArrowRight}
+                                className="flex-1"
+                                onClick={() => {
+                                  const job = jobs.find(j => j.id === app.job_id);
+                                  if (job) handleApplyClick(job);
+                                }}
+                              >
+                                Reapply
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Container>
 
@@ -821,11 +1145,82 @@ export default function AuthenticatedJobsPage() {
         onSuccess={handleApplicationSuccess}
       />
 
+      {/* Withdraw Modal */}
+      <ModernModal
+        isOpen={withdrawModalOpen}
+        onClose={() => {
+          setWithdrawModalOpen(false);
+          setSelectedApplicationToWithdraw(null);
+        }}
+        title="Withdraw Application"
+        subtitle="Confirm withdrawal"
+        colorVariant="orange"
+        icon={AlertCircle}
+        size="md"
+      >
+        {selectedApplicationToWithdraw && (
+          <div className="space-y-4">
+            <div className="bg-orange-50 border-l-4 border-orange-600 p-4 rounded">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-orange-800 mb-1">Are you sure?</p>
+                  <p className="text-sm text-orange-700">
+                    Withdrawing this application cannot be undone. You may reapply later if the position is still available.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Application Details:</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-gray-400" />
+                  <span className="font-medium text-gray-900">
+                    {selectedApplicationToWithdraw.jobs?.title}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700">
+                    Applied: {formatShortDate(selectedApplicationToWithdraw.created_at)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setWithdrawModalOpen(false);
+                  setSelectedApplicationToWithdraw(null);
+                }}
+                className="flex-1"
+                disabled={withdrawing}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                icon={Ban}
+                loading={withdrawing}
+                onClick={handleWithdrawConfirm}
+                className="flex-1"
+                disabled={withdrawing}
+              >
+                {withdrawing ? 'Withdrawing...' : 'Confirm Withdrawal'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </ModernModal>
+
       {/* Status History Modal */}
       {showStatusHistoryModal && selectedApplicationForHistory && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
             <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 flex items-center justify-between z-10 shadow-lg rounded-t-xl">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
@@ -847,15 +1242,13 @@ export default function AuthenticatedJobsPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              {/* Job Info */}
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 p-4 rounded-lg">
                 <div className="flex items-start gap-3">
                   <Briefcase className="w-5 h-5 text-blue-600 mt-0.5" />
                   <div className="flex-1">
                     <p className="font-semibold text-gray-900 text-lg">
-                      {jobsWithApplicationStatus.find(j => j.userApplication?.id === selectedApplicationForHistory.id)?.title || 'Position'}
+                      {selectedApplicationForHistory.jobs?.title || 'Position'}
                     </p>
                     <p className="text-sm text-gray-600 mt-1">Job Application</p>
                     <p className="text-xs text-gray-500 mt-2">
@@ -869,7 +1262,6 @@ export default function AuthenticatedJobsPage() {
                 </div>
               </div>
 
-              {/* Status Timeline */}
               {loadingHistory ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
@@ -893,7 +1285,6 @@ export default function AuthenticatedJobsPage() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end rounded-b-xl">
               <Button
                 variant="secondary"
@@ -908,7 +1299,6 @@ export default function AuthenticatedJobsPage() {
           </div>
         </div>
       )}
-
     </AdminLayout>
   );
 }
