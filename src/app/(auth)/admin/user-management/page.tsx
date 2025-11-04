@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import {
-  UserPlus, UserX, Trash2, User as UserIcon, User, Mail, Shield, Calendar, X,
+  UserPlus, UserX, Trash2, User as UserIcon, Mail, Shield, Calendar, X,
   CheckCircle2, AlertCircle, Eye, Loader2, Briefcase, Building, Clock, Activity
 } from 'lucide-react';
 import { getEventConfig, type EventCategory } from '@/lib/activityEventConfig';
