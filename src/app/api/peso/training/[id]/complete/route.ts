@@ -171,7 +171,7 @@ export async function POST(
             : `Your training completion for "${program.title}" is pending review.`;
 
         notificationPromises.push(
-          supabase.from('notifications').insert({
+          Promise.resolve(supabase.from('notifications').insert({
             user_id: updatedApp.applicant_id,
             type: 'training_status',
             title: completionStatus === 'passed'
@@ -183,7 +183,7 @@ export async function POST(
             link_url: '/applicant/trainings',
             related_entity_type: 'training_application',
             related_entity_id: applicantId,
-          })
+          }).then())
         );
       }
     }

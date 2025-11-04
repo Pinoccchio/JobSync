@@ -281,11 +281,11 @@ export async function PATCH(
     // 7. Log activity
     try {
       // If status changed, log status change specifically
-      if (body.status && body.status !== existingJob.status) {
+      if (body.status && body.status !== (existingJob as any).status) {
         await supabase.rpc('log_job_status_changed', {
           p_user_id: user.id,
           p_job_id: id,
-          p_old_status: existingJob.status,
+          p_old_status: (existingJob as any).status,
           p_new_status: body.status,
           p_metadata: {
             job_title: updatedJob.title,
@@ -332,7 +332,7 @@ export async function PATCH(
       });
 
       // If job status changed to archived/hidden, notify applicants
-      if (body.status && body.status !== 'active' && existingJob.status === 'active') {
+      if (body.status && body.status !== 'active' && (existingJob as any).status === 'active') {
         await notifyJobApplicants(id, {
           type: 'system',
           title: `Job Posting ${body.status === 'archived' ? 'Closed' : 'Updated'}`,

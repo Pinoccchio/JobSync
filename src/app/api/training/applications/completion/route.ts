@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Calculate attendance percentage if not set (100% if they made it to completion)
-        if (!app.attendance_percentage) {
+        if (!(app as any).attendance_percentage) {
           updateData.attendance_percentage = 100;
         }
 
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
         completedCount++;
 
         // Prepare notification based on pass/fail
-        const programTitle = app.training_programs?.title || 'Training Program';
+        const programTitle = (app.training_programs as any)?.title || 'Training Program';
 
         if (completion.completion_status === 'passed') {
           notifications.push({

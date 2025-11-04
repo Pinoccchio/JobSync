@@ -289,7 +289,7 @@ export async function PATCH(
     }
 
     // 11. Create descriptive notification for applicant
-    const jobTitle = existingApplication.jobs?.title || 'the position';
+    const jobTitle = (existingApplication.jobs as any)?.title || 'the position';
     let notificationTitle = '';
     let notificationMessage = '';
 

@@ -1096,7 +1096,7 @@ export default function TrainingsPage() {
                       {/* Action Buttons */}
                       <div className="flex gap-2 pt-2">
                         <Button
-                          variant="info"
+                          variant="primary"
                           size="sm"
                           icon={History}
                           onClick={() => {
@@ -1296,7 +1296,7 @@ export default function TrainingsPage() {
                             <p className="font-semibold text-gray-800">Application Withdrawn</p>
                           </div>
                           <p className="text-sm text-gray-600">
-                            You withdrew this application on {formatShortDate(app.updated_at)}. You may reapply if slots are still available.
+                            You withdrew this application. You may reapply if slots are still available.
                           </p>
                         </div>
                       )}
@@ -1355,7 +1355,7 @@ export default function TrainingsPage() {
                       {/* Action Buttons */}
                       <div className="flex gap-2 pt-2">
                         <Button
-                          variant="info"
+                          variant="primary"
                           size="sm"
                           icon={History}
                           onClick={() => {
@@ -1519,7 +1519,6 @@ export default function TrainingsPage() {
                 <FileUploadWithProgress
                   bucket="id-images"
                   accept="image/*"
-                  maxSizeMB={5}
                   onUploadComplete={handleImageUpload}
                   label="Upload a clear photo of your valid ID (Driver's License, Passport, etc.)"
                 />

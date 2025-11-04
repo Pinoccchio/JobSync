@@ -466,7 +466,7 @@ export default function PESOProgramsPage() {
             <p className="text-gray-600 mt-1">Manage job training programs and courses</p>
           </div>
           <div className="flex gap-3">
-            <RefreshButton onClick={fetchPrograms} />
+            <RefreshButton onRefresh={fetchPrograms} label="Refresh" showLastRefresh={true} />
             <Button variant="primary" icon={Plus} onClick={() => setShowAddModal(true)}>
               Add New Program
             </Button>
@@ -611,9 +611,7 @@ export default function PESOProgramsPage() {
           <EnhancedTable
             data={filteredPrograms}
             columns={columns}
-            loading={loading}
             searchPlaceholder="Search programs..."
-            emptyMessage="No training programs found. Click 'Add New Program' to create one."
           />
         </Card>
 

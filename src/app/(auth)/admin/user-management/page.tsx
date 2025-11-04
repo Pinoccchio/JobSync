@@ -506,7 +506,7 @@ export default function UserManagementPage() {
                   <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <User className="w-6 h-6 text-white" />
+                  <UserIcon className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -551,7 +551,7 @@ export default function UserManagementPage() {
           {/* Action Buttons and Filters */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <RefreshButton onRefresh={() => { fetchUsers(); fetchRecentActivities(); }} label="Refresh" showLastRefresh={true} />
+              <RefreshButton onRefresh={async () => { await fetchUsers(); await fetchRecentActivities(); }} label="Refresh" showLastRefresh={true} />
 
               {/* Filters */}
               <select
@@ -1032,7 +1032,7 @@ export default function UserManagementPage() {
                   {/* Basic Information */}
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <User className="w-5 h-5 text-[#22A555]" />
+                      <UserIcon className="w-5 h-5 text-[#22A555]" />
                       Basic Information
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

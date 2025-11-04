@@ -116,7 +116,7 @@ export default function AnnouncementsPage() {
               <p className="text-sm text-gray-600">Stay updated with the latest news and opportunities</p>
             </div>
           </div>
-          <RefreshButton onClick={fetchAnnouncements} loading={loading} />
+          <RefreshButton onRefresh={fetchAnnouncements} label="Refresh" showLastRefresh={true} />
         </div>
 
         {/* Category Filters */}

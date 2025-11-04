@@ -341,8 +341,8 @@ export default function AuthenticatedJobsPage() {
   };
 
   // Get unique employment types and locations for filters
-  const employmentTypes = Array.from(new Set(jobs.map(j => j.employment_type).filter(Boolean)));
-  const locations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean)));
+  const employmentTypes = Array.from(new Set(jobs.map(j => j.employment_type).filter(Boolean))) as string[];
+  const locations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean))) as string[];
 
   return (
     <AdminLayout role="Applicant" userName={user?.fullName || 'Applicant'} pageTitle="Job Opportunities" pageDescription="Browse and apply for available positions">
@@ -351,9 +351,9 @@ export default function AuthenticatedJobsPage() {
           {/* Refresh Button */}
           <div className="flex items-center justify-end">
             <RefreshButton
-              onRefresh={() => {
-                fetchJobs();
-                fetchUserApplications();
+              onRefresh={async () => {
+                await fetchJobs();
+                await fetchUserApplications();
               }}
               label="Refresh"
               showLastRefresh={true}
@@ -748,7 +748,7 @@ export default function AuthenticatedJobsPage() {
                                 className="w-full justify-center py-2"
                               />
                               <Button
-                                variant="info"
+                                variant="primary"
                                 className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md"
                                 size="sm"
                                 icon={History}
@@ -900,7 +900,7 @@ export default function AuthenticatedJobsPage() {
                           {/* Action Buttons */}
                           <div className="flex gap-2 pt-2">
                             <Button
-                              variant="info"
+                              variant="primary"
                               size="sm"
                               icon={History}
                               onClick={() => handleViewStatusHistory(app)}
@@ -1147,7 +1147,7 @@ export default function AuthenticatedJobsPage() {
       <ApplicationModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        job={selectedJob}
+        job={selectedJob as any}
         onSuccess={handleApplicationSuccess}
       />
 

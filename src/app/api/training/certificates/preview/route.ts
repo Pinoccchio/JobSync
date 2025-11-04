@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateCertificatePDF, generateCertificateId } from '@/lib/certificates/certificateGenerator';
-import type { CertificateData, CertificateLayoutParams } from '@/types/certificate.types';
+import type { CertificateData } from '@/types/certificate.types';
 
 /**
  * POST /api/training/certificates/preview
@@ -13,7 +13,6 @@ import type { CertificateData, CertificateLayoutParams } from '@/types/certifica
  * - application_id: string (required) - Training application ID
  * - notes: string (optional) - Additional notes to include on certificate
  * - include_signature: boolean (optional) - Whether to include PESO officer signature
- * - layoutParams: CertificateLayoutParams (optional) - Custom layout parameters for spacing/fonts
  *
  * Response:
  * - PDF blob (application/pdf)
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Parse request body
-    const { application_id, notes, include_signature, layoutParams } = await request.json();
+    const { application_id, notes, include_signature } = await request.json();
 
     if (!application_id) {
       return NextResponse.json(
@@ -150,7 +149,7 @@ export async function POST(request: NextRequest) {
     // 6. Generate PDF (server-side with signature support)
     let pdfBytes: Uint8Array;
     try {
-      pdfBytes = await generateCertificatePDF(certificateData, layoutParams);
+      pdfBytes = await generateCertificatePDF(certificateData);
     } catch (pdfError: any) {
       console.error('Error generating preview PDF:', pdfError);
       return NextResponse.json(
@@ -160,7 +159,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Return PDF as blob
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="certificate-preview-${application.full_name.replace(/\s+/g, '-')}.pdf"`,

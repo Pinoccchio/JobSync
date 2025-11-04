@@ -127,7 +127,6 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
       surname: 'SANTOS',
       firstName: 'MARIA ELENA',
       middleName: 'REYES',
-      nameExtension: '',
       occupation: 'Public School Teacher II',
       employerBusinessName: 'Asuncion National High School',
       businessAddress: 'Poblacion, Asuncion, Davao del Norte 8410',
@@ -147,7 +146,6 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
       surname: 'SANTOS',
       firstName: 'ROBERTO',
       middleName: 'DELA CRUZ',
-      nameExtension: 'SR.',
     },
     mother: {
       surname: 'REYES',
@@ -229,7 +227,6 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
       departmentAgencyOfficeCompany: 'Asuncion Municipal Hall - IT Department',
       monthlySalary: 15000,
       salaryGrade: 'SG-9',
-      stepIncrement: 'Step 1',
       statusOfAppointment: 'Permanent',
       governmentService: true,
       periodOfService: {
@@ -242,7 +239,6 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
       departmentAgencyOfficeCompany: 'Asuncion Municipal Hall - MIS Office',
       monthlySalary: 22000,
       salaryGrade: 'SG-15',
-      stepIncrement: 'Step 1',
       statusOfAppointment: 'Permanent',
       governmentService: true,
       periodOfService: {
@@ -255,7 +251,6 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
       departmentAgencyOfficeCompany: 'Davao del Norte Provincial Government - ICT Office',
       monthlySalary: 35000,
       salaryGrade: 'SG-18',
-      stepIncrement: 'Step 2',
       statusOfAppointment: 'Permanent',
       governmentService: true,
       periodOfService: {
@@ -456,7 +451,7 @@ const MOCK_PDS_DATA: Partial<PDSData> = {
   },
   completionPercentage: 0,
   isCompleted: false,
-  lastSavedSection: null,
+  lastSavedSection: undefined,
 };
 
 export const PDSWizard: React.FC = () => {
@@ -487,8 +482,6 @@ export const PDSWizard: React.FC = () => {
         return Array.isArray(data) && data.length > 0 && !!data[0]?.title;
       case 'other-information':
         return !!(data?.declaration?.agreed);
-      case 'questions':
-        return data !== undefined; // Questions are mostly boolean, just check if data exists
       default:
         return false;
     }
@@ -556,17 +549,17 @@ export const PDSWizard: React.FC = () => {
         // No PDS exists yet - initialize with empty state
         // Auto-save will create it on first change
         setPdsData({
-          personalInfo: {},
-          familyBackground: {},
+          personalInfo: {} as any,
+          familyBackground: {} as any,
           educationalBackground: [],
           eligibility: [],
           workExperience: [],
           voluntaryWork: [],
           trainings: [],
-          otherInformation: {},
+          otherInformation: {} as any,
           completionPercentage: 0,
           isCompleted: false,
-          lastSavedSection: null,
+          lastSavedSection: undefined,
         });
       }
     } catch (error) {

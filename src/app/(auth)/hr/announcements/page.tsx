@@ -697,7 +697,6 @@ export default function AnnouncementsPage() {
                     bucket="announcements"
                     onUploadComplete={handleImageUpload}
                     accept="image/jpeg,image/jpg,image/png"
-                    maxSizeMB={5}
                   />
                   {formData.imageUrl && (
                     <p className="text-sm text-[#22A555] mt-2 flex items-center gap-2">
@@ -813,7 +812,6 @@ export default function AnnouncementsPage() {
                     bucket="announcements"
                     onUploadComplete={handleImageUpload}
                     accept="image/jpeg,image/jpg,image/png"
-                    maxSizeMB={5}
                   />
                   {formData.imageUrl && (
                     <p className="text-sm text-[#22A555] mt-2 flex items-center gap-2">

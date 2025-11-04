@@ -180,7 +180,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
     // Eligibility analysis
     if (applicant.eligibilities && jobRequirements.eligibilities && jobRequirements.eligibilities.length > 0) {
       const matchedEligibilities = jobRequirements.eligibilities.filter(reqElig =>
-        applicant.eligibilities?.some(e => {
+        applicant.eligibilities?.some((e: any) => {
           // Ensure e is a string (handle objects with eligibilityTitle property)
           const eligStr = typeof e === 'string' ? e : (e?.eligibilityTitle || String(e));
           return eligStr.toLowerCase().includes(reqElig.toLowerCase()) ||
@@ -552,7 +552,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
           {applicant.eligibilities && applicant.eligibilities.length > 0 && (
             <div className="ml-7 -mt-2">
               <div className="flex flex-wrap gap-2">
-                {applicant.eligibilities.map((elig, idx) => {
+                {applicant.eligibilities.map((elig: any, idx: number) => {
                   // Extract eligibility title from object or use string directly
                   const eligTitle = typeof elig === 'string' ? elig : (elig?.eligibilityTitle || elig?.name || 'Unknown');
                   return <Badge key={idx} variant="success">{eligTitle}</Badge>;
@@ -563,7 +563,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                   <span className="font-semibold">
                     {(() => {
                       const matchedEligibilities = jobRequirements.eligibilities.filter(reqElig =>
-                        applicant.eligibilities?.some(e => {
+                        applicant.eligibilities?.some((e: any) => {
                           // Ensure e is a string (handle objects with eligibilityTitle or name property)
                           const eligStr = typeof e === 'string' ? e : (e?.eligibilityTitle || e?.name || String(e));
                           return eligStr.toLowerCase().includes(reqElig.toLowerCase()) ||
@@ -665,13 +665,13 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                       <span className="text-gray-600">Has:</span>
                       <span className="font-medium">{applicant.education || 'Not specified'}</span>
                       {applicant.educationScore >= 80 && (
-                        <CheckCircle className="w-5 h-5 text-green-500 ml-2" title="Meets requirement" />
+                        <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
                       )}
                       {applicant.educationScore >= 50 && applicant.educationScore < 80 && (
-                        <AlertCircle className="w-5 h-5 text-yellow-500 ml-2" title="Partially meets" />
+                        <AlertCircle className="w-5 h-5 text-yellow-500 ml-2" />
                       )}
                       {applicant.educationScore < 50 && (
-                        <XCircle className="w-5 h-5 text-red-500 ml-2" title="Does not meet" />
+                        <XCircle className="w-5 h-5 text-red-500 ml-2" />
                       )}
                     </div>
                   </div>
@@ -691,13 +691,13 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                       {applicant.experience !== undefined && applicant.experience >= jobRequirements.yearsOfExperience ? (
                         applicant.experience > jobRequirements.yearsOfExperience * 1.5 ? (
                           <div className="flex items-center ml-2">
-                            <Star className="w-5 h-5 text-yellow-500" title="Exceeds requirement" />
+                            <Star className="w-5 h-5 text-yellow-500" />
                           </div>
                         ) : (
-                          <CheckCircle className="w-5 h-5 text-green-500 ml-2" title="Meets requirement" />
+                          <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
                         )
                       ) : (
-                        <XCircle className="w-5 h-5 text-red-500 ml-2" title="Does not meet" />
+                        <XCircle className="w-5 h-5 text-red-500 ml-2" />
                       )}
                     </div>
                   </div>
@@ -741,7 +741,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                       <p className="text-sm font-medium text-gray-700 mb-2">Eligibility Match</p>
                       <div className="space-y-2">
                         {jobRequirements.eligibilities.map((reqElig, idx) => {
-                          const hasEligibility = applicant.eligibilities?.some(e => {
+                          const hasEligibility = applicant.eligibilities?.some((e: any) => {
                             // Ensure e is a string (handle objects with eligibilityTitle or name property)
                             const eligStr = typeof e === 'string' ? e : (e?.eligibilityTitle || e?.name || String(e));
                             return eligStr.toLowerCase().includes(reqElig.toLowerCase()) ||

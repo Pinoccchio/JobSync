@@ -126,7 +126,7 @@ export default function PESODashboard() {
           completedCount: completedCount || 0,
         });
 
-        setRecentApplications(applications || []);
+        setRecentApplications((applications as any) || []);
       }
     } catch (error) {
       console.error('❌ Error fetching PESO dashboard data:', error);

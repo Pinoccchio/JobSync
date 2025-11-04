@@ -11,10 +11,8 @@ import { generateCertificatePreview, generateCertificateId } from '@/lib/certifi
 import type { CertificateData, CertificateLayoutParams } from '@/types/certificate.types';
 import { MarkAttendanceModal } from '@/components/peso/MarkAttendanceModal';
 import { AwardCompletionModal } from '@/components/peso/AwardCompletionModal';
-import CertificatePresetSelector from '@/components/peso/CertificatePresetSelector';
 import CertificatePreview from '@/components/peso/CertificatePreview';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { LAYOUT_PRESETS, calculateAutoFitLayout, type LayoutPresetType } from '@/lib/certificates/layoutPresets';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText, Users, ExternalLink, CheckSquare, Square } from 'lucide-react';
 
@@ -75,27 +73,6 @@ export default function PESOApplicationsPage() {
   const [hasSignature, setHasSignature] = useState<boolean>(false);
   const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
   const [generateLoading, setGenerateLoading] = useState(false);
-
-  // Certificate layout preset (default: auto-fit)
-  const [selectedPreset, setSelectedPreset] = useState<LayoutPresetType>('auto');
-
-  // Compute layout parameters based on selected preset
-  const layoutParams = useMemo(() => {
-    if (selectedPreset === 'auto' && selectedApplication) {
-      // Auto-fit: analyze content and calculate optimal layout
-      const contentAnalysis = {
-        nameLength: selectedApplication.full_name?.length || 0,
-        programTitleLength: selectedApplication.training_programs?.title?.length || 0,
-        skillsCount: 0, // We'll get this from the program when available
-        hasDuration: !!selectedApplication.training_programs?.duration,
-        hasSkills: false,
-      };
-      return calculateAutoFitLayout(contentAnalysis);
-    } else {
-      // Use selected preset
-      return LAYOUT_PRESETS[selectedPreset].params;
-    }
-  }, [selectedPreset, selectedApplication]);
 
   // Bulk operations state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -365,7 +342,6 @@ export default function PESOApplicationsPage() {
         body: JSON.stringify({
           application_id: selectedApplication.id,
           include_signature: includeSignature,
-          layoutParams,
         }),
       });
 
@@ -441,11 +417,6 @@ export default function PESOApplicationsPage() {
     } finally {
       setSignatureLoading(false);
     }
-  };
-
-  // Handle preset selection
-  const handlePresetChange = (presetId: LayoutPresetType) => {
-    setSelectedPreset(presetId);
   };
 
   // Get unique programs for filter
@@ -1091,7 +1062,7 @@ export default function PESOApplicationsPage() {
                 setSelectedApplication(row);
                 setApproveModalOpen(true);
               },
-              variant: 'success' as const,
+              variant: 'default' as const,
             },
             {
               label: 'Deny',
@@ -1100,7 +1071,7 @@ export default function PESOApplicationsPage() {
                 setSelectedApplication(row);
                 setDenyModalOpen(true);
               },
-              variant: 'danger' as const,
+              variant: 'default' as const,
             }
           );
         } else if (row.status === 'under_review') {
@@ -1112,7 +1083,7 @@ export default function PESOApplicationsPage() {
                 setSelectedApplication(row);
                 setApproveModalOpen(true);
               },
-              variant: 'success' as const,
+              variant: 'default' as const,
             },
             {
               label: 'Deny',
@@ -1121,7 +1092,7 @@ export default function PESOApplicationsPage() {
                 setSelectedApplication(row);
                 setDenyModalOpen(true);
               },
-              variant: 'danger' as const,
+              variant: 'default' as const,
             }
           );
         } else if (row.status === 'approved') {
@@ -1157,7 +1128,7 @@ export default function PESOApplicationsPage() {
                 setProgramApplicationsForBulk([row]);
                 setShowAttendanceModal(true);
               },
-              variant: 'primary' as const,
+              variant: 'default' as const,
             }
           );
         } else if (row.status === 'in_progress') {
@@ -1174,7 +1145,7 @@ export default function PESOApplicationsPage() {
               setProgramApplicationsForBulk([row]);
               setShowCompletionModal(true);
             },
-            variant: 'success' as const,
+            variant: 'default' as const,
           });
         } else if (row.status === 'completed') {
           menuItems.push({
@@ -1185,7 +1156,7 @@ export default function PESOApplicationsPage() {
               setCertifyModalOpen(true);
               fetchSignatureStatus(); // Fetch signature status when modal opens
             },
-            variant: 'warning' as const,
+            variant: 'default' as const,
           });
         }
 
@@ -1198,16 +1169,7 @@ export default function PESOApplicationsPage() {
     if (programFilter !== 'all') {
       return [
         {
-          header: (
-            <div className="flex items-center justify-center">
-              <input
-                type="checkbox"
-                checked={filteredApplications.length > 0 && selectedApplications.size === filteredApplications.length}
-                onChange={handleSelectAll}
-                className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
-              />
-            </div>
-          ),
+          header: '',
           accessor: 'select' as const,
           render: (_: any, row: TrainingApplication) => (
             <div className="flex items-center justify-center">
@@ -1573,7 +1535,6 @@ export default function PESOApplicationsPage() {
               paginated
               pageSize={10}
               searchPlaceholder="Search by name, email, training, or status..."
-              loading={loading}
             />
           </Card>
         </div>
@@ -2048,13 +2009,11 @@ export default function PESOApplicationsPage() {
             setCertifyModalOpen(false);
             setSelectedApplication(null);
             setIncludeSignature(false);
-            setSelectedPreset('auto');
           }}
           title="Generate Training Certificate"
           subtitle="Preview and customize before issuing"
           colorVariant="green"
           icon={Award}
-          size="full"
         >
           {selectedApplication && (
             <div className="h-[calc(100vh-250px)]">
@@ -2064,7 +2023,6 @@ export default function PESOApplicationsPage() {
                   <div className="h-full pr-3">
                     <CertificatePreview
                       applicationId={selectedApplication.id}
-                      layoutParams={layoutParams}
                       includeSignature={includeSignature}
                     />
                   </div>
@@ -2141,14 +2099,6 @@ export default function PESOApplicationsPage() {
                       </div>
                     </label>
                   </div>
-
-                  {/* Preset Selector */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
-                    <CertificatePresetSelector
-                      selectedPreset={selectedPreset}
-                      onSelectPreset={handlePresetChange}
-                    />
-                  </div>
                 </div>
 
                 {/* Action Buttons (Fixed at bottom) */}
@@ -2159,7 +2109,6 @@ export default function PESOApplicationsPage() {
                       setCertifyModalOpen(false);
                       setSelectedApplication(null);
                       setIncludeSignature(false);
-                      setSelectedPreset('auto');
                     }}
                     disabled={generateLoading}
                   >

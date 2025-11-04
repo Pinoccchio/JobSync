@@ -104,7 +104,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
     // Optimistic update - update UI immediately
     const now = new Date().toISOString();
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: n.is_read ? n.read_at : now })));
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: n.is_read ? (n as any).read_at : now })));
     setUnreadCount(0);
     showToast('All notifications marked as read', 'success');
 

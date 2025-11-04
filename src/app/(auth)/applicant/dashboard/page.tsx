@@ -276,7 +276,7 @@ export default function ApplicantDashboard() {
         const hasHistory = row.statusHistory && row.statusHistory.length > 0;
         return (
           <Button
-            variant={hasHistory ? "info" : "default"}
+            variant={hasHistory ? "primary" : "secondary"}
             size="sm"
             icon={History}
             onClick={() => {
@@ -285,7 +285,7 @@ export default function ApplicantDashboard() {
             }}
             className="text-xs whitespace-nowrap"
           >
-            {hasHistory ? `View History (${row.statusHistory.length})` : 'View Status'}
+            {hasHistory ? `View History (${row.statusHistory?.length || 0})` : 'View Status'}
           </Button>
         );
       }

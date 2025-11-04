@@ -232,7 +232,7 @@ export default function ScannedRecordsPage() {
         const hasHistory = row.statusHistory && row.statusHistory.length > 0;
         return (
           <Button
-            variant={hasHistory ? "info" : "default"}
+            variant={hasHistory ? "primary" : "secondary"}
             size="sm"
             icon={History}
             onClick={() => {
@@ -241,7 +241,7 @@ export default function ScannedRecordsPage() {
             }}
             className="text-xs whitespace-nowrap"
           >
-            {hasHistory ? `View History (${row.statusHistory.length})` : 'View Status'}
+            {hasHistory ? `View History (${row.statusHistory?.length || 0})` : 'View Status'}
           </Button>
         );
       }
@@ -486,7 +486,7 @@ export default function ScannedRecordsPage() {
           setShowApplicationDrawer(false);
           setSelectedApplicationForDrawer(null);
         }}
-        application={selectedApplicationForDrawer}
+        application={selectedApplicationForDrawer as any}
       />
 
       {/* Status History Modal */}

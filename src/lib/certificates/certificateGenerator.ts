@@ -127,14 +127,15 @@ async function loadSignatureBase64(signatureUrl: string): Promise<string | null>
 
 /**
  * Default layout parameters for certificate generation
+ * Using compact mode for optimal formatting
  */
 const DEFAULT_LAYOUT: Required<CertificateLayoutParams> = {
-  topMargin: 10,
-  sectionSpacing: 8,
-  titleFontSize: 28,
-  nameFontSize: 20,
-  bodyFontSize: 12,
-  programFontSize: 16,
+  topMargin: 8,
+  sectionSpacing: 6,
+  titleFontSize: 26,
+  nameFontSize: 18,
+  bodyFontSize: 11,
+  programFontSize: 14,
   signatureWidth: 35,
   signatureHeight: 10,
   signatureGap: 5,
@@ -364,7 +365,9 @@ export async function generateCertificatePDF(
       // Add signature image above the signature line
       const sigWidth = layout.signatureWidth;
       const sigHeight = layout.signatureHeight;
-      const sigX = centerX - sigWidth / 2;  // Center horizontally
+      // Align signature with the center of the signature line (not page center)
+      const signatureLineCenter = 87.5; // Center of the signature line (from 50mm to 125mm)
+      const sigX = signatureLineCenter - sigWidth / 2;  // Center on signature line
       const sigY = SIGNATURE_Y;  // Position above line with gap
       doc.addImage(signatureBase64, 'PNG', sigX, sigY, sigWidth, sigHeight);
     } catch (error) {

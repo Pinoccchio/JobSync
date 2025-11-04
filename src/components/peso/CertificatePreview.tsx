@@ -2,11 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { Loader2, FileX, RefreshCw } from 'lucide-react';
-import { CertificateLayoutParams } from '@/types/certificate.types';
 
 interface CertificatePreviewProps {
   applicationId: string;
-  layoutParams: CertificateLayoutParams;
   includeSignature: boolean;
   notes?: string;
   onError?: (error: string) => void;
@@ -16,11 +14,10 @@ interface CertificatePreviewProps {
  * CertificatePreview Component
  *
  * Displays a real-time preview of the certificate PDF using an embedded viewer.
- * Automatically regenerates when layout parameters change (with 500ms debounce).
+ * Automatically regenerates when parameters change (with 500ms debounce).
  */
 export default function CertificatePreview({
   applicationId,
-  layoutParams,
   includeSignature,
   notes,
   onError,
@@ -50,7 +47,6 @@ export default function CertificatePreview({
           application_id: applicationId,
           include_signature: includeSignature,
           notes,
-          layoutParams,
         }),
       });
 
@@ -86,7 +82,7 @@ export default function CertificatePreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced regeneration when layout params change
+  // Debounced regeneration when params change
   useEffect(() => {
     // Clear existing timer
     if (debounceTimer) {
@@ -105,7 +101,7 @@ export default function CertificatePreview({
       if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutParams, includeSignature, notes]);
+  }, [includeSignature, notes]);
 
   return (
     <div className="relative w-full h-full bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
