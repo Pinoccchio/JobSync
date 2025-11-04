@@ -6,6 +6,7 @@ import { Button, Input } from '@/components/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
 import { updatePassword } from '@/lib/supabase/auth';
+import { createClient } from '@/lib/supabase/client';
 import { Lock, CheckCircle, ArrowLeft } from 'lucide-react';
 
 function ResetPasswordForm() {
@@ -23,38 +24,52 @@ function ResetPasswordForm() {
     confirmPassword: '',
   });
 
-  // Check if we have the required parameters or Supabase errors
+  // Check if we have the required parameters, session, or Supabase errors
   useEffect(() => {
-    // Check for Supabase error parameters (from failed email link validation)
-    const error = searchParams.get('error');
-    const errorCode = searchParams.get('error_code');
-    const errorDescription = searchParams.get('error_description');
+    const validateAccess = async () => {
+      // 1. Check for Supabase error parameters first (from failed email link validation)
+      const error = searchParams.get('error');
+      const errorCode = searchParams.get('error_code');
+      const errorDescription = searchParams.get('error_description');
 
-    if (error || errorCode) {
-      // Handle Supabase authentication errors
-      let errorMessage = 'Invalid or expired password reset link';
+      if (error || errorCode) {
+        // Handle Supabase authentication errors
+        let errorMessage = 'Invalid or expired password reset link';
 
-      if (errorCode === 'otp_expired') {
-        errorMessage = 'This password reset link has expired. Please request a new one.';
-      } else if (errorCode === 'access_denied') {
-        errorMessage = 'Access denied. This password reset link is invalid.';
-      } else if (errorDescription) {
-        errorMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+        if (errorCode === 'otp_expired') {
+          errorMessage = 'This password reset link has expired. Please request a new one.';
+        } else if (errorCode === 'access_denied') {
+          errorMessage = 'Access denied. This password reset link is invalid.';
+        } else if (errorDescription) {
+          errorMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+        }
+
+        showToast(errorMessage, 'error');
+        setTimeout(() => router.push('/forgot-password'), 3000);
+        return;
       }
 
-      showToast(errorMessage, 'error');
-      setTimeout(() => router.push('/forgot-password'), 3000);
-      return;
-    }
+      // 2. Check for active session (after successful OTP verification in callback)
+      const supabase = createClient();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    // Check for valid token_hash and type parameters
-    const tokenHash = searchParams.get('token_hash');
-    const type = searchParams.get('type');
+      if (session) {
+        // User has active session - allow password reset without URL parameters
+        console.log('✅ Active session found, user can reset password');
+        return;
+      }
 
-    if (!tokenHash || type !== 'recovery') {
-      showToast('Missing authentication parameters. Please use the link from your email.', 'error');
-      setTimeout(() => router.push('/forgot-password'), 3000);
-    }
+      // 3. No session - check for valid token_hash and type parameters in URL
+      const tokenHash = searchParams.get('token_hash');
+      const type = searchParams.get('type');
+
+      if (!tokenHash || type !== 'recovery') {
+        showToast('Missing authentication parameters. Please use the link from your email.', 'error');
+        setTimeout(() => router.push('/forgot-password'), 3000);
+      }
+    };
+
+    validateAccess();
   }, [searchParams, router, showToast]);
 
   // Validation functions
