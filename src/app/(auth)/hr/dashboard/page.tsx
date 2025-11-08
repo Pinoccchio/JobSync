@@ -4,10 +4,9 @@ import { AdminLayout } from '@/components/layout';
 import { DashboardTile, Card, Button, Container, RefreshButton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Download, FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Loader2, Activity, Star, Archive } from 'lucide-react';
+import { FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Activity, Star, Archive, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/auth';
 import { MonthlyApplicantsChart, JobMatchedChart } from '@/components/charts';
-import { generateDashboardReport } from '@/lib/utils/reportGenerator';
 
 interface DashboardStats {
   totalScanned: number;
@@ -32,7 +31,6 @@ export default function HRDashboard() {
     activeJobs: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [generatingReport, setGeneratingReport] = useState(false);
 
   // Track component mount state to prevent state updates after unmount
   const isMounted = useRef(true);
@@ -126,19 +124,6 @@ export default function HRDashboard() {
     }
   }, [authLoading, isAuthenticated, fetchDashboardStats]); // All dependencies to prevent race condition
 
-  const handleGenerateReport = async () => {
-    setGeneratingReport(true);
-    try {
-      await generateDashboardReport(stats);
-      showToast('Report generated successfully! Check your downloads folder.', 'success');
-    } catch (error) {
-      console.error('Error generating report:', error);
-      showToast('Failed to generate report. Please try again.', 'error');
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
   const tiles = [
     {
       title: 'Total Applications',
@@ -200,22 +185,6 @@ export default function HRDashboard() {
               label="Refresh"
               showLastRefresh={true}
             />
-            <Button
-              variant="success"
-              icon={generatingReport ? Loader2 : Download}
-              onClick={handleGenerateReport}
-              disabled={loading || generatingReport}
-              className={generatingReport ? 'opacity-75' : ''}
-            >
-              {generatingReport ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Generating...
-                </>
-              ) : (
-                'Generate Report'
-              )}
-            </Button>
           </div>
 
           {/* Dashboard Tiles */}

@@ -10,6 +10,7 @@ export { FileUploadWithProgress } from './FileUploadWithProgress';
 export { Modal } from './Modal';
 export { ModernModal } from './ModernModal';
 export { ConfirmModal } from './ConfirmModal';
+export { ImagePreviewModal } from './ImagePreviewModal';
 export { Toast } from './Toast';
 export { ApplicationModal } from './ApplicationModal';
 export { Badge } from './Badge';

@@ -9,6 +9,7 @@ interface User {
   id: string;
   email: string;
   fullName: string;
+  profileImageUrl?: string | null;
 }
 
 /**
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: result.data.profile.id,
           email: result.data.profile.email,
           fullName: result.data.profile.fullName,
+          profileImageUrl: result.data.profile.profileImageUrl,
         };
 
         setUser(mappedUser);
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: result.data.profile.id,
         email: result.data.profile.email,
         fullName: result.data.profile.fullName,
+        profileImageUrl: result.data.profile.profileImageUrl,
       };
 
       setUser(mappedUser);

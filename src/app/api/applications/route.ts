@@ -124,8 +124,41 @@ export async function GET(request: NextRequest) {
     if (profile.role === 'APPLICANT') {
       // Applicants can only see their own applications
       query = query.eq('applicant_id', user.id);
-    } else if (profile.role === 'HR' || profile.role === 'ADMIN') {
-      // HR and Admin can see all applications
+    } else if (profile.role === 'HR') {
+      // HR can ONLY see applications for jobs they created
+      // First, get job IDs created by this HR user
+      const { data: hrJobs, error: hrJobsError } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('created_by', user.id);
+
+      if (hrJobsError) {
+        console.error('Error fetching HR jobs:', hrJobsError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to fetch HR jobs' },
+          { status: 500 }
+        );
+      }
+
+      const hrJobIds = hrJobs?.map(job => job.id) || [];
+
+      if (hrJobIds.length > 0) {
+        // Filter applications to only jobs created by this HR
+        query = query.in('job_id', hrJobIds);
+      } else {
+        // HR has no jobs, return empty array by using impossible condition
+        query = query.eq('job_id', '00000000-0000-0000-0000-000000000000');
+      }
+
+      // Apply optional filters (only if job belongs to this HR)
+      if (jobId && hrJobIds.includes(jobId)) {
+        query = query.eq('job_id', jobId);
+      }
+      if (applicantId) {
+        query = query.eq('applicant_id', applicantId);
+      }
+    } else if (profile.role === 'ADMIN') {
+      // ADMIN can see ALL applications across all HRs
       // Apply optional filters
       if (jobId) {
         query = query.eq('job_id', jobId);

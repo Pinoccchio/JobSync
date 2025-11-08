@@ -13,7 +13,8 @@ import {
   BarChart3,
   Users,
   Activity,
-  Database
+  Database,
+  Pen
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -43,7 +44,7 @@ const PESO_MENU_ITEMS = [
   { label: 'Dashboard', href: '/peso/dashboard', icon: Home },
   { label: 'Training Applications', href: '/peso/applications', icon: ClipboardList },
   { label: 'Training Programs', href: '/peso/programs', icon: GraduationCap },
-  { label: 'Settings', href: '/peso/settings', icon: Settings },
+  { label: 'Digital Signature', href: '/peso/digital-signature', icon: Pen },
 ];
 
 const APPLICANT_MENU_ITEMS = [

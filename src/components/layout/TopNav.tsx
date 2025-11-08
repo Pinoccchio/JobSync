@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, LogOut, CheckCircle, XCircle, Clock, ChevronDown, Trash2, FileText } from 'lucide-react';
+import { Bell, LogOut, CheckCircle, XCircle, Clock, ChevronDown, Trash2, FileText, Settings } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -36,7 +36,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 }) => {
   const router = useRouter();
   const { showToast } = useToast();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -373,9 +373,17 @@ export const TopNav: React.FC<TopNavProps> = ({
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-3 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors"
           >
-            <div className="w-9 h-9 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm">
-              {userName.charAt(0).toUpperCase()}
-            </div>
+            {user?.profileImageUrl ? (
+              <img
+                src={user.profileImageUrl}
+                alt={userName}
+                className="w-10 h-10 rounded-full object-cover shadow-sm border-2 border-white"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="text-left hidden md:block">
               <p className="text-sm font-medium text-gray-900">{userName}</p>
               <p className="text-xs text-gray-600">{userRole}</p>
@@ -406,6 +414,24 @@ export const TopNav: React.FC<TopNavProps> = ({
                       </button>
                     </Link>
                   )}
+
+                  {(userRole === 'Applicant' || userRole === 'HR Admin' || userRole === 'PESO Admin' || userRole === 'System Admin') && (
+                    <Link href={
+                      userRole === 'Applicant' ? '/applicant/settings' :
+                      userRole === 'HR Admin' ? '/hr/settings' :
+                      userRole === 'PESO Admin' ? '/peso/settings' :
+                      '/admin/settings'
+                    }>
+                      <button
+                        onClick={() => setShowUserMenu(false)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700 flex items-center gap-3 transition-colors"
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span className="text-sm">Account Settings</span>
+                      </button>
+                    </Link>
+                  )}
+
                   <button
                     onClick={async () => {
                       try {

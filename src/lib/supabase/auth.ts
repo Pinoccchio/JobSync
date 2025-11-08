@@ -22,6 +22,7 @@ export interface LoginResult {
     id: string;
     email: string;
     fullName: string;
+    profileImageUrl?: string | null;
     role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT';
     status: 'active' | 'inactive';
     last_login: string | null;
@@ -41,6 +42,7 @@ export interface SessionResult {
     id: string;
     email: string;
     fullName: string;
+    profileImageUrl?: string | null;
     role: 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT';
     status: 'active' | 'inactive';
     last_login: string | null;
@@ -159,6 +161,7 @@ export async function loginUser(credentials: LoginCredentials): Promise<AuthResu
           id: finalProfile.id,
           email: finalProfile.email || authData.user.email || '',
           fullName: finalProfile.full_name,
+          profileImageUrl: finalProfile.profile_image_url,
           role: finalProfile.role as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT',
           status: finalProfile.status as 'active' | 'inactive',
           last_login: finalProfile.last_login_at,
@@ -299,6 +302,7 @@ export async function getCurrentSession(): Promise<AuthResult<SessionResult>> {
           id: profile.id,
           email: profile.email || session.user.email || '',
           fullName: profile.full_name,
+          profileImageUrl: profile.profile_image_url,
           role: profile.role as 'ADMIN' | 'HR' | 'PESO' | 'APPLICANT',
           status: profile.status as 'active' | 'inactive',
           last_login: profile.last_login_at,

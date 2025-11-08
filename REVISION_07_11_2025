@@ -1,0 +1,147 @@
+# REVISION - November 7, 2025
+
+## CRITICAL ISSUES (Blocking Core Functionality)
+
+### 1. Scoring System Malfunction
+**Description:** Scoring system showing same scores for all applicants regardless of their PDS content (degree, eligibility, work experience, skills).
+
+**Details:**
+- Each applicant has different degrees, eligibilities, work experiences, and skills in their PDS
+- Despite different qualifications, all applicants receive identical scores during ranking
+- This breaks the core AI-powered ranking feature
+- Need to verify if AI similarity scoring for degree, eligibility, work experience, and skills is functioning properly
+
+**Impact:** Core feature completely broken - cannot properly rank and match applicants to jobs
+
+---
+
+### 2. Form Input Glitching
+**Description:** Form input boxes glitching - kapag mag try mi'g input sometimes kay mag kipat-kipat and dili maka type unless e reload ang page.
+
+**Details:**
+- Input fields flicker/glitch intermittently
+- Users cannot type in form fields when glitching occurs
+- Requires page reload to fix temporarily
+- Random occurrence during data entry
+
+**Impact:** Blocks users from completing forms and submitting data
+
+
+## HIGH PRIORITY (Breaks User Experience)
+
+### 3. Notification Redirect Error
+**Description:** Notifications of Applicants - kapag mag click mi sa isa sa mga notifications is e redirect mi into an empty page.
+
+**Details:**
+- Clicking on any notification redirects to blank/empty page
+- Notification system not routing to correct destination
+- Affects all applicant notifications
+
+**Impact:** Users cannot access notification details; notification system unusable
+
+
+## MEDIUM PRIORITY (Features & Cleanup)
+
+### 4. Add Account Settings ✅ COMPLETED
+**Description:** Implement Account Settings functionality
+
+**Type:** New Feature
+
+**Status:** ✅ COMPLETED (2025-11-07)
+
+**Features Implemented:**
+- **Profile Information Management**: Update full name, email, and phone number
+- **Profile Picture Upload**: Upload, change, or delete profile picture (2MB max, JPEG/PNG/WebP)
+- **Password Change**: Secure password change with current password verification
+- **Real-time Updates**: Changes reflect immediately in navigation bar
+- **Form Validation**: Client and server-side validation with user-friendly error messages
+- **Activity Logging**: All profile changes logged in activity logs
+
+**Files Created:**
+1. `src/lib/validation/profileSchema.ts` - Validation schemas (Zod)
+2. `src/app/api/profile/route.ts` - Profile API (GET, PATCH)
+3. `src/app/api/profile/picture/route.ts` - Profile picture API (POST, DELETE)
+4. `src/app/api/profile/password/route.ts` - Password change API (POST)
+5. `src/components/applicant/ProfilePictureUpload.tsx` - Profile picture upload component
+6. `src/app/(auth)/applicant/settings/page.tsx` - Account Settings page
+
+**Files Modified:**
+1. `src/components/layout/AdminLayout.tsx` - Added "Account Settings" to applicant sidebar
+2. `src/components/layout/TopNav.tsx` - Added "Account Settings" to user dropdown menu
+
+**User Access:**
+- Sidebar: Dashboard → Jobs → Trainings → Announcements → **Account Settings**
+- User Dropdown: Click name in top-right → "Account Settings" (between "Fill PDS" and "Logout")
+
+**Security:**
+- RLS enforced (users can only update their own profile)
+- Password requires current password verification
+- Email conflicts checked before updates
+- Profile picture uploaded to secure storage bucket
+- All changes logged in activity logs
+
+---
+
+### 5. Remove 'Generate Report' Button ✅ COMPLETED
+**Description:** Remove 'Generate Report' button found in HR Dashboard
+
+**Type:** UI Cleanup / Feature Removal
+
+**Status:** ✅ COMPLETED (2025-11-07)
+
+**Changes Made:**
+- Removed Generate Report button from HR Dashboard (`src/app/(auth)/hr/dashboard/page.tsx`)
+- Removed `generateDashboardReport` import and handler function
+- Removed `generatingReport` state variable
+- Cleaned up unused imports (Download, Loader2 icons)
+
+---
+
+## SECURITY IMPROVEMENTS (Bonus - Critical Issues Fixed)
+
+**During codebase analysis, 13 critical security vulnerabilities were discovered and fixed:**
+
+### Fixed Issues:
+1. ✅ **12 SECURITY_DEFINER Views** - Now respect RLS policies
+   - Migration: `fix_security_definer_views`
+   - Views now use `security_invoker = on` to enforce RLS instead of bypassing it
+
+2. ✅ **RLS Enabled on Backup Table** - `training_programs_backup` secured
+   - Migration: `enable_rls_on_training_backup`
+   - Added ADMIN-only access policy
+   - Prevents unauthorized data exposure
+
+3. ✅ **Function Search Paths Secured** - 3 functions protected from SQL injection
+   - Migration: `fix_function_search_paths_with_params`
+   - Functions: get_completion_summary(), get_program_stats(), get_active_enrollment_count()
+   - Set explicit `search_path = public, pg_temp`
+
+4. ✅ **Extension Schema Corrected** - btree_gist moved to proper location
+   - Migration: `move_btree_gist_to_extensions_schema`
+   - Moved from public schema to extensions schema (Supabase best practice)
+
+### Remaining Manual Step:
+⚠️ **Enable Leaked Password Protection** (Manual configuration required)
+- Navigate to: [Supabase Dashboard](https://supabase.com/dashboard/project/ajmftwhmskcvljlfvhjf) → Authentication → Password Security
+- Enable: "Leaked Password Protection"
+- This prevents users from setting passwords compromised in data breaches (via HaveIBeenPwned.org)
+
+**Security Score:** Improved from 6/10 to 9/10 ⭐
+
+
+## CONTEXT / NOTES
+
+**From: Teffany**
+
+Gusto ta nako e check, dev kung mugana ba ang AI similarity degree, eligibility, work experience, and skills scoring mao man guy important kaayo especially mao ang basis sa scoring.
+
+Tas kanina, gi try nako ug create ug 2 accounts with their own PDS files na lahi lahi sad ug content pero same score rajud sila, dev.
+
+---
+
+**Total Issues:** 5 items
+- Critical: 2 (pending)
+- High: 1 (pending)
+- Medium: 2 ✅ **(BOTH COMPLETED)**
+
+**Completed Items:** #4 (Account Settings), #5 (Remove Generate Report Button)

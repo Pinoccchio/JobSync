@@ -19,7 +19,7 @@ interface ProfileData {
   status: string;
 }
 
-export default function PESOSettingsPage() {
+export default function AccountSettingsPage() {
   const { user, refreshAuth } = useAuth();
   const { showToast } = useToast();
 
@@ -273,7 +273,7 @@ export default function PESOSettingsPage() {
   if (profileLoading) {
     return (
       <AdminLayout
-        role="PESO"
+        role="Applicant"
         userName={user?.fullName || 'User'}
         pageTitle="Account Settings"
         pageDescription="Loading..."
@@ -289,7 +289,7 @@ export default function PESOSettingsPage() {
 
   return (
     <AdminLayout
-      role="PESO"
+      role="Applicant"
       userName={user?.fullName || 'User'}
       pageTitle="Account Settings"
       pageDescription="Manage your profile information and security settings"
