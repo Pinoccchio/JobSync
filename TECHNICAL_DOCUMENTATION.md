@@ -3464,9 +3464,341 @@ npm audit fix
 
 ---
 
-## 15. Appendices
+## 15. System Limitations
 
-### 15.1 Glossary
+### 15.1 Current System Limitations
+
+#### 15.1.1 AI Ranking Limitations
+
+1. **Gemini AI Dependency**
+   - System requires active Gemini API key and internet connection
+   - Ranking may fail if Gemini API is down or rate-limited
+   - Fallback deterministic tie-breaking is less sophisticated
+   - **Mitigation**: Implemented fallback algorithms ensure ranking always completes
+
+2. **Algorithm Assumptions**
+   - Assumes PDS data is accurate and complete
+   - Cannot detect falsified qualifications without manual verification
+   - Ranking quality depends on applicant honesty
+   - **Mitigation**: HR manual review required before final hiring decision
+
+3. **Context Understanding**
+   - AI may not fully understand Philippine government-specific requirements
+   - Some eligibilities may not be properly weighted
+   - Job title variations may not be perfectly matched
+   - **Mitigation**: Fuzzy matching and token-based algorithms improve flexibility
+
+#### 15.1.2 Data Quality Constraints
+
+1. **Incomplete PDS Records**
+   - Applicants with incomplete PDS cannot be ranked accurately
+   - Missing work experience or education data lowers scores unfairly
+   - **Mitigation**: System requires complete PDS before application submission
+
+2. **Standardization Issues**
+   - Skill names vary (e.g., "MS Excel" vs "Microsoft Excel" vs "Excel")
+   - Degree names not standardized (e.g., "BS CompSci" vs "Bachelor of Science in Computer Science")
+   - **Mitigation**: Levenshtein distance and token matching handle variations
+
+#### 15.1.3 Technical Limitations
+
+1. **Scalability**
+   - Ranking 100+ applicants may take 30-60 seconds
+   - Gemini AI has rate limits (60 requests per minute)
+   - Real-time ranking not feasible for very large applicant pools
+   - **Mitigation**: Batch processing, async operations, progress indicators
+
+2. **Browser Compatibility**
+   - Optimized for modern browsers (Chrome, Firefox, Edge, Safari)
+   - IE11 not supported
+   - Some features require JavaScript enabled
+   - **Mitigation**: Clear browser requirements communicated to users
+
+3. **Mobile Experience**
+   - PDS form complex on small screens
+   - Some admin features better suited for desktop
+   - **Mitigation**: Responsive design, but desktop recommended for admins
+
+#### 15.1.4 Security Considerations
+
+1. **API Key Exposure Risk**
+   - Gemini API key stored in environment variables
+   - Service role key required for ranking operations
+   - **Mitigation**: Keys never exposed to client, used only in server-side code
+
+2. **File Upload Risks**
+   - Users can upload malicious files disguised as images/PDFs
+   - **Mitigation**: File type validation, size limits, antivirus scanning recommended
+
+#### 15.1.5 Compliance Limitations
+
+1. **Data Privacy**
+   - System stores sensitive personal information (government IDs, addresses)
+   - GDPR/Data Privacy Act compliance requires additional measures
+   - **Mitigation**: Audit trail tracks all data access, RLS policies restrict viewing
+
+2. **Audit Trail Size**
+   - Audit trail grows indefinitely (currently 12,333+ records)
+   - May impact database performance over time
+   - **Mitigation**: Monthly archival of old records recommended
+
+### 15.2 Known Issues
+
+1. **Tie-Breaking Edge Cases**
+   - If 50+ candidates have identical scores, AI tie-breaking may timeout
+   - Fallback mechanism ensures ranking completes but may be less accurate
+
+2. **Real-time Notification Delays**
+   - Notifications may arrive 1-5 seconds after event in poor network conditions
+   - WebSocket connection may drop on unstable internet
+
+3. **PDF Generation Performance**
+   - Generating PDFs with 100+ rows may take 10-15 seconds
+   - Browser may appear frozen during generation
+   - **Mitigation**: Loading indicators, async generation
+
+---
+
+## 16. Future Work & Recommendations
+
+### 16.1 Planned Enhancements
+
+#### 16.1.1 Advanced AI Features
+
+1. **Resume Parsing with AI**
+   - Implement OCR + Gemini AI to extract data from uploaded PDF resumes
+   - Automatically populate PDS fields from resume
+   - Reduce manual data entry burden on applicants
+   - **Timeline**: Q1 2026
+   - **Effort**: 3-4 weeks development
+
+2. **Interview Question Generation**
+   - Use Gemini AI to generate tailored interview questions based on applicant background
+   - Provide HR with suggested questions for each candidate
+   - **Timeline**: Q2 2026
+   - **Effort**: 2-3 weeks development
+
+3. **Predictive Analytics**
+   - Analyze historical hiring data to predict applicant success
+   - Identify patterns in successful hires
+   - Refine ranking algorithms based on outcomes
+   - **Timeline**: Q3 2026
+   - **Effort**: 4-6 weeks development + data collection
+
+#### 16.1.2 User Experience Improvements
+
+1. **Mobile App Development**
+   - Native iOS/Android apps for applicants
+   - Improved mobile PDS form experience
+   - Push notifications
+   - **Timeline**: Q4 2026
+   - **Effort**: 12-16 weeks development
+
+2. **Bulk Operations**
+   - Bulk approve/reject applications
+   - Bulk email notifications
+   - Batch PDF generation
+   - **Timeline**: Q1 2026
+   - **Effort**: 2-3 weeks development
+
+3. **Advanced Search & Filters**
+   - Search applicants by skills, education, location
+   - Save filter presets
+   - Export filtered results
+   - **Timeline**: Q2 2026
+   - **Effort**: 2 weeks development
+
+#### 16.1.3 Integration Opportunities
+
+1. **Email Service Integration**
+   - Integrate with SendGrid or AWS SES
+   - Automated email notifications for application status
+   - Email verification during registration
+   - **Timeline**: Q1 2026
+   - **Effort**: 1-2 weeks development
+
+2. **SMS Notifications**
+   - Integrate with Twilio or Semaphore
+   - SMS notifications for critical updates
+   - Two-factor authentication via SMS
+   - **Timeline**: Q2 2026
+   - **Effort**: 1 week development
+
+3. **Government System Integration**
+   - Connect to PhilSys for ID verification
+   - Integrate with CSC database for eligibility verification
+   - **Timeline**: Long-term (pending partnerships)
+   - **Effort**: Significant (6+ months)
+
+#### 16.1.4 Performance Optimizations
+
+1. **Caching Layer**
+   - Implement Redis caching for frequently accessed data
+   - Cache job listings, announcements
+   - Reduce database queries by 40-60%
+   - **Timeline**: Q1 2026
+   - **Effort**: 2-3 weeks development
+
+2. **Database Optimization**
+   - Partition large tables (audit_trail, notifications)
+   - Implement materialized views for reports
+   - Optimize slow queries
+   - **Timeline**: Q2 2026
+   - **Effort**: 3-4 weeks development
+
+3. **CDN Implementation**
+   - Serve static assets via CDN (Cloudflare, AWS CloudFront)
+   - Reduce latency for users
+   - **Timeline**: Q1 2026
+   - **Effort**: 1 week configuration
+
+#### 16.1.5 Security Enhancements
+
+1. **Two-Factor Authentication (2FA)**
+   - Implement 2FA for admin accounts
+   - Optional 2FA for all users
+   - **Timeline**: Q2 2026
+   - **Effort**: 2-3 weeks development
+
+2. **Advanced Audit Logging**
+   - Log all file downloads
+   - Track IP addresses and geolocation
+   - Automated anomaly detection
+   - **Timeline**: Q3 2026
+   - **Effort**: 3-4 weeks development
+
+3. **Data Encryption at Rest**
+   - Encrypt sensitive fields in database
+   - Implement key rotation
+   - **Timeline**: Q2 2026
+   - **Effort**: 2-3 weeks development
+
+### 16.2 Research Opportunities
+
+1. **Algorithm Refinement Study**
+   - Conduct study comparing AI rankings vs. actual hiring outcomes
+   - Measure correlation between match scores and job performance
+   - Adjust algorithm weights based on findings
+   - **Type**: Longitudinal study (12-24 months)
+
+2. **User Acceptance Testing**
+   - Survey HR staff on system usability
+   - Gather applicant feedback on PDS form experience
+   - Identify pain points and improvement areas
+   - **Type**: Qualitative research (interviews, surveys)
+
+3. **Fairness and Bias Analysis**
+   - Analyze rankings for potential bias (age, gender, geographic location)
+   - Ensure AI algorithms are fair and equitable
+   - Publish findings for transparency
+   - **Type**: Quantitative analysis with ethics review
+
+### 16.3 Maintenance Recommendations
+
+1. **Regular Dependency Updates**
+   - Update npm packages monthly
+   - Update Next.js framework quarterly
+   - Test updates in staging environment first
+
+2. **Database Maintenance Schedule**
+   - Run VACUUM ANALYZE monthly
+   - Archive audit trail records older than 6 months
+   - Review and optimize indexes quarterly
+
+3. **Security Audits**
+   - Conduct security audit annually
+   - Penetration testing by third party
+   - Review RLS policies semi-annually
+
+4. **Performance Monitoring**
+   - Set up automated performance monitoring (e.g., New Relic, Datadog)
+   - Alert on slow queries (>1 second)
+   - Monitor Gemini AI usage and costs
+
+5. **User Training**
+   - Conduct HR/PESO training sessions quarterly
+   - Create video tutorials for common tasks
+   - Maintain updated user manual
+
+---
+
+## 17. References & Bibliography
+
+### 17.1 Academic References
+
+1. **Fishburn, P. C.** (1967). "Additive Utilities with Incomplete Product Set: Application to Priorities and Assignments." *Operations Research*, 15(3), 537-542.
+   - Theoretical basis for Algorithm 1 (Weighted Sum Model)
+
+2. **Kahneman, D., & Tversky, A.** (1979). "Prospect Theory: An Analysis of Decision Under Risk." *Econometrica*, 47(2), 263-292.
+   - Theoretical basis for Algorithm 2 (Exponential weighting)
+
+3. **Gale, D., & Shapley, L. S.** (1962). "College Admissions and the Stability of Marriage." *The American Mathematical Monthly*, 69(1), 9-15.
+   - Theoretical basis for Algorithm 3 (Lexicographic ordering)
+
+4. **Levenshtein, V. I.** (1966). "Binary Codes Capable of Correcting Deletions, Insertions, and Reversals." *Soviet Physics Doklady*, 10(8), 707-710.
+   - Fuzzy string matching algorithm
+
+### 17.2 Technical Documentation
+
+1. **Next.js Documentation.** (2024). Vercel Inc. Retrieved from https://nextjs.org/docs
+   - Framework documentation and best practices
+
+2. **Supabase Documentation.** (2024). Supabase Inc. Retrieved from https://supabase.com/docs
+   - Database, authentication, and storage implementation
+
+3. **Google AI Documentation.** (2024). Google LLC. Retrieved from https://ai.google.dev/docs
+   - Gemini AI API integration and usage
+
+4. **PostgreSQL Documentation.** (2024). PostgreSQL Global Development Group. Retrieved from https://www.postgresql.org/docs/
+   - Database design and optimization
+
+5. **TypeScript Handbook.** (2024). Microsoft Corporation. Retrieved from https://www.typescriptlang.org/docs/
+   - Type system and language features
+
+### 17.3 Standards and Regulations
+
+1. **Republic Act No. 10173** - Data Privacy Act of 2012. Philippines.
+   - Data protection and privacy compliance
+
+2. **Civil Service Commission.** (2017). "Revised Personal Data Sheet (CS Form No. 212)." Philippines.
+   - Official PDS format and requirements
+
+3. **TESDA Regulations.** Technical Education and Skills Development Authority. Philippines.
+   - Training program certification standards
+
+### 17.4 Related Research
+
+1. **Chen, Y., et al.** (2020). "AI-Powered Recruitment: Opportunities and Challenges." *Journal of Human Resource Management*, 31(4), 456-478.
+   - Literature review on AI in recruitment
+
+2. **Raghavan, M., et al.** (2020). "Mitigating Bias in Algorithmic Hiring: Evaluating Claims and Practices." *Proceedings of FAT* 2020*, 469-481.
+   - Fairness in AI recruitment systems
+
+3. **Tambe, P., Cappelli, P., & Yakubovich, V.** (2019). "Artificial Intelligence in Human Resources Management: Challenges and a Path Forward." *California Management Review*, 61(4), 15-42.
+   - AI adoption in HR practices
+
+### 17.5 Software Libraries
+
+1. **React.** (2024). Meta Platforms, Inc. https://react.dev/
+   - Version 19.1.0 - UI library
+
+2. **Tailwind CSS.** (2024). Tailwind Labs Inc. https://tailwindcss.com/
+   - Version 4.0 - CSS framework
+
+3. **Zod.** (2024). Colin McDonnell. https://zod.dev/
+   - Version 4.1.12 - Schema validation
+
+4. **recharts.** (2024). Recharts Contributors. https://recharts.org/
+   - Version 3.3.0 - Data visualization
+
+5. **jsPDF.** (2024). jsPDF Contributors. https://github.com/parallax/jsPDF
+   - Version 3.0.3 - PDF generation
+
+---
+
+## 18. Appendices
+
+### 18.1 Glossary
 
 | Term | Definition |
 |------|------------|
@@ -3484,7 +3816,7 @@ npm audit fix
 | **Token-Based Matching** | Matching skills by shared words rather than exact phrases |
 | **Weighted Sum** | Linear combination of scores with different importance weights |
 
-### 15.2 Algorithm Reference
+### 18.2 Algorithm Reference
 
 #### Algorithm 1: Weighted Sum Model
 
@@ -3523,7 +3855,7 @@ ELSE
 END IF
 ```
 
-### 15.3 API Reference Summary
+### 18.3 API Reference Summary
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
@@ -3545,7 +3877,7 @@ END IF
 | `/api/notifications` | GET | Yes | List notifications |
 | `/api/notifications/[id]/read` | PUT | Yes | Mark as read |
 
-### 15.4 Database Schema Cheat Sheet
+### 18.4 Database Schema Cheat Sheet
 
 **Core Tables**:
 - `profiles` (76) - User accounts
@@ -3574,7 +3906,7 @@ training_programs
   └── training_applications (program_id)
 ```
 
-### 15.5 Environment Variables Reference
+### 18.5 Environment Variables Reference
 
 ```env
 # Supabase Database
@@ -3590,7 +3922,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NODE_ENV=development # or production
 ```
 
-### 15.6 Support & Resources
+### 18.6 Support & Resources
 
 **Documentation**:
 - Next.js: https://nextjs.org/docs
@@ -3598,15 +3930,6 @@ NODE_ENV=development # or production
 - Gemini AI: https://ai.google.dev/docs
 - TypeScript: https://www.typescriptlang.org/docs
 - Tailwind CSS: https://tailwindcss.com/docs
-
-**Community**:
-- GitHub Issues: https://github.com/yourusername/jobsync/issues
-- Email Support: support@asuncion.gov.ph
-
-**Contact**:
-- Technical Lead: tech@asuncion.gov.ph
-- HR Department: hr@asuncion.gov.ph
-- PESO Office: peso@asuncion.gov.ph
 
 ---
 
