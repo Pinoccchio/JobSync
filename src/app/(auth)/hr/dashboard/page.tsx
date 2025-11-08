@@ -5,7 +5,6 @@ import { DashboardTile, Card, Button, Container, RefreshButton } from '@/compone
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { FileText, Clock, XCircle, CheckCircle2, Briefcase, AlertCircle, Activity, Star, Archive, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/auth';
 import { MonthlyApplicantsChart, JobMatchedChart } from '@/components/charts';
 
 interface DashboardStats {
@@ -50,64 +49,23 @@ export default function HRDashboard() {
       setLoading(true);
     }
     try {
-      // Fetch total applications (PDS scanned)
-      const { count: totalScanned } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true });
+      // Fetch stats from API endpoint (properly filtered for HR multi-tenancy)
+      const response = await fetch('/api/hr/dashboard/stats');
+      const result = await response.json();
 
-      // Fetch pending applications (only pending status)
-      const { count: pendingReview } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      // Fetch in progress applications (under_review, shortlisted, interviewed)
-      const { count: inProgress } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['under_review', 'shortlisted', 'interviewed']);
-
-      // Fetch approved/hired applications
-      const { count: approvedHired } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['approved', 'hired']);
-
-      // Fetch denied/withdrawn applications
-      const { count: deniedWithdrawn } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['denied', 'withdrawn']);
-
-      // Fetch archived applications
-      const { count: archived } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'archived');
-
-      // Fetch active job postings
-      const { count: activeJobs } = await supabase
-        .from('jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to fetch dashboard stats');
+      }
 
       // Only update state if component is still mounted
       if (isMounted.current) {
-        setStats({
-          totalScanned: totalScanned || 0,
-          pendingReview: pendingReview || 0,
-          inProgress: inProgress || 0,
-          approvedHired: approvedHired || 0,
-          deniedWithdrawn: deniedWithdrawn || 0,
-          archived: archived || 0,
-          activeJobs: activeJobs || 0,
-        });
+        setStats(result.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching HR dashboard stats:', error);
       // Use showToast directly without including it in dependencies to avoid infinite loop
       if (isMounted.current) {
-        showToast('Failed to load dashboard statistics', 'error');
+        showToast(error.message || 'Failed to load dashboard statistics', 'error');
       }
     } finally {
       // Only update loading state if component is still mounted

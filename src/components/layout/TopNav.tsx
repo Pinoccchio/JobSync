@@ -147,18 +147,13 @@ export const TopNav: React.FC<TopNavProps> = ({
     }
   };
 
-  // Handle notification click
+  // Handle notification click - simply marks as read without redirecting
   const handleNotificationClick = (notification: Notification) => {
-    // Mark as read
     if (!notification.is_read) {
       markAsRead(notification.id);
+      showToast('Notification marked as read', 'success');
     }
-
-    // Navigate to link if available
-    if (notification.link_url) {
-      router.push(notification.link_url);
-      setShowNotifications(false);
-    }
+    // No redirect - users can continue viewing other notifications
   };
 
   // Load notifications on mount

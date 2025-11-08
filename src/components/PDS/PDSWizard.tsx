@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from './ProgressBar';
 import { useToast } from '@/contexts/ToastContext';
@@ -637,7 +637,7 @@ export const PDSWizard: React.FC = () => {
     }
   };
 
-  const handleSectionChange = (sectionId: PDSSection, data: any) => {
+  const handleSectionChange = useCallback((sectionId: PDSSection, data: any) => {
     setPdsData((prev) => {
       const updated = { ...prev };
 
@@ -683,7 +683,7 @@ export const PDSWizard: React.FC = () => {
       }
       return updated;
     });
-  };
+  }, [currentStep, validateSectionData, calculateCompletion]);
 
   const handleSubmit = async () => {
     try {

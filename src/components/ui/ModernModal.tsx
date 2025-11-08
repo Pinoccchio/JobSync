@@ -101,7 +101,7 @@ export const ModernModal: React.FC<ModernModalProps> = ({
               <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
                 {useLogoIcon ? (
                   <Image
-                    src="/logo.jpg"
+                    src="/JS-logo.png"
                     alt="JobSync"
                     width={40}
                     height={40}

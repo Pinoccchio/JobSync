@@ -14,6 +14,7 @@ import {
   type ApplicantData,
   type ScoreBreakdown
 } from './scoringAlgorithms';
+import { findTieGroups, breakTiesWithAI, type TieBreakResult } from './aiTieBreaker';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -41,6 +42,8 @@ export interface RankedApplicant {
   rankingReasoning: string;
   geminiInsights?: string;
   algorithmDetails?: AlgorithmDetails;
+  matchedSkillsCount: number; // Number of job skills matched by applicant
+  matchedEligibilitiesCount: number; // Number of job eligibilities matched by applicant
 }
 
 /**
@@ -64,11 +67,14 @@ export async function rankApplicantsForJob(
     eligibilities: Array<{ eligibilityTitle: string }>;
     skills: string[];
     totalYearsExperience: number;
+    workExperienceTitles?: string[];
   }>
 ): Promise<RankedApplicant[]> {
   // Score all applicants
   const scoredApplicants = applicants.map(applicant => {
     const jobReq = {
+      title: job.title,
+      description: job.description,
       degreeRequirement: job.degreeRequirement,
       eligibilities: job.eligibilities,
       skills: job.skills,
@@ -79,7 +85,8 @@ export async function rankApplicantsForJob(
       highestEducationalAttainment: applicant.highestEducationalAttainment,
       eligibilities: applicant.eligibilities,
       skills: applicant.skills,
-      totalYearsExperience: applicant.totalYearsExperience
+      totalYearsExperience: applicant.totalYearsExperience,
+      workExperienceTitles: applicant.workExperienceTitles
     };
 
     // Get individual algorithm scores
@@ -167,7 +174,51 @@ export async function rankApplicantsForJob(
     return 0;
   });
 
-  // Assign ranks
+  // AI-Powered Tie-Breaking: Differentiate candidates with identical scores
+  console.log('🔍 Checking for tied candidates...');
+
+  const tieGroups = findTieGroups(
+    sortedApplicants.map(app => ({
+      applicantId: app.applicantId,
+      applicantName: app.applicantName,
+      matchScore: app.totalScore,
+      educationScore: app.educationScore,
+      experienceScore: app.experienceScore,
+      skillsScore: app.skillsScore,
+      eligibilityScore: app.eligibilityScore,
+      highestEducationalAttainment: app.highestEducationalAttainment,
+      totalYearsExperience: app.totalYearsExperience,
+      skills: app.skills,
+      eligibilities: app.eligibilities,
+      workExperienceTitles: app.workExperienceTitles
+    }))
+  );
+
+  if (tieGroups.length > 0) {
+    console.log(`   Found ${tieGroups.length} tie groups with ${tieGroups.reduce((sum, g) => sum + g.applicants.length, 0)} total tied candidates`);
+
+    // Break ties using AI
+    const tieBreakResults = await breakTiesWithAI(tieGroups, job.title, job.description);
+
+    // Apply micro-adjustments
+    if (tieBreakResults.length > 0) {
+      tieBreakResults.forEach(result => {
+        const applicant = sortedApplicants.find(a => a.applicantId === result.applicantId);
+        if (applicant) {
+          applicant.totalScore += result.microAdjustment;
+          applicant.reasoning += ` [AI Tie-break: ${result.reasoning}]`;
+        }
+      });
+
+      // Re-sort after applying micro-adjustments
+      sortedApplicants.sort((a, b) => b.totalScore - a.totalScore);
+      console.log('   ✅ Ties broken successfully, candidates re-sorted');
+    }
+  } else {
+    console.log('   ✨ No tied candidates found - all scores are unique!');
+  }
+
+  // Assign final ranks
   const rankedApplicants: RankedApplicant[] = sortedApplicants.map((applicant, index) => ({
     applicantId: applicant.applicantId,
     applicantName: applicant.applicantName,
@@ -179,7 +230,9 @@ export async function rankApplicantsForJob(
     eligibilityScore: applicant.eligibilityScore,
     algorithmUsed: applicant.algorithmUsed,
     rankingReasoning: applicant.reasoning,
-    algorithmDetails: applicant.algorithmDetails
+    algorithmDetails: applicant.algorithmDetails,
+    matchedSkillsCount: applicant.matchedSkillsCount,
+    matchedEligibilitiesCount: applicant.matchedEligibilitiesCount
   }));
 
   // Get Gemini AI insights for top 5 candidates

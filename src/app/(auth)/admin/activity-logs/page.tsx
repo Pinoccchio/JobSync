@@ -2,8 +2,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import {
-  Card, EnhancedTable, Container, RefreshButton, EventBadge, EventIcon,
-  StatusIndicator, EventFilterGroup
+  Avatar, Card, EnhancedTable, Container, RefreshButton, EventBadge, EventIcon,
+  StatusIndicator, EventFilterGroup, ImagePreviewModal
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
@@ -26,6 +26,10 @@ interface ActivityLog {
   status: 'success' | 'failed';
   metadata: any;
   timestamp: string;
+  profiles?: {
+    full_name?: string;
+    profile_image_url?: string | null;
+  };
 }
 
 export default function ActivityLogsPage() {
@@ -40,13 +44,32 @@ export default function ActivityLogsPage() {
   const [activeStatus, setActiveStatus] = useState<'all' | 'success' | 'failed'>('all');
   const [activeSeverity, setActiveSeverity] = useState<Set<EventSeverity>>(new Set());
 
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>('');
+
   // Fetch activity logs function
   const fetchActivityLogs = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('activity_logs')
-        .select('id, event_type, event_category, user_email, user_role, details, status, metadata, timestamp')
+        .select(`
+          id,
+          event_type,
+          event_category,
+          user_email,
+          user_role,
+          details,
+          status,
+          metadata,
+          timestamp,
+          profiles:user_id (
+            full_name,
+            profile_image_url
+          )
+        `)
         .order('timestamp', { ascending: false })
         .limit(100);
 
@@ -64,6 +87,15 @@ export default function ActivityLogsPage() {
       setIsLoading(false);
     }
   }, [showToast]);
+
+  // Handle avatar click to show image preview
+  const handleAvatarClick = (imageUrl: string | null, userName: string) => {
+    if (imageUrl) {
+      setPreviewImageUrl(imageUrl);
+      setPreviewUserName(userName);
+      setShowImagePreview(true);
+    }
+  };
 
   // Apply filters
   useEffect(() => {
@@ -174,8 +206,14 @@ export default function ActivityLogsPage() {
       accessor: 'user_email' as const,
       sortable: true,
       render: (value: string, row: ActivityLog) => (
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <div className="flex items-center gap-3">
+          <Avatar
+            imageUrl={row.profiles?.profile_image_url}
+            userName={row.profiles?.full_name || value || 'System'}
+            size="sm"
+            onClick={() => handleAvatarClick(row.profiles?.profile_image_url, row.profiles?.full_name || value || 'System')}
+            clickable
+          />
           <div>
             <p className="text-sm font-medium text-gray-900">{value || 'System'}</p>
             {row.user_role && (
@@ -410,6 +448,15 @@ export default function ActivityLogsPage() {
           </Card>
         </div>
       </Container>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={previewImageUrl}
+        imageName={`${previewUserName}'s Profile Picture`}
+        userName={previewUserName}
+      />
     </AdminLayout>
   );
 }

@@ -37,13 +37,14 @@ export async function POST(
       );
     }
 
-    // 2. Fetch all pending applications for this job with applicant profiles
+    // 2. Fetch all pending applications for this job with applicant profiles AND PDS data
     const { data: applications, error: applicationsError } = await supabase
       .from('applications')
       .select(`
         id,
         applicant_id,
         applicant_profile_id,
+        pds_id,
         applicant_profiles (
           id,
           first_name,
@@ -52,6 +53,14 @@ export async function POST(
           total_years_experience,
           skills,
           eligibilities
+        ),
+        applicant_pds!pds_id (
+          id,
+          user_id,
+          educational_background,
+          work_experience,
+          eligibility,
+          other_information
         )
       `)
       .eq('job_id', jobId)
@@ -74,27 +83,140 @@ export async function POST(
     }
 
     // 3. Prepare applicant data for ranking
-    // Filter out applications without applicant profiles first
+    // Extract data from PDS (preferred) or applicant_profiles (fallback)
     const applicantsData = applications
       .filter(app => {
-        // Skip applications without applicant profiles
-        if (!app.applicant_profiles || !app.applicant_profile_id) {
-          console.warn(`Skipping application ${app.id}: missing applicant profile (profile_id: ${app.applicant_profile_id})`);
+        // Skip applications without either PDS or profile data
+        if (!app.applicant_pds && !app.applicant_profiles) {
+          console.warn(`Skipping application ${app.id}: missing both PDS and profile data`);
           return false;
         }
         return true;
       })
       .map(app => {
         const profile = app.applicant_profiles as any;
+        const pds = app.applicant_pds as any;
+
+        // --- EXTRACT HIGHEST EDUCATION ---
+        let highestEducation = profile?.highest_educational_attainment || 'Not specified';
+
+        if (pds?.educational_background && Array.isArray(pds.educational_background)) {
+          // Education level hierarchy (highest to lowest)
+          const levels: Record<string, number> = {
+            'GRADUATE STUDIES': 5,
+            'COLLEGE': 4,
+            'VOCATIONAL': 3,
+            'SECONDARY': 2,
+            'ELEMENTARY': 1
+          };
+
+          const highest = pds.educational_background
+            .filter((edu: any) => edu && edu.level)
+            .reduce((max: any, current: any) => {
+              const currentLevel = levels[current.level as keyof typeof levels] || 0;
+              const maxLevel = max ? (levels[max.level as keyof typeof levels] || 0) : 0;
+              return currentLevel > maxLevel ? current : max;
+            }, null);
+
+          if (highest) {
+            // Build education string: "COLLEGE - Bachelor of Science in Information Technology"
+            highestEducation = highest.course
+              ? `${highest.level} - ${highest.course}`
+              : highest.level;
+          }
+        }
+
+        // --- CALCULATE TOTAL YEARS OF EXPERIENCE ---
+        let totalYears = profile?.total_years_experience || 0;
+
+        if (pds?.work_experience && Array.isArray(pds.work_experience)) {
+          totalYears = pds.work_experience
+            .filter((work: any) => work && work.from && work.to)
+            .reduce((total: number, work: any) => {
+              try {
+                const from = new Date(work.from);
+                const to = work.to === 'Present' ? new Date() : new Date(work.to);
+
+                if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+                  return total;
+                }
+
+                const years = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+                return total + Math.max(0, years);
+              } catch (error) {
+                console.warn(`Error calculating work experience duration:`, error);
+                return total;
+              }
+            }, 0);
+
+          totalYears = Math.round(totalYears * 10) / 10; // Round to 1 decimal place
+        }
+
+        // --- EXTRACT SKILLS ---
+        let skills: string[] = profile?.skills || [];
+
+        if (pds?.other_information?.skills) {
+          if (Array.isArray(pds.other_information.skills)) {
+            // Skills are stored as array of objects: [{skillName: "..."}, ...]
+            skills = pds.other_information.skills
+              .filter((s: any) => s && (s.skillName || typeof s === 'string'))
+              .map((s: any) => typeof s === 'string' ? s : s.skillName)
+              .filter((s: string) => s && s.trim());
+          } else if (typeof pds.other_information.skills === 'string') {
+            // If skills is a JSON string, parse it
+            try {
+              const parsed = JSON.parse(pds.other_information.skills);
+              if (Array.isArray(parsed)) {
+                skills = parsed
+                  .filter((s: any) => s && (s.skillName || typeof s === 'string'))
+                  .map((s: any) => typeof s === 'string' ? s : s.skillName)
+                  .filter((s: string) => s && s.trim());
+              }
+            } catch (error) {
+              // If parsing fails, try to use as single skill
+              skills = [pds.other_information.skills];
+            }
+          }
+        }
+
+        // --- EXTRACT ELIGIBILITIES ---
+        let eligibilities: Array<{eligibilityTitle: string}> = profile?.eligibilities || [];
+
+        if (pds?.eligibility && Array.isArray(pds.eligibility)) {
+          eligibilities = pds.eligibility
+            .filter((e: any) => e && e.eligibilityTitle)
+            .map((e: any) => ({ eligibilityTitle: e.eligibilityTitle }));
+        }
+
+        // --- EXTRACT WORK EXPERIENCE TITLES ---
+        let workExperienceTitles: string[] = [];
+
+        if (pds?.work_experience && Array.isArray(pds.work_experience)) {
+          workExperienceTitles = pds.work_experience
+            .filter((work: any) => work && work.positionTitle)
+            .map((work: any) => work.positionTitle.trim())
+            .filter((title: string) => title && title.length > 0);
+        }
+
+        console.log(`📊 Extracted data for ${profile?.first_name} ${profile?.surname}:`, {
+          education: highestEducation,
+          experience: totalYears,
+          skillsCount: skills.length,
+          eligibilitiesCount: eligibilities.length,
+          workTitlesCount: workExperienceTitles.length,
+          source: pds ? 'PDS' : 'Profile'
+        });
+
         return {
           applicationId: app.id,
           applicantId: app.applicant_id,
           applicantProfileId: app.applicant_profile_id,
-          applicantName: `${profile.first_name} ${profile.surname}`,
-          highestEducationalAttainment: profile.highest_educational_attainment || 'Not specified',
-          eligibilities: profile.eligibilities || [],
-          skills: profile.skills || [],
-          totalYearsExperience: profile.total_years_experience || 0
+          applicantName: `${profile?.first_name || 'Unknown'} ${profile?.surname || ''}`.trim(),
+          highestEducationalAttainment: highestEducation,
+          eligibilities: eligibilities,
+          skills: skills,
+          totalYearsExperience: totalYears,
+          workExperienceTitles: workExperienceTitles
         };
       });
 
@@ -112,8 +234,8 @@ export async function POST(
     const rankedApplicants = await rankApplicantsForJob(
       {
         id: job.id,
-        title: job.title,
-        description: job.description,
+        title: job.title, // Include job title for relevance matching
+        description: job.description, // Include description for context
         degreeRequirement: job.degree_requirement,
         eligibilities: job.eligibilities || [],
         skills: job.skills || [],
@@ -125,6 +247,15 @@ export async function POST(
     // 5. Update applications with ranking results
     const updates = rankedApplicants.map(applicant => {
       const appData = applicantsData.find(a => a.applicantId === applicant.applicantId);
+
+      // Debug logging for match counts before database save
+      console.log(`🔍 [API] Preparing update for ${applicant.applicantName}:`, {
+        rank: applicant.rank,
+        matchedSkillsCount: applicant.matchedSkillsCount,
+        matchedEligibilitiesCount: applicant.matchedEligibilitiesCount,
+        eligibilityScore: applicant.eligibilityScore
+      });
+
       return {
         id: appData!.applicationId,
         rank: applicant.rank,
@@ -135,7 +266,9 @@ export async function POST(
         eligibility_score: applicant.eligibilityScore,
         algorithm_used: applicant.algorithmUsed,
         ranking_reasoning: applicant.rankingReasoning + (applicant.geminiInsights ? ` | Gemini Insight: ${applicant.geminiInsights}` : ''),
-        algorithm_details: applicant.algorithmDetails ? JSON.stringify(applicant.algorithmDetails) : null
+        algorithm_details: applicant.algorithmDetails ? JSON.stringify(applicant.algorithmDetails) : null,
+        matched_skills_count: applicant.matchedSkillsCount,
+        matched_eligibilities_count: applicant.matchedEligibilitiesCount
       };
     });
 
@@ -152,7 +285,9 @@ export async function POST(
           eligibility_score: update.eligibility_score,
           algorithm_used: update.algorithm_used,
           ranking_reasoning: update.ranking_reasoning,
-          algorithm_details: update.algorithm_details
+          algorithm_details: update.algorithm_details,
+          matched_skills_count: update.matched_skills_count,
+          matched_eligibilities_count: update.matched_eligibilities_count
         })
         .eq('id', update.id);
 

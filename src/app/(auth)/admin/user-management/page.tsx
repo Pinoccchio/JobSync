@@ -3,8 +3,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
 import {
-  Card, EnhancedTable, Button, Container, Badge, Input, RefreshButton,
-  EventIcon, EventBadge, StatusIndicator
+  Avatar, Card, EnhancedTable, Button, Container, Badge, Input, RefreshButton,
+  EventIcon, EventBadge, StatusIndicator, ImagePreviewModal
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,6 +52,11 @@ export default function UserManagementPage() {
   // Filter states
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>('');
 
   // Fetch users from API
   const fetchUsers = useCallback(async () => {
@@ -119,6 +124,15 @@ export default function UserManagementPage() {
   // useTableRealtime('activity_logs', ['INSERT'], 'event_category=eq.user_management', () => {
   //   fetchRecentActivities();
   // });
+
+  // Handle avatar click to show image preview
+  const handleAvatarClick = (imageUrl: string | null, userName: string) => {
+    if (imageUrl) {
+      setPreviewImageUrl(imageUrl);
+      setPreviewUserName(userName);
+      setShowImagePreview(true);
+    }
+  };
 
   // Create user
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -342,8 +356,14 @@ export default function UserManagementPage() {
       header: 'Name',
       accessor: 'full_name' as const,
       render: (value: string, row: User) => (
-        <div className="flex items-center gap-2">
-          <UserIcon className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-3">
+          <Avatar
+            imageUrl={row.profile_image_url}
+            userName={value}
+            size="sm"
+            onClick={() => handleAvatarClick(row.profile_image_url, value)}
+            clickable
+          />
           <div>
             <span className="font-medium text-gray-900">{value}</span>
             {isNewUser(row.created_at) && (
@@ -648,7 +668,7 @@ export default function UserManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Create Admin Account</h3>
@@ -768,7 +788,7 @@ export default function UserManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Delete User Account</h3>
@@ -870,7 +890,7 @@ export default function UserManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">
@@ -1008,7 +1028,7 @@ export default function UserManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">User Account Details</h3>
@@ -1177,6 +1197,15 @@ export default function UserManagementPage() {
           )}
         </div>
       </Container>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={previewImageUrl}
+        imageName={`${previewUserName}'s Profile Picture`}
+        userName={previewUserName}
+      />
     </AdminLayout>
   );
 }

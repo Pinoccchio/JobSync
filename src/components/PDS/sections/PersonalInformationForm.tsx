@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PersonalInformation } from '@/types/pds.types';
@@ -55,14 +55,19 @@ export const PersonalInformationForm: React.FC<PersonalInformationFormProps> = (
       reset(data);
       setSameAsResidential(data.permanentAddress?.sameAsResidential ?? false);
     }
-  }, [data, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]); // Removed 'reset' from dependencies to prevent re-render loop
 
   // Update parent component when form changes
-  // Use JSON.stringify to prevent infinite loop (object comparison by value, not reference)
-  const watchedDataString = JSON.stringify(watchedData);
+  // Use useRef to prevent re-render on every keystroke while still detecting actual changes
+  const previousDataRef = useRef<string>('');
   useEffect(() => {
-    onChange(watchedData);
-  }, [watchedDataString]);
+    const currentData = JSON.stringify(watchedData);
+    if (currentData !== previousDataRef.current) {
+      previousDataRef.current = currentData;
+      onChange(watchedData);
+    }
+  }, [watchedData, onChange]);
 
   // Handle "Same as Residential" checkbox
   const handleSameAsResidentialChange = (checked: boolean) => {

@@ -12,7 +12,7 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Image
-                src="/logo-no-bg.png"
+                src="/JS-logo.png"
                 alt="Municipality of Asuncion"
                 width={32}
                 height={32}

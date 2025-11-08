@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, StatusFilter, QuickFilters } from '@/components/ui';
+import { Avatar, Card, EnhancedTable, Button, Container, Badge, RefreshButton, StatusFilter, QuickFilters, ImagePreviewModal } from '@/components/ui';
 import { ApplicationStatusBadge } from '@/components/ApplicationStatusBadge';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { ApplicationDrawer } from '@/components/hr/ApplicationDrawer';
@@ -55,6 +55,11 @@ export default function ScannedRecordsPage() {
   } | null>(null);
   const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
   const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<Application | null>(null);
+
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>('');
 
   // Fetch applications
   const fetchScannedRecords = useCallback(async () => {
@@ -111,6 +116,15 @@ export default function ScannedRecordsPage() {
     fetchScannedRecords();
   }, [fetchScannedRecords]);
 
+  // Handle avatar click to show image preview
+  const handleAvatarClick = (imageUrl: string | null, userName: string) => {
+    if (imageUrl) {
+      setPreviewImageUrl(imageUrl);
+      setPreviewUserName(userName);
+      setShowImagePreview(true);
+    }
+  };
+
   // View PDS
   const handleViewPDS = async (application: Application) => {
     try {
@@ -155,17 +169,25 @@ export default function ScannedRecordsPage() {
       header: 'Applicant Name',
       accessor: 'applicantName' as const,
       render: (value: string, row: Application) => (
-        <button
-          onClick={() => {
-            setSelectedApplicationForDrawer(row);
-            setShowApplicationDrawer(true);
-          }}
-          className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer text-left"
-          title="Click to view application details"
-        >
-          <User className="w-4 h-4 text-gray-400" />
-          <span className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{value}</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Avatar
+            imageUrl={row.applicant_profiles?.profiles?.profile_image_url}
+            userName={value}
+            size="sm"
+            onClick={() => handleAvatarClick(row.applicant_profiles?.profiles?.profile_image_url, value)}
+            clickable
+          />
+          <button
+            onClick={() => {
+              setSelectedApplicationForDrawer(row);
+              setShowApplicationDrawer(true);
+            }}
+            className="flex-1 text-left hover:opacity-75 transition-opacity"
+            title="Click to view application details"
+          >
+            <span className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{value}</span>
+          </button>
+        </div>
       )
     },
     {
@@ -569,6 +591,15 @@ export default function ScannedRecordsPage() {
           </div>
         </div>
       )}
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={previewImageUrl}
+        imageName={`${previewUserName}'s Profile Picture`}
+        userName={previewUserName}
+      />
     </AdminLayout>
   );
 }

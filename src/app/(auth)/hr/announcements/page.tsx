@@ -631,7 +631,7 @@ export default function AnnouncementsPage() {
             <div className="bg-gradient-to-r from-[#22A555] to-[#1a8045] px-6 py-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                  <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                  <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">Create New Announcement</h2>
@@ -745,7 +745,7 @@ export default function AnnouncementsPage() {
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                  <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                  <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">Edit Announcement</h2>
@@ -862,7 +862,7 @@ export default function AnnouncementsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                    <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">Archive Announcement</h3>
@@ -964,7 +964,7 @@ export default function AnnouncementsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                    <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">Restore Announcement</h3>
@@ -1069,7 +1069,7 @@ export default function AnnouncementsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                    <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">⚠️ Permanently Delete</h3>

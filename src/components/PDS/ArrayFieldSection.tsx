@@ -78,7 +78,7 @@ export const ArrayFieldSection: React.FC<ArrayFieldSectionProps> = ({
         <div className="space-y-6">
           {items.map((item, index) => (
             <div
-              key={index}
+              key={item.id || index}
               className="bg-white border border-gray-200 rounded-lg p-6 relative"
             >
               {/* Remove Button */}

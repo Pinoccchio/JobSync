@@ -23,6 +23,30 @@ export async function GET(request: NextRequest) {
     // Optional filters
     const status = searchParams.get('status'); // active, completed, cancelled
 
+    // Get current user and their role for multi-tenancy filtering
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
+    }
+
+    // Get user profile to check role
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { success: false, error: 'Profile not found' },
+        { status: 404 }
+      );
+    }
+
     // Build query
     let query = supabase
       .from('training_programs')
@@ -50,6 +74,16 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false });
+
+    // Apply role-based filtering (multi-tenancy)
+    if (profile.role === 'PESO') {
+      // PESO users can only see programs they created
+      query = query.eq('created_by', user.id);
+    } else if (profile.role === 'APPLICANT') {
+      // Applicants can view all active programs (public)
+      // No created_by filter needed, but status filter will be applied below
+    }
+    // ADMIN can see all programs (no additional filter)
 
     // Apply status filter
     if (status && status !== 'all') {

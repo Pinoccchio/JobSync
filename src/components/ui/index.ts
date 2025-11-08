@@ -13,6 +13,7 @@ export { ConfirmModal } from './ConfirmModal';
 export { ImagePreviewModal } from './ImagePreviewModal';
 export { Toast } from './Toast';
 export { ApplicationModal } from './ApplicationModal';
+export { Avatar } from './Avatar';
 export { Badge } from './Badge';
 export { Container } from './Container';
 export { RefreshButton } from './RefreshButton';

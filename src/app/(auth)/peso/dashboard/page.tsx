@@ -60,42 +60,79 @@ export default function PESODashboard() {
       setLoading(true);
     }
     try {
-      // Fetch total training applications
+      // Get current user's ID
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      // First, get all training programs created by this PESO user
+      const { data: pesoPrograms } = await supabase
+        .from('training_programs')
+        .select('id')
+        .eq('created_by', currentUser.id);
+
+      const pesoProgramIds = pesoPrograms?.map(p => p.id) || [];
+
+      // If PESO user has no programs, return zero stats
+      if (pesoProgramIds.length === 0) {
+        if (isMounted.current) {
+          setStats({
+            totalApplications: 0,
+            pendingApplications: 0,
+            activePrograms: 0,
+            enrolledCount: 0,
+            inProgressCount: 0,
+            completedCount: 0,
+          });
+          setRecentApplications([]);
+        }
+        return;
+      }
+
+      // Fetch total training applications (only for PESO user's programs)
       const { count: totalApplications } = await supabase
         .from('training_applications')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .in('program_id', pesoProgramIds);
 
-      // Fetch pending training applications
+      // Fetch pending training applications (only for PESO user's programs)
       const { count: pendingApplications } = await supabase
         .from('training_applications')
         .select('*', { count: 'exact', head: true })
+        .in('program_id', pesoProgramIds)
         .eq('status', 'pending');
 
-      // Fetch active training programs
+      // Fetch active training programs (only created by this PESO user)
       const { count: activePrograms } = await supabase
         .from('training_programs')
         .select('*', { count: 'exact', head: true })
+        .eq('created_by', currentUser.id)
         .eq('status', 'active');
 
-      // Fetch enrolled applications
+      // Fetch enrolled applications (only for PESO user's programs)
       const { count: enrolledCount } = await supabase
         .from('training_applications')
         .select('*', { count: 'exact', head: true })
+        .in('program_id', pesoProgramIds)
         .eq('status', 'enrolled');
 
-      // Fetch in-progress applications
+      // Fetch in-progress applications (only for PESO user's programs)
       const { count: inProgressCount } = await supabase
         .from('training_applications')
         .select('*', { count: 'exact', head: true })
+        .in('program_id', pesoProgramIds)
         .eq('status', 'in_progress');
 
-      // Fetch completed applications
+      // Fetch completed applications (only for PESO user's programs)
       const { count: completedCount } = await supabase
         .from('training_applications')
         .select('*', { count: 'exact', head: true })
+        .in('program_id', pesoProgramIds)
         .eq('status', 'completed');
 
-      // Fetch recent applications (last 5)
+      // Fetch recent applications (last 5, only for PESO user's programs)
       const { data: applications, error } = await supabase
         .from('training_applications')
         .select(`
@@ -108,6 +145,7 @@ export default function PESODashboard() {
             title
           )
         `)
+        .in('program_id', pesoProgramIds)
         .order('submitted_at', { ascending: false })
         .limit(5);
 

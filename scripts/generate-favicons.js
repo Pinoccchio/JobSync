@@ -1,7 +1,7 @@
 /**
- * Generate Favicon Files from logo-no-bg.png
+ * Generate Favicon Files from JS-logo.png
  *
- * This script converts the Municipality of Asuncion logo (logo-no-bg.png)
+ * This script converts the Municipality of Asuncion logo (JS-logo.png)
  * into various favicon formats needed for web and mobile.
  * Uses the transparent PNG version for better quality.
  *
@@ -12,16 +12,16 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const inputFile = path.join(__dirname, '../public/logo-no-bg.png');
+const inputFile = path.join(__dirname, '../public/JS-logo.png');
 const publicDir = path.join(__dirname, '../public');
 
 async function generateFavicons() {
-  console.log('🎨 Generating favicon files from logo-no-bg.png (transparent background)...\n');
+  console.log('🎨 Generating favicon files from JS-logo.png (transparent background)...\n');
 
   try {
-    // Check if logo-no-bg.png exists
+    // Check if JS-logo.png exists
     if (!fs.existsSync(inputFile)) {
-      throw new Error('logo-no-bg.png not found in public directory!');
+      throw new Error('JS-logo.png not found in public directory!');
     }
 
     // 1. Generate favicon.ico (48x48 for better quality)

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { X, User, Mail, Phone, MapPin, Briefcase, GraduationCap, Award, TrendingUp, FileText, Calendar } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Avatar, Button, ImagePreviewModal } from '@/components/ui';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { StatusTimeline } from './StatusTimeline';
 
@@ -34,6 +34,9 @@ export const ApplicationDrawer: React.FC<ApplicationDrawerProps> = ({
   const [showPDSModal, setShowPDSModal] = useState(false);
   const [fetchedPDSData, setFetchedPDSData] = useState<any>(null);
   const [loadingPDS, setLoadingPDS] = useState(false);
+
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
 
   if (!isOpen || !application) return null;
 
@@ -82,9 +85,22 @@ export const ApplicationDrawer: React.FC<ApplicationDrawerProps> = ({
         {/* Header */}
         <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 z-10 rounded-t-xl">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">{application.applicantName}</h2>
-              <p className="text-sm text-white/90 mt-1">{application.jobTitle}</p>
+            <div className="flex items-center gap-4">
+              <Avatar
+                imageUrl={application._raw?.applicant_profiles?.profiles?.profile_image_url}
+                userName={application.applicantName}
+                size="lg"
+                onClick={() => {
+                  if (application._raw?.applicant_profiles?.profiles?.profile_image_url) {
+                    setShowImagePreview(true);
+                  }
+                }}
+                clickable
+              />
+              <div>
+                <h2 className="text-2xl font-bold">{application.applicantName}</h2>
+                <p className="text-sm text-white/90 mt-1">{application.jobTitle}</p>
+              </div>
             </div>
             <button
               onClick={onClose}
@@ -280,6 +296,15 @@ export const ApplicationDrawer: React.FC<ApplicationDrawerProps> = ({
         }}
         pdsData={fetchedPDSData}
         applicantName={application?.applicantName || ''}
+      />
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={application?._raw?.applicant_profiles?.profiles?.profile_image_url || null}
+        imageName={`${application?.applicantName || 'Applicant'}'s Profile Picture`}
+        userName={application?.applicantName || 'Applicant'}
       />
     </>
   );

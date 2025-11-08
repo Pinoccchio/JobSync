@@ -15,7 +15,7 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
             <Image
-              src="/logo-no-bg.png"
+              src="/JS-logo.png"
               alt="Municipality of Asuncion"
               width={40}
               height={40}

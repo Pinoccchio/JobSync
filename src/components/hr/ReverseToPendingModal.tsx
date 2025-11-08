@@ -51,7 +51,7 @@ export const ReverseToPendingModal: React.FC<ReverseToPendingModalProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Reverse to Pending</h3>

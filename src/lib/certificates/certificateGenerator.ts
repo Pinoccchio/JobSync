@@ -39,9 +39,9 @@ async function loadLogoBase64(): Promise<string | null> {
     // Check if we're in browser or Node.js environment
     if (typeof window !== 'undefined') {
       // Browser environment - use fetch
-      const response = await fetch('/logo-no-bg.png');
+      const response = await fetch('/JS-logo.png');
       if (!response.ok) {
-        console.warn('Logo file not found at /logo-no-bg.png');
+        console.warn('Logo file not found at /JS-logo.png');
         return null;
       }
       const blob = await response.blob();
@@ -55,7 +55,7 @@ async function loadLogoBase64(): Promise<string | null> {
       // Node.js environment - use fs
       const fs = await import('fs');
       const path = await import('path');
-      const logoPath = path.join(process.cwd(), 'public', 'logo-no-bg.png');
+      const logoPath = path.join(process.cwd(), 'public', 'JS-logo.png');
 
       if (!fs.existsSync(logoPath)) {
         console.warn(`Logo file not found at ${logoPath}`);

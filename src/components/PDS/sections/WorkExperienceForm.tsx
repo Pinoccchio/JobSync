@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { WorkExperience } from '@/types/pds.types';
@@ -39,11 +39,16 @@ export const WorkExperienceForm: React.FC<WorkExperienceFormProps> = ({
 
   const watchedData = watch('items');
 
-  // Use JSON.stringify to prevent infinite loop (object comparison by value, not reference)
-  const watchedDataString = JSON.stringify(watchedData);
+  // Update parent component when form changes
+  // Use useRef to prevent re-render on every keystroke while still detecting actual changes
+  const previousDataRef = useRef<string>('');
   useEffect(() => {
-    onChange(watchedData);
-  }, [watchedDataString]);
+    const currentData = JSON.stringify(watchedData);
+    if (currentData !== previousDataRef.current) {
+      previousDataRef.current = currentData;
+      onChange(watchedData);
+    }
+  }, [watchedData, onChange]);
 
   return (
     <div className="space-y-8">

@@ -134,25 +134,21 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
 
     // Skills analysis
     if (applicant.skills && jobRequirements.skills && jobRequirements.skills.length > 0) {
-      const matchedSkills = jobRequirements.skills.filter(reqSkill =>
-        applicant.skills?.some(
-          s => s.toLowerCase().includes(reqSkill.toLowerCase()) ||
-               reqSkill.toLowerCase().includes(s.toLowerCase())
-        )
-      );
-      const matchPercentage = Math.round((matchedSkills.length / jobRequirements.skills.length) * 100);
+      // Use stored match count from database (calculated with fuzzy matching)
+      const matchedSkillsCount = applicant.matchedSkillsCount ?? 0;
+      const matchPercentage = Math.round((matchedSkillsCount / jobRequirements.skills.length) * 100);
 
-      if (matchedSkills.length === 0) {
+      if (matchedSkillsCount === 0) {
         explanations.push(
           `They possess 0 out of ${jobRequirements.skills.length} required skills (0% match).`
         );
-      } else if (matchedSkills.length === jobRequirements.skills.length) {
+      } else if (matchedSkillsCount === jobRequirements.skills.length) {
         explanations.push(
           `They possess all ${jobRequirements.skills.length} required skills (100% match).`
         );
       } else {
         explanations.push(
-          `They possess ${matchedSkills.length} out of ${jobRequirements.skills.length} required skills (${matchPercentage}% match).`
+          `They possess ${matchedSkillsCount} out of ${jobRequirements.skills.length} required skills (${matchPercentage}% match).`
         );
       }
     }
@@ -179,26 +175,20 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
 
     // Eligibility analysis
     if (applicant.eligibilities && jobRequirements.eligibilities && jobRequirements.eligibilities.length > 0) {
-      const matchedEligibilities = jobRequirements.eligibilities.filter(reqElig =>
-        applicant.eligibilities?.some((e: any) => {
-          // Ensure e is a string (handle objects with eligibilityTitle property)
-          const eligStr = typeof e === 'string' ? e : (e?.eligibilityTitle || String(e));
-          return eligStr.toLowerCase().includes(reqElig.toLowerCase()) ||
-                 reqElig.toLowerCase().includes(eligStr.toLowerCase());
-        })
-      );
+      // Use stored match count from database (calculated with fuzzy matching)
+      const matchedEligibilitiesCount = applicant.matchedEligibilitiesCount ?? 0;
 
-      if (matchedEligibilities.length === 0) {
+      if (matchedEligibilitiesCount === 0) {
         explanations.push(
           `They have 0 out of ${jobRequirements.eligibilities.length} required eligibilities.`
         );
-      } else if (matchedEligibilities.length === jobRequirements.eligibilities.length) {
+      } else if (matchedEligibilitiesCount === jobRequirements.eligibilities.length) {
         explanations.push(
           `They have all ${jobRequirements.eligibilities.length} required eligibilities.`
         );
       } else {
         explanations.push(
-          `They have ${matchedEligibilities.length} out of ${jobRequirements.eligibilities.length} required eligibilities.`
+          `They have ${matchedEligibilitiesCount} out of ${jobRequirements.eligibilities.length} required eligibilities.`
         );
       }
     }
@@ -515,20 +505,20 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                 <p className="text-sm text-gray-600 mt-2">
                   <span className="font-semibold">
                     {(() => {
-                      const matchedSkills = jobRequirements.skills.filter(reqSkill =>
-                        applicant.skills?.some(
-                          s => s.toLowerCase().includes(reqSkill.toLowerCase()) ||
-                               reqSkill.toLowerCase().includes(s.toLowerCase())
-                        )
-                      );
-                      const matchPercentage = Math.round((matchedSkills.length / jobRequirements.skills.length) * 100);
+                      // Use stored match count from database (calculated with fuzzy matching)
+                      const matchedSkillsCount = applicant.matchedSkillsCount ?? 0;
+                      const matchPercentage = Math.round((matchedSkillsCount / jobRequirements.skills.length) * 100);
 
-                      if (matchedSkills.length === 0) {
+                      if (matchedSkillsCount === 0) {
+                        // Check if there's a non-zero score despite 0 exact matches (indicates partial/token matching)
+                        if (applicant.skillsScore > 0) {
+                          return <span className="text-orange-600">(Partial alignment detected - related skills found) 🔸</span>;
+                        }
                         return <span className="text-red-600">(0 out of {jobRequirements.skills.length} required skills) ⚠</span>;
-                      } else if (matchedSkills.length === jobRequirements.skills.length) {
+                      } else if (matchedSkillsCount === jobRequirements.skills.length) {
                         return <span className="text-green-600">(All {jobRequirements.skills.length} required skills matched) ⭐</span>;
                       } else {
-                        return <span className="text-yellow-600">({matchedSkills.length} out of {jobRequirements.skills.length} required skills - {matchPercentage}%) ⚡</span>;
+                        return <span className="text-yellow-600">({matchedSkillsCount} out of {jobRequirements.skills.length} required skills - {matchPercentage}%) ⚡</span>;
                       }
                     })()}
                   </span>
@@ -562,22 +552,20 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                 <p className="text-sm text-gray-600 mt-2">
                   <span className="font-semibold">
                     {(() => {
-                      const matchedEligibilities = jobRequirements.eligibilities.filter(reqElig =>
-                        applicant.eligibilities?.some((e: any) => {
-                          // Ensure e is a string (handle objects with eligibilityTitle or name property)
-                          const eligStr = typeof e === 'string' ? e : (e?.eligibilityTitle || e?.name || String(e));
-                          return eligStr.toLowerCase().includes(reqElig.toLowerCase()) ||
-                                 reqElig.toLowerCase().includes(eligStr.toLowerCase());
-                        })
-                      );
-                      const matchPercentage = Math.round((matchedEligibilities.length / jobRequirements.eligibilities.length) * 100);
+                      // Use stored match count from database (calculated with fuzzy matching)
+                      const matchedEligibilitiesCount = applicant.matchedEligibilitiesCount ?? 0;
+                      const matchPercentage = Math.round((matchedEligibilitiesCount / jobRequirements.eligibilities.length) * 100);
 
-                      if (matchedEligibilities.length === 0) {
+                      if (matchedEligibilitiesCount === 0) {
+                        // Check if there's a non-zero score despite 0 exact matches (indicates partial matching)
+                        if (applicant.eligibilityScore > 0) {
+                          return <span className="text-orange-600">(Partial alignment detected - related eligibilities found) 🔸</span>;
+                        }
                         return <span className="text-red-600">(0 out of {jobRequirements.eligibilities.length} required eligibilities) ⚠</span>;
-                      } else if (matchedEligibilities.length === jobRequirements.eligibilities.length) {
+                      } else if (matchedEligibilitiesCount === jobRequirements.eligibilities.length) {
                         return <span className="text-green-600">(All {jobRequirements.eligibilities.length} required eligibilities matched) ⭐</span>;
                       } else {
-                        return <span className="text-yellow-600">({matchedEligibilities.length} out of {jobRequirements.eligibilities.length} required eligibilities - {matchPercentage}%) ⚡</span>;
+                        return <span className="text-yellow-600">({matchedEligibilitiesCount} out of {jobRequirements.eligibilities.length} required eligibilities - {matchPercentage}%) ⚡</span>;
                       }
                     })()}
                   </span>

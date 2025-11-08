@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import Image from 'next/image';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem, StatusFilter, QuickFilters } from '@/components/ui';
+import { Avatar, Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem, StatusFilter, QuickFilters, ImagePreviewModal } from '@/components/ui';
 import { ApplicationStatusBadge } from '@/components/ApplicationStatusBadge';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { RankingDetailsModal } from '@/components/hr/RankingDetailsModal';
@@ -71,6 +71,8 @@ interface Application {
   signatureUrl: string | null;
   signatureUploadedAt: string | null;
   statusHistory?: StatusHistoryItem[];
+  matchedSkillsCount?: number; // Number of job skills matched by applicant
+  matchedEligibilitiesCount?: number; // Number of job eligibilities matched by applicant
   _raw: any;
 }
 
@@ -123,6 +125,11 @@ export default function RankedRecordsPage() {
   const [showStatusHistoryModal, setShowStatusHistoryModal] = useState(false);
   const [selectedApplicationForHistory, setSelectedApplicationForHistory] = useState<Application | null>(null);
 
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>('');
+
   // Fetch applications
   const fetchApplications = useCallback(async () => {
     try {
@@ -146,6 +153,8 @@ export default function RankedRecordsPage() {
             signatureUrl: app.applicant_pds?.signature_url || null,
             signatureUploadedAt: app.applicant_pds?.signature_uploaded_at || null,
             statusHistory: app.status_history || [],
+            matchedSkillsCount: app.matched_skills_count,
+            matchedEligibilitiesCount: app.matched_eligibilities_count,
             _raw: app,
           }))
         );
@@ -175,6 +184,15 @@ export default function RankedRecordsPage() {
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
+
+  // Handle avatar click to show image preview
+  const handleAvatarClick = (imageUrl: string | null, userName: string) => {
+    if (imageUrl) {
+      setPreviewImageUrl(imageUrl);
+      setPreviewUserName(userName);
+      setShowImagePreview(true);
+    }
+  };
 
   // Show approve confirmation modal
   const handleApprove = (row: Application) => {
@@ -761,6 +779,9 @@ export default function RankedRecordsPage() {
           ? JSON.parse(raw.algorithm_details)
           : raw.algorithm_details
       ) : undefined,
+      // Add match counts from database
+      matchedSkillsCount: application.matchedSkillsCount,
+      matchedEligibilitiesCount: application.matchedEligibilitiesCount,
       // Add statistical context
       statistics,
       percentiles,
@@ -838,14 +859,22 @@ export default function RankedRecordsPage() {
       header: 'Applicant',
       accessor: 'applicantName' as const,
       render: (value: string, row: Application) => (
-        <button
-          onClick={() => handleViewApplicationDetails(row)}
-          className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer text-left"
-          title="Click to view application details"
-        >
-          <User className="w-4 h-4 text-gray-400" />
-          <span className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{value}</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Avatar
+            imageUrl={row.applicant_profiles?.profiles?.profile_image_url}
+            userName={value}
+            size="sm"
+            onClick={() => handleAvatarClick(row.applicant_profiles?.profiles?.profile_image_url, value)}
+            clickable
+          />
+          <button
+            onClick={() => handleViewApplicationDetails(row)}
+            className="flex-1 text-left hover:opacity-75 transition-opacity"
+            title="Click to view application details"
+          >
+            <span className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{value}</span>
+          </button>
+        </div>
       ),
     },
     {
@@ -1411,7 +1440,7 @@ export default function RankedRecordsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                    <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">Rank Applicants with Gemini AI</h3>
@@ -1516,7 +1545,7 @@ export default function RankedRecordsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                    <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">Approve Application</h3>
@@ -1623,7 +1652,7 @@ export default function RankedRecordsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                    <Image src="/logo.jpg" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                    <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">Deny Application</h3>
@@ -1911,6 +1940,15 @@ export default function RankedRecordsPage() {
           </div>
         </div>
       )}
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={previewImageUrl}
+        imageName={`${previewUserName}'s Profile Picture`}
+        userName={previewUserName}
+      />
     </AdminLayout>
   );
 }

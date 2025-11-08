@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Container, Badge, RefreshButton, Modal } from '@/components/ui';
+import { Avatar, Card, EnhancedTable, Container, Badge, RefreshButton, Modal, ImagePreviewModal } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +23,10 @@ interface AuditRecord {
   user_email: string | null;
   user_role: string | null;
   timestamp: string;
+  profiles?: {
+    full_name?: string;
+    profile_image_url?: string | null;
+  };
 }
 
 export default function AuditTrailPage() {
@@ -38,13 +42,24 @@ export default function AuditTrailPage() {
   const [operationFilter, setOperationFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
 
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>('');
+
   // Fetch audit trail
   const fetchAuditTrail = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('audit_trail')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            profile_image_url
+          )
+        `)
         .order('timestamp', { ascending: false })
         .limit(200);
 
@@ -66,6 +81,15 @@ export default function AuditTrailPage() {
   useEffect(() => {
     fetchAuditTrail();
   }, [fetchAuditTrail]);
+
+  // Handle avatar click to show image preview
+  const handleAvatarClick = (imageUrl: string | null, userName: string) => {
+    if (imageUrl) {
+      setPreviewImageUrl(imageUrl);
+      setPreviewUserName(userName);
+      setShowImagePreview(true);
+    }
+  };
 
   // Apply filters
   useEffect(() => {
@@ -183,8 +207,14 @@ export default function AuditTrailPage() {
       header: 'User',
       accessor: 'user_email' as const,
       render: (value: string | null, row: AuditRecord) => (
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-3">
+          <Avatar
+            imageUrl={row.profiles?.profile_image_url}
+            userName={row.profiles?.full_name || value || 'System'}
+            size="sm"
+            onClick={() => handleAvatarClick(row.profiles?.profile_image_url, row.profiles?.full_name || value || 'System')}
+            clickable
+          />
           <div className="flex flex-col">
             {value ? (
               <>
@@ -466,6 +496,15 @@ export default function AuditTrailPage() {
           </div>
         )}
       </Modal>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={previewImageUrl}
+        imageName={`${previewUserName}'s Profile Picture`}
+        userName={previewUserName}
+      />
     </AdminLayout>
   );
 }

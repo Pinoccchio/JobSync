@@ -118,7 +118,7 @@ export default function LoginPage() {
           {/* Left Section - Logo & Info */}
           <div className="flex flex-col items-center justify-center text-center">
             <Image
-              src="/logo-no-bg.png"
+              src="/JS-logo.png"
               alt="Municipality of Asuncion Logo"
               width={280}
               height={280}

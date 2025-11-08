@@ -109,7 +109,8 @@ export async function GET(request: NextRequest) {
           highest_educational_attainment,
           ocr_processed,
           profiles:user_id (
-            email
+            email,
+            profile_image_url
           )
         ),
         applicant_pds:pds_id (

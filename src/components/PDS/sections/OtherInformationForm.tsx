@@ -67,7 +67,8 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
         signatureRef.current.fromDataURL(data.declaration.signatureData);
       }
     }
-  }, [data, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]); // Removed 'reset' from dependencies to prevent re-render loop
 
   // Load signature if exists
   useEffect(() => {
@@ -77,15 +78,20 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
   }, [data?.declaration?.signatureData]);
 
   // Update parent component when form changes
-  // Use debounce to prevent infinite loop and excessive re-renders
-  const watchedDataString = JSON.stringify(watchedData);
+  // Use useRef to prevent re-render on every keystroke while still detecting actual changes
+  // Debounce 100ms to prevent excessive updates
+  const previousDataRef = useRef<string>('');
   useEffect(() => {
     const timer = setTimeout(() => {
-      onChange(watchedData);
-    }, 100); // Debounce 100ms
+      const currentData = JSON.stringify(watchedData);
+      if (currentData !== previousDataRef.current) {
+        previousDataRef.current = currentData;
+        onChange(watchedData);
+      }
+    }, 100);
 
     return () => clearTimeout(timer);
-  }, [watchedDataString, onChange]);
+  }, [watchedData, onChange]);
 
   // Handle signature - Upload to Supabase Storage
   const handleSignatureEnd = async () => {
@@ -245,7 +251,7 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
           <div className="flex flex-wrap gap-2">
             {watchSkills.map((skill, index) => (
               <div
-                key={index}
+                key={`skill-${skill}-${index}`}
                 className="flex items-center gap-2 bg-[#22A555]/10 text-[#22A555] px-3 py-1.5 rounded-lg"
               >
                 <span className="text-sm font-medium">{skill}</span>
@@ -288,7 +294,7 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
         {watchRecognitions.length > 0 && (
           <ul className="space-y-2">
             {watchRecognitions.map((recognition, index) => (
-              <li key={index} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
+              <li key={`recognition-${recognition}-${index}`} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
                 <span className="text-sm">{recognition}</span>
                 <button
                   type="button"
@@ -326,7 +332,7 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
         {watchMemberships.length > 0 && (
           <ul className="space-y-2">
             {watchMemberships.map((membership, index) => (
-              <li key={index} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
+              <li key={`membership-${membership}-${index}`} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
                 <span className="text-sm">{membership}</span>
                 <button
                   type="button"

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Container, Badge, RefreshButton, ModernModal, Input, Textarea, DropdownMenu } from '@/components/ui';
+import { Avatar, Card, EnhancedTable, Button, Container, Badge, RefreshButton, ModernModal, Input, Textarea, DropdownMenu, ImagePreviewModal } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +48,9 @@ interface TrainingApplication {
   reviewed_at?: string;
   status_history?: StatusHistoryItem[];
   training_programs?: TrainingProgram;
+  profiles?: {
+    profile_image_url?: string | null;
+  };
 }
 
 export default function PESOApplicationsPage() {
@@ -96,6 +99,11 @@ export default function PESOApplicationsPage() {
   const [bulkEnrollModalOpen, setBulkEnrollModalOpen] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
+  // Image Preview Modal
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>('');
+
   // Fetch training applications function
   const fetchApplications = useCallback(async () => {
     try {
@@ -127,6 +135,15 @@ export default function PESOApplicationsPage() {
   //   showToast('Training application updated', 'info');
   //   // fetchApplications(); // Uncomment when real data
   // });
+
+  // Handle avatar click to show image preview
+  const handleAvatarClick = (imageUrl: string | null, userName: string) => {
+    if (imageUrl) {
+      setPreviewImageUrl(imageUrl);
+      setPreviewUserName(userName);
+      setShowImagePreview(true);
+    }
+  };
 
   // Handle view details
   const handleView = (application: TrainingApplication) => {
@@ -895,9 +912,15 @@ export default function PESOApplicationsPage() {
     {
       header: 'Full Name',
       accessor: 'full_name' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-400" />
+      render: (value: string, row: TrainingApplication) => (
+        <div className="flex items-center gap-3">
+          <Avatar
+            imageUrl={row.profiles?.profile_image_url}
+            userName={value}
+            size="sm"
+            onClick={() => handleAvatarClick(row.profiles?.profile_image_url, value)}
+            clickable
+          />
           <span className="font-medium text-gray-900">{value}</span>
         </div>
       )
@@ -2361,6 +2384,15 @@ export default function PESOApplicationsPage() {
         </ModernModal>
 
       </Container>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+        imageUrl={previewImageUrl}
+        imageName={`${previewUserName}'s Profile Picture`}
+        userName={previewUserName}
+      />
     </AdminLayout>
   );
 }

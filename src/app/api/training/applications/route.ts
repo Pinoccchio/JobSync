@@ -69,6 +69,9 @@ export async function GET(request: NextRequest) {
             full_name,
             role
           )
+        ),
+        profiles:applicant_id (
+          profile_image_url
         )
       `)
       .order('submitted_at', { ascending: false});
@@ -81,8 +84,28 @@ export async function GET(request: NextRequest) {
         applicant_id: user.id,
         email: user.email,
       });
+    } else if (profile.role === 'PESO') {
+      // PESO can only see applications for programs they created
+      const { data: pesoPrograms } = await supabase
+        .from('training_programs')
+        .select('id')
+        .eq('created_by', user.id);
+
+      const pesoProgramIds = pesoPrograms?.map(p => p.id) || [];
+
+      if (pesoProgramIds.length > 0) {
+        query = query.in('program_id', pesoProgramIds);
+        console.log('📊 [API] Filtering for PESO:', {
+          peso_user_id: user.id,
+          program_count: pesoProgramIds.length,
+        });
+      } else {
+        // PESO has no programs, return empty result
+        query = query.eq('program_id', '00000000-0000-0000-0000-000000000000');
+        console.log('📊 [API] PESO has no programs, returning empty');
+      }
     }
-    // PESO and ADMIN can see all applications
+    // ADMIN can see all applications (no additional filter)
 
     // Apply program filter
     if (programId) {

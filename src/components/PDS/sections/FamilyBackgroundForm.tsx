@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FamilyBackground } from '@/types/pds.types';
@@ -52,14 +52,19 @@ export const FamilyBackgroundForm: React.FC<FamilyBackgroundFormProps> = ({
     if (data) {
       reset(data);
     }
-  }, [data, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]); // Removed 'reset' from dependencies to prevent re-render loop
 
   // Update parent component when form changes
-  // Use JSON.stringify to prevent infinite loop (object comparison by value, not reference)
-  const watchedDataString = JSON.stringify(watchedData);
+  // Use useRef to prevent re-render on every keystroke while still detecting actual changes
+  const previousDataRef = useRef<string>('');
   useEffect(() => {
-    onChange(watchedData);
-  }, [watchedDataString]);
+    const currentData = JSON.stringify(watchedData);
+    if (currentData !== previousDataRef.current) {
+      previousDataRef.current = currentData;
+      onChange(watchedData);
+    }
+  }, [watchedData, onChange]);
 
   return (
     <div className="space-y-8">
