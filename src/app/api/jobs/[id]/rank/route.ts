@@ -113,79 +113,217 @@ export async function POST(
           const highest = pds.educational_background
             .filter((edu: any) => edu && edu.level)
             .reduce((max: any, current: any) => {
-              const currentLevel = levels[current.level as keyof typeof levels] || 0;
-              const maxLevel = max ? (levels[max.level as keyof typeof levels] || 0) : 0;
+              const currentLevel = levels[current.level.toUpperCase() as keyof typeof levels] || 0;
+              const maxLevel = max ? (levels[max.level.toUpperCase() as keyof typeof levels] || 0) : 0;
               return currentLevel > maxLevel ? current : max;
             }, null);
 
           if (highest) {
-            // Build education string: "COLLEGE - Bachelor of Science in Information Technology"
-            highestEducation = highest.course
-              ? `${highest.level} - ${highest.course}`
-              : highest.level;
+            // Extract degree name only (not level prefix) to match algorithm expectations
+            // Use basicEducationDegreeCourse (actual PDS field) with fallbacks
+            highestEducation = highest.basicEducationDegreeCourse || highest.course || highest.level;
           }
         }
 
         // --- CALCULATE TOTAL YEARS OF EXPERIENCE ---
         let totalYears = profile?.total_years_experience || 0;
 
+        // Helper function to get current date/time in Philippine timezone (UTC+8)
+        const getPhilippineTime = (): Date => {
+          const now = new Date();
+          // Get UTC time and add 8 hours for Philippine timezone (UTC+8)
+          const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+          const philippineTime = new Date(utcTime + (8 * 3600000)); // UTC + 8 hours
+          return philippineTime;
+        };
+
+        // Helper function to parse dates in multiple formats
+        const parseFlexibleDate = (dateStr: string): Date | null => {
+          if (!dateStr || dateStr === 'Present') return null;
+
+          // Try ISO format first (YYYY-MM-DD)
+          let parsed = new Date(dateStr);
+          if (!isNaN(parsed.getTime())) return parsed;
+
+          // Try MM/DD/YYYY format
+          const mmddyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (mmddyyyy) {
+            parsed = new Date(`${mmddyyyy[3]}-${mmddyyyy[1].padStart(2, '0')}-${mmddyyyy[2].padStart(2, '0')}`);
+            if (!isNaN(parsed.getTime())) return parsed;
+          }
+
+          // Try DD/MM/YYYY format
+          const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (ddmmyyyy) {
+            parsed = new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`);
+            if (!isNaN(parsed.getTime())) return parsed;
+          }
+
+          console.warn(`⚠️ Could not parse date: "${dateStr}"`);
+          return null;
+        };
+
         if (pds?.work_experience && Array.isArray(pds.work_experience)) {
+          console.log(`📝 Processing ${pds.work_experience.length} work experience records for ${profile?.first_name} ${profile?.surname}`);
+
           totalYears = pds.work_experience
-            .filter((work: any) => work && work.from && work.to)
+            .filter((work: any) => {
+              if (!work) return false;
+              // Check for dates in nested periodOfService object first, then direct properties
+              const hasFrom = work.periodOfService?.from || work.from || work.fromDate || work.dateFrom;
+              const hasTo = work.periodOfService?.to || work.to || work.toDate || work.dateTo;
+              if (!hasFrom || !hasTo) {
+                console.warn(`⚠️ Work experience missing dates:`, { work });
+              }
+              return hasFrom && hasTo;
+            })
             .reduce((total: number, work: any) => {
               try {
-                const from = new Date(work.from);
-                const to = work.to === 'Present' ? new Date() : new Date(work.to);
+                // Check multiple possible field names for dates (including nested periodOfService)
+                const fromDateStr = work.periodOfService?.from || work.from || work.fromDate || work.dateFrom;
+                const toDateStr = work.periodOfService?.to || work.to || work.toDate || work.dateTo;
 
-                if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+                const from = parseFlexibleDate(fromDateStr);
+                const to = (toDateStr === 'Present' || toDateStr === 'present')
+                  ? getPhilippineTime() // ✅ Use Philippine timezone (UTC+8) for "Present"
+                  : parseFlexibleDate(toDateStr);
+
+                if (!from || !to) {
+                  console.warn(`⚠️ Invalid work dates: from="${fromDateStr}", to="${toDateStr}"`);
                   return total;
                 }
 
                 const years = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-                return total + Math.max(0, years);
+                const calculatedYears = Math.max(0, years);
+
+                console.log(`  ✓ Work experience: ${work.positionTitle || work.position || 'Unknown'} - ${calculatedYears.toFixed(1)} years`);
+                return total + calculatedYears;
               } catch (error) {
-                console.warn(`Error calculating work experience duration:`, error);
+                console.error(`❌ Error calculating work experience duration:`, error, work);
                 return total;
               }
             }, 0);
 
-          totalYears = Math.round(totalYears * 10) / 10; // Round to 1 decimal place
+          // Round to 1 decimal place and fix floating-point precision issues
+          totalYears = Math.round(totalYears * 10) / 10;
+          totalYears = parseFloat(totalYears.toFixed(1)); // Eliminate floating-point artifacts
+          console.log(`📊 Total work experience: ${totalYears} years`);
+        } else {
+          console.log(`⚠️ No work experience array found in PDS for ${profile?.first_name} ${profile?.surname}`);
         }
 
         // --- EXTRACT SKILLS ---
         let skills: string[] = profile?.skills || [];
 
-        if (pds?.other_information?.skills) {
-          if (Array.isArray(pds.other_information.skills)) {
-            // Skills are stored as array of objects: [{skillName: "..."}, ...]
-            skills = pds.other_information.skills
-              .filter((s: any) => s && (s.skillName || typeof s === 'string'))
-              .map((s: any) => typeof s === 'string' ? s : s.skillName)
-              .filter((s: string) => s && s.trim());
-          } else if (typeof pds.other_information.skills === 'string') {
+        // Check multiple possible locations for skills in PDS
+        const extractSkills = (data: any): string[] => {
+          const extracted: string[] = [];
+
+          // Location 1: other_information.skills
+          const skillsData = data?.other_information?.skills || data?.skills;
+
+          if (Array.isArray(skillsData)) {
+            // Skills are array of objects: [{skillName: "..."}, ...] or array of strings
+            skillsData.forEach((s: any) => {
+              if (typeof s === 'string' && s.trim()) {
+                extracted.push(s.trim());
+              } else if (s && s.skillName && typeof s.skillName === 'string') {
+                extracted.push(s.skillName.trim());
+              } else if (s && s.name && typeof s.name === 'string') {
+                extracted.push(s.name.trim());
+              }
+            });
+          } else if (typeof skillsData === 'string') {
             // If skills is a JSON string, parse it
             try {
-              const parsed = JSON.parse(pds.other_information.skills);
+              const parsed = JSON.parse(skillsData);
               if (Array.isArray(parsed)) {
-                skills = parsed
-                  .filter((s: any) => s && (s.skillName || typeof s === 'string'))
-                  .map((s: any) => typeof s === 'string' ? s : s.skillName)
-                  .filter((s: string) => s && s.trim());
+                return extractSkills({ other_information: { skills: parsed } });
+              } else {
+                // Single skill as string
+                extracted.push(skillsData.trim());
               }
             } catch (error) {
-              // If parsing fails, try to use as single skill
-              skills = [pds.other_information.skills];
+              // Not JSON, treat as single skill
+              if (skillsData.trim()) {
+                extracted.push(skillsData.trim());
+              }
             }
+          }
+
+          // Location 2: other_information.specialSkills
+          if (data?.other_information?.specialSkills && Array.isArray(data.other_information.specialSkills)) {
+            data.other_information.specialSkills.forEach((s: any) => {
+              if (typeof s === 'string' && s.trim()) {
+                extracted.push(s.trim());
+              } else if (s && (s.skillName || s.name)) {
+                extracted.push((s.skillName || s.name).trim());
+              }
+            });
+          }
+
+          // Location 3: other_information.skills_hobbies
+          if (data?.other_information?.skills_hobbies && Array.isArray(data.other_information.skills_hobbies)) {
+            data.other_information.skills_hobbies.forEach((s: any) => {
+              if (typeof s === 'string' && s.trim()) {
+                extracted.push(s.trim());
+              } else if (s && (s.skillName || s.name)) {
+                extracted.push((s.skillName || s.name).trim());
+              }
+            });
+          }
+
+          return [...new Set(extracted)]; // Remove duplicates
+        };
+
+        if (pds) {
+          const pdsSkills = extractSkills(pds);
+          if (pdsSkills.length > 0) {
+            skills = pdsSkills;
+            console.log(`  ✓ Extracted ${skills.length} skills from PDS:`, skills);
+          } else {
+            console.log(`⚠️ No skills found in PDS. Raw other_information:`, JSON.stringify(pds.other_information || {}, null, 2));
           }
         }
 
         // --- EXTRACT ELIGIBILITIES ---
         let eligibilities: Array<{eligibilityTitle: string}> = profile?.eligibilities || [];
 
-        if (pds?.eligibility && Array.isArray(pds.eligibility)) {
-          eligibilities = pds.eligibility
-            .filter((e: any) => e && e.eligibilityTitle)
-            .map((e: any) => ({ eligibilityTitle: e.eligibilityTitle }));
+        // Check multiple possible field names for eligibilities
+        const extractEligibilities = (data: any): Array<{eligibilityTitle: string}> => {
+          const extracted: Array<{eligibilityTitle: string}> = [];
+
+          // Try multiple possible field names
+          const eligData = data?.eligibility || data?.eligibilities || data?.civil_service_eligibilities;
+
+          if (Array.isArray(eligData)) {
+            eligData.forEach((e: any) => {
+              if (!e) return;
+
+              // Try multiple possible field names for the title
+              // IMPORTANT: Check 'careerService' first (the actual field name in PDS forms)
+              const title = e.careerService || e.eligibilityTitle || e.title || e.name || e.eligibility || e.eligibilityName;
+
+              if (title && typeof title === 'string' && title.trim()) {
+                extracted.push({ eligibilityTitle: title.trim() });
+              } else if (typeof e === 'string' && e.trim()) {
+                // Eligibility stored as plain string
+                extracted.push({ eligibilityTitle: e.trim() });
+              }
+            });
+          }
+
+          return extracted;
+        };
+
+        if (pds) {
+          const pdsEligibilities = extractEligibilities(pds);
+          if (pdsEligibilities.length > 0) {
+            eligibilities = pdsEligibilities;
+            console.log(`  ✓ Extracted ${eligibilities.length} eligibilities from PDS:`, eligibilities.map(e => e.eligibilityTitle));
+          } else {
+            console.log(`⚠️ No eligibilities found in PDS. Raw eligibility data:`, JSON.stringify(pds.eligibility || pds.eligibilities || {}, null, 2));
+          }
         }
 
         // --- EXTRACT WORK EXPERIENCE TITLES ---
@@ -193,19 +331,48 @@ export async function POST(
 
         if (pds?.work_experience && Array.isArray(pds.work_experience)) {
           workExperienceTitles = pds.work_experience
-            .filter((work: any) => work && work.positionTitle)
-            .map((work: any) => work.positionTitle.trim())
+            .filter((work: any) => {
+              if (!work) return false;
+              const title = work.positionTitle || work.position || work.jobTitle;
+              return title && typeof title === 'string';
+            })
+            .map((work: any) => {
+              const title = work.positionTitle || work.position || work.jobTitle;
+              return title.trim();
+            })
             .filter((title: string) => title && title.length > 0);
+
+          console.log(`  ✓ Extracted ${workExperienceTitles.length} work experience titles:`, workExperienceTitles);
         }
 
-        console.log(`📊 Extracted data for ${profile?.first_name} ${profile?.surname}:`, {
-          education: highestEducation,
-          experience: totalYears,
-          skillsCount: skills.length,
-          eligibilitiesCount: eligibilities.length,
-          workTitlesCount: workExperienceTitles.length,
-          source: pds ? 'PDS' : 'Profile'
-        });
+        // --- COMPREHENSIVE DATA VALIDATION ---
+        console.log(`\n═══════════════════════════════════════════════════`);
+        console.log(`📊 FINAL EXTRACTED DATA for ${profile?.first_name} ${profile?.surname}`);
+        console.log(`═══════════════════════════════════════════════════`);
+        console.log(`  🎓 Education: ${highestEducation}`);
+        console.log(`  💼 Total Experience: ${totalYears} years`);
+        console.log(`  📝 Work Titles: ${workExperienceTitles.length} (${workExperienceTitles.join(', ') || 'None'})`);
+        console.log(`  🔧 Skills: ${skills.length} (${skills.join(', ') || 'None'})`);
+        console.log(`  🏆 Eligibilities: ${eligibilities.length} (${eligibilities.map(e => e.eligibilityTitle).join(', ') || 'None'})`);
+        console.log(`  📦 Data Source: ${pds ? 'PDS (Web Form)' : 'Profile (Fallback)'}`);
+
+        // Validation warnings
+        if (pds && totalYears === 0 && pds.work_experience && Array.isArray(pds.work_experience) && pds.work_experience.length > 0) {
+          console.warn(`⚠️ WARNING: Work experience records exist but years calculated as 0!`);
+          console.warn(`   Raw work experience data:`, JSON.stringify(pds.work_experience, null, 2));
+        }
+
+        if (pds && skills.length === 0) {
+          console.warn(`⚠️ WARNING: No skills extracted from PDS!`);
+          console.warn(`   Check if skills are properly saved in other_information`);
+        }
+
+        if (pds && eligibilities.length === 0) {
+          console.warn(`⚠️ WARNING: No eligibilities extracted from PDS!`);
+          console.warn(`   Check if eligibilities are properly saved`);
+        }
+
+        console.log(`═══════════════════════════════════════════════════\n`);
 
         return {
           applicationId: app.id,
@@ -226,6 +393,28 @@ export async function POST(
         { message: 'No eligible applications to rank (missing profile data). Please ensure applicants have completed their profiles.' },
         { status: 200 }
       );
+    }
+
+    // 3.5. Update applicant_profiles with extracted PDS data for frontend display
+    console.log('💾 Saving extracted data to applicant_profiles...');
+    for (const applicantData of applicantsData) {
+      if (applicantData.applicantProfileId) {
+        const { error: profileUpdateError } = await supabase
+          .from('applicant_profiles')
+          .update({
+            highest_educational_attainment: applicantData.highestEducationalAttainment,
+            total_years_experience: applicantData.totalYearsExperience,
+            skills: applicantData.skills,
+            eligibilities: applicantData.eligibilities
+          })
+          .eq('id', applicantData.applicantProfileId);
+
+        if (profileUpdateError) {
+          console.error(`❌ Failed to update applicant_profiles ${applicantData.applicantProfileId}:`, profileUpdateError);
+        } else {
+          console.log(`✅ Updated profile for ${applicantData.applicantName}`);
+        }
+      }
     }
 
     // 4. Rank applicants using Gemini AI-powered algorithms

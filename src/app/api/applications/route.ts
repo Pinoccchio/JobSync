@@ -15,6 +15,76 @@ import { createNotification, notifyJobCreator, notifyAdmins } from '@/lib/notifi
  * - applicant_profiles table: user_id, education, work_experience, eligibilities, skills, etc.
  */
 
+/**
+ * Extract applicant data from PDS (web-based forms) with fallback to applicant_profiles (OCR)
+ * Prioritizes applicant_pds data since PDF upload feature was removed 2025-01-01
+ */
+function extractPDSData(pds: any, profile: any) {
+  // Extract skills from PDS other_information or fallback to profile
+  let skills: string[] = profile?.skills || [];
+  if (pds?.other_information?.skills && Array.isArray(pds.other_information.skills)) {
+    skills = pds.other_information.skills;
+  }
+
+  // Extract eligibilities from PDS eligibility array or fallback to profile
+  let eligibilities: any[] = profile?.eligibilities || [];
+  if (pds?.eligibility && Array.isArray(pds.eligibility)) {
+    eligibilities = pds.eligibility.map((e: any) => ({
+      eligibilityTitle: e.careerService || e.eligibilityTitle || e.title || e.name || String(e)
+    }));
+  }
+
+  // Calculate total years of experience from PDS work_experience
+  let totalYears = profile?.total_years_experience || 0;
+  if (pds?.work_experience && Array.isArray(pds.work_experience)) {
+    // Calculate using same logic as ranking API
+    totalYears = pds.work_experience.reduce((total: number, work: any) => {
+      const fromDateStr = work.periodOfService?.from || work.from;
+      const toDateStr = work.periodOfService?.to || work.to;
+
+      if (!fromDateStr || !toDateStr) return total;
+
+      const from = new Date(fromDateStr);
+      const to = toDateStr === 'Present' ? new Date() : new Date(toDateStr);
+
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) return total;
+
+      const years = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      return total + Math.max(0, years);
+    }, 0);
+    totalYears = Math.round(totalYears * 10) / 10; // Round to 1 decimal place
+  }
+
+  // Extract highest educational attainment from PDS educational_background
+  let education = profile?.highest_educational_attainment || 'Not specified';
+  if (pds?.educational_background && Array.isArray(pds.educational_background)) {
+    const levels: Record<string, number> = {
+      'GRADUATE STUDIES': 5,
+      'COLLEGE': 4,
+      'VOCATIONAL': 3,
+      'SECONDARY': 2,
+      'ELEMENTARY': 1
+    };
+
+    const highest = pds.educational_background.reduce((max: any, current: any) => {
+      const currentLevel = levels[current.level?.toUpperCase()] || 0;
+      const maxLevel = max ? (levels[max.level?.toUpperCase()] || 0) : 0;
+      return currentLevel > maxLevel ? current : max;
+    }, null);
+
+    if (highest) {
+      education = highest.basicEducationDegreeCourse || highest.course || highest.level;
+    }
+  }
+
+  return {
+    skills,
+    eligibilities,
+    total_years_experience: totalYears,
+    highest_educational_attainment: education,
+  };
+}
+
 // GET /api/applications - List applications with filters
 export async function GET(request: NextRequest) {
   try {
@@ -75,6 +145,8 @@ export async function GET(request: NextRequest) {
         notification_sent,
         created_at,
         updated_at,
+        matched_skills_count,
+        matched_eligibilities_count,
         jobs:job_id (
           id,
           title,
@@ -116,7 +188,11 @@ export async function GET(request: NextRequest) {
         applicant_pds:pds_id (
           id,
           signature_url,
-          signature_uploaded_at
+          signature_uploaded_at,
+          educational_background,
+          work_experience,
+          eligibility,
+          other_information
         )
       `)
       .order('created_at', { ascending: false });
@@ -190,10 +266,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 8. Process each application to extract PDS data
+    const processedApplications = applications?.map((app: any) => {
+      const pds = app.applicant_pds;
+      const profile = app.applicant_profiles;
+
+      // Extract data from PDS with fallback to profile
+      const extracted = extractPDSData(pds, profile);
+
+      return {
+        ...app,
+        // Add extracted fields for frontend consumption
+        _extracted: extracted,
+      };
+    }) || [];
+
     return NextResponse.json({
       success: true,
-      data: applications,
-      count: applications?.length || 0,
+      data: processedApplications,
+      count: processedApplications?.length || 0,
     });
 
   } catch (error: any) {

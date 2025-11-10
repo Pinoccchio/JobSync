@@ -103,6 +103,42 @@ function stringSimilarity(str1: string, str2: string): number {
 }
 
 /**
+ * Match degree requirement that may contain "OR" conditions
+ * Handles requirements like "Bachelor of Science in Office Administration or Public Administration"
+ *
+ * @param jobDegree - The job's degree requirement (may contain "or" to specify alternatives)
+ * @param applicantDegree - The applicant's degree
+ * @returns Similarity score (0-100) - takes the highest match from all OR options
+ *
+ * @example
+ * matchDegreeRequirement(
+ *   "Bachelor of Science in Office Administration or Public Administration",
+ *   "Bachelor of Science in Public Administration"
+ * ) // Returns ~100 (matches second option)
+ */
+function matchDegreeRequirement(jobDegree: string, applicantDegree: string): number {
+  // Split by " or " to handle multiple acceptable degrees
+  const degreeOptions = jobDegree.split(/ or /i);
+  let maxScore = 0;
+
+  for (const option of degreeOptions) {
+    const trimmedOption = option.trim();
+    const similarity = stringSimilarity(trimmedOption, applicantDegree);
+
+    // ✅ FIX: Normalize OR conditions - treat high similarity (≥85%) as perfect match
+    // This ensures "Office Administration" and "Public Administration" both score 100%
+    // when requirement is "Office Administration or Public Administration"
+    if (degreeOptions.length > 1 && similarity >= 85) {
+      return 100; // Perfect match for any OR option with high similarity
+    }
+
+    maxScore = Math.max(maxScore, similarity);
+  }
+
+  return maxScore;
+}
+
+/**
  * Calculate skill match score using weighted matching
  * Scoring:
  * - Exact match: 100 points per skill
@@ -202,8 +238,8 @@ export function algorithm1_WeightedSum(
   const jobDegree = job.degreeRequirement.toLowerCase().trim();
   const applicantDegree = applicant.highestEducationalAttainment.toLowerCase().trim();
 
-  // Calculate base similarity
-  let educationScore = stringSimilarity(jobDegree, applicantDegree);
+  // Calculate base similarity (handles "OR" conditions in degree requirements)
+  let educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
 
   // Boost for same degree level (bachelor's, master's, etc.)
   const degreeLevels = ['elementary', 'secondary', 'vocational', 'bachelor', 'master', 'doctoral', 'graduate studies'];
@@ -300,20 +336,28 @@ export function algorithm1_WeightedSum(
 
   if (jobEligibilities.length > 0 && !jobEligibilities.some(e => e.includes('none') || e.includes('not required'))) {
     let totalScore = 0;
-    let matchedCount = 0;
+    const matchedEligibilities = new Set<string>(); // ✅ Track unique applicant eligibilities
 
     for (const reqElig of jobEligibilities) {
       let bestMatch = 0;
+      let bestMatchingAppElig = ''; // ✅ Track WHICH applicant eligibility matched
 
       for (const appElig of applicantEligibilities) {
         const similarity = stringSimilarity(reqElig, appElig);
 
         if (similarity >= 70) {
           // Strong match (exact or very similar)
-          bestMatch = Math.max(bestMatch, similarity);
+          if (similarity > bestMatch) {
+            bestMatch = similarity;
+            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+          }
         } else if (similarity >= 40) {
           // Moderate match
-          bestMatch = Math.max(bestMatch, similarity * 0.7);
+          const moderateScore = similarity * 0.7;
+          if (moderateScore > bestMatch) {
+            bestMatch = moderateScore;
+            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+          }
         } else {
           // Check for keyword matches (e.g., "Civil Service" in both)
           const reqTokens = normalizeSkill(reqElig);
@@ -322,29 +366,33 @@ export function algorithm1_WeightedSum(
 
           if (commonTokens.length > 0) {
             const tokenMatchScore = (commonTokens.length / reqTokens.length) * 40;
-            bestMatch = Math.max(bestMatch, tokenMatchScore);
+            if (tokenMatchScore > bestMatch) {
+              bestMatch = tokenMatchScore;
+              bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+            }
           }
         }
       }
 
-      if (bestMatch > 0) {
-        matchedCount++;
+      if (bestMatchingAppElig) {
+        matchedEligibilities.add(bestMatchingAppElig); // ✅ Add unique applicant eligibility to Set
       }
       totalScore += bestMatch;
     }
 
-    matchedEligibilitiesCount = matchedCount;
+    matchedEligibilitiesCount = matchedEligibilities.size; // ✅ Count unique applicant eligibilities
 
     // Debug logging for eligibility matching
     console.log(`🔍 [Algorithm 1] Eligibility matching:`, {
       jobEligibilities,
       applicantEligibilities,
-      matchedCount,
+      matchedEligibilities: Array.from(matchedEligibilities),
+      matchedCount: matchedEligibilitiesCount,
       totalScore
     });
 
     // Calculate proportional score
-    const matchRatio = matchedCount / jobEligibilities.length;
+    const matchRatio = matchedEligibilitiesCount / jobEligibilities.length;
     const avgSimilarity = totalScore / jobEligibilities.length;
 
     // Combined score: 60% match ratio + 40% similarity quality
@@ -356,7 +404,7 @@ export function algorithm1_WeightedSum(
     eligibilityScore = Math.min(eligibilityScore + bonus, 100);
 
     // Ensure minimum score if some matches found
-    if (matchedCount > 0) {
+    if (matchedEligibilitiesCount > 0) {
       eligibilityScore = Math.max(eligibilityScore, 40);
     } else {
       eligibilityScore = Math.min(eligibilityScore, 25); // Penalty for no matches
@@ -447,11 +495,11 @@ export function algorithm2_SkillExperienceComposite(
   const beta = 0.5;
   const composite = skillsScore * Math.exp(beta * Math.min(experienceRatio, 2)) / Math.exp(beta * 2);
 
-  // Education scoring: Enhanced continuous scoring
+  // Education scoring: Enhanced continuous scoring (handles "OR" conditions)
   const jobDegree = job.degreeRequirement.toLowerCase().trim();
   const applicantDegree = applicant.highestEducationalAttainment.toLowerCase().trim();
 
-  let educationScore = stringSimilarity(jobDegree, applicantDegree);
+  let educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
 
   const degreeLevels = ['elementary', 'secondary', 'vocational', 'bachelor', 'master', 'doctoral', 'graduate studies'];
   const jobLevel = degreeLevels.find(level => jobDegree.includes(level));
@@ -484,18 +532,26 @@ export function algorithm2_SkillExperienceComposite(
 
   if (jobEligibilities.length > 0 && !jobEligibilities.some(e => e.includes('none') || e.includes('not required'))) {
     let totalScore = 0;
-    let matchedCount = 0;
+    const matchedEligibilities = new Set<string>(); // ✅ Track unique applicant eligibilities
 
     for (const reqElig of jobEligibilities) {
       let bestMatch = 0;
+      let bestMatchingAppElig = ''; // ✅ Track WHICH applicant eligibility matched
 
       for (const appElig of applicantEligibilities) {
         const similarity = stringSimilarity(reqElig, appElig);
 
         if (similarity >= 70) {
-          bestMatch = Math.max(bestMatch, similarity);
+          if (similarity > bestMatch) {
+            bestMatch = similarity;
+            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+          }
         } else if (similarity >= 40) {
-          bestMatch = Math.max(bestMatch, similarity * 0.7);
+          const moderateScore = similarity * 0.7;
+          if (moderateScore > bestMatch) {
+            bestMatch = moderateScore;
+            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+          }
         } else {
           const reqTokens = normalizeSkill(reqElig);
           const appTokens = normalizeSkill(appElig);
@@ -503,20 +559,23 @@ export function algorithm2_SkillExperienceComposite(
 
           if (commonTokens.length > 0) {
             const tokenMatchScore = (commonTokens.length / reqTokens.length) * 40;
-            bestMatch = Math.max(bestMatch, tokenMatchScore);
+            if (tokenMatchScore > bestMatch) {
+              bestMatch = tokenMatchScore;
+              bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+            }
           }
         }
       }
 
-      if (bestMatch > 0) {
-        matchedCount++;
+      if (bestMatchingAppElig) {
+        matchedEligibilities.add(bestMatchingAppElig); // ✅ Add unique applicant eligibility to Set
       }
       totalScore += bestMatch;
     }
 
-    matchedEligibilitiesCount = matchedCount;
+    matchedEligibilitiesCount = matchedEligibilities.size; // ✅ Count unique applicant eligibilities
 
-    const matchRatio = matchedCount / jobEligibilities.length;
+    const matchRatio = matchedEligibilitiesCount / jobEligibilities.length;
     const avgSimilarity = totalScore / jobEligibilities.length;
 
     eligibilityScore = (matchRatio * 60) + (avgSimilarity * 0.4);
@@ -525,7 +584,7 @@ export function algorithm2_SkillExperienceComposite(
     const bonus = Math.min(bonusElig * 5, 15);
     eligibilityScore = Math.min(eligibilityScore + bonus, 100);
 
-    if (matchedCount > 0) {
+    if (matchedEligibilitiesCount > 0) {
       eligibilityScore = Math.max(eligibilityScore, 40);
     } else {
       eligibilityScore = Math.min(eligibilityScore, 25);
@@ -578,29 +637,37 @@ export function algorithm3_EligibilityEducationTiebreaker(
 
   if (jobEligibilities.length > 0 && !jobEligibilities.some(e => e.includes('none') || e.includes('not required'))) {
     let totalEligScore = 0;
-    let matchedCount = 0;
+    const matchedEligibilities = new Set<string>(); // ✅ Track unique applicant eligibilities
 
     for (const reqElig of jobEligibilities) {
       let bestMatch = 0;
+      let bestMatchingAppElig = ''; // ✅ Track WHICH applicant eligibility matched
 
       for (const appElig of applicantEligibilities) {
         const similarity = stringSimilarity(reqElig, appElig);
         if (similarity >= 70) {
-          bestMatch = Math.max(bestMatch, similarity);
+          if (similarity > bestMatch) {
+            bestMatch = similarity;
+            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+          }
         } else if (similarity >= 40) {
-          bestMatch = Math.max(bestMatch, similarity * 0.7);
+          const moderateScore = similarity * 0.7;
+          if (moderateScore > bestMatch) {
+            bestMatch = moderateScore;
+            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
+          }
         }
       }
 
-      if (bestMatch > 0) {
-        matchedCount++;
+      if (bestMatchingAppElig) {
+        matchedEligibilities.add(bestMatchingAppElig); // ✅ Add unique applicant eligibility to Set
       }
       totalEligScore += bestMatch;
     }
 
-    matchedEligibilitiesCount = matchedCount;
+    matchedEligibilitiesCount = matchedEligibilities.size; // ✅ Count unique applicant eligibilities
 
-    const matchRatio = matchedCount / jobEligibilities.length;
+    const matchRatio = matchedEligibilitiesCount / jobEligibilities.length;
     const avgSimilarity = totalEligScore / jobEligibilities.length;
     eligibilityScore = (matchRatio * 60) + (avgSimilarity * 0.4);
 
@@ -613,11 +680,11 @@ export function algorithm3_EligibilityEducationTiebreaker(
     reasoning.push('No license required (+20)');
   }
 
-  // Priority 2: Degree match - Enhanced continuous scoring
+  // Priority 2: Degree match - Enhanced continuous scoring (handles "OR" conditions)
   const jobDegree = job.degreeRequirement.toLowerCase().trim();
   const applicantDegree = applicant.highestEducationalAttainment.toLowerCase().trim();
 
-  let educationScore = stringSimilarity(jobDegree, applicantDegree);
+  let educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
 
   const degreeLevels = ['elementary', 'secondary', 'vocational', 'bachelor', 'master', 'doctoral', 'graduate studies'];
   const jobLevel = degreeLevels.find(level => jobDegree.includes(level));

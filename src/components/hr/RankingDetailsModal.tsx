@@ -23,6 +23,62 @@ import {
 } from '@/lib/utils/rankingStatistics';
 import { AlgorithmInfoModal } from './AlgorithmInfoModal';
 
+/**
+ * Calculate string similarity percentage using Levenshtein distance
+ * Used for checking OR-condition matches in education requirements
+ * @returns Similarity percentage (0-100)
+ */
+function calculateStringSimilarity(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+
+  // Exact match
+  if (s1 === s2) return 100;
+
+  // Substring match (high similarity)
+  if (s1.includes(s2) || s2.includes(s1)) return 90;
+
+  // Levenshtein distance calculation for fuzzy matching
+  const len1 = s1.length;
+  const len2 = s2.length;
+
+  // Create matrix for dynamic programming
+  const matrix: number[][] = [];
+
+  // Initialize first column and row
+  for (let i = 0; i <= len1; i++) matrix[i] = [i];
+  for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+
+  // Fill matrix with edit distances
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  // Convert edit distance to similarity percentage
+  const maxLen = Math.max(len1, len2);
+  if (maxLen === 0) return 100;
+
+  const distance = matrix[len1][len2];
+  return ((maxLen - distance) / maxLen) * 100;
+}
+
+/**
+ * Round experience years to 1 decimal place to eliminate floating-point precision errors
+ * @param years - Number of years (may have floating-point precision errors)
+ * @returns Rounded value with 1 decimal place precision
+ * @example roundExperience(0.3999999999999999) → 0.4
+ */
+function roundExperience(years: number): number {
+  return Math.round(years * 10) / 10;
+}
+
 interface Statistics {
   min: number;
   max: number;
@@ -71,6 +127,8 @@ interface RankingDetailsModalProps {
     skills?: string[];
     eligibilities?: string[];
     algorithmDetails?: AlgorithmDetails;
+    matchedSkillsCount?: number;
+    matchedEligibilitiesCount?: number;
     // Statistical context
     statistics?: {
       matchScore: Statistics;
@@ -112,22 +170,24 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
 
     // Experience analysis
     if (applicant.experience !== undefined) {
-      const excessYears = applicant.experience - jobRequirements.yearsOfExperience;
+      // Round to 1 decimal place to eliminate floating-point precision issues
+      const roundedExperience = Math.round((applicant.experience || 0) * 10) / 10;
+      const excessYears = Math.round(((applicant.experience || 0) - jobRequirements.yearsOfExperience) * 10) / 10;
       const percentageAbove = jobRequirements.yearsOfExperience > 0
         ? Math.round((excessYears / jobRequirements.yearsOfExperience) * 100)
         : 0;
 
       if (excessYears > 0) {
         explanations.push(
-          `This candidate has ${applicant.experience} years of experience, exceeding the ${jobRequirements.yearsOfExperience}-year requirement by ${excessYears} ${excessYears === 1 ? 'year' : 'years'} (${percentageAbove}% more than required).`
+          `This candidate has ${roundedExperience} years of experience, exceeding the ${jobRequirements.yearsOfExperience}-year requirement by ${excessYears} ${excessYears === 1 ? 'year' : 'years'} (${percentageAbove}% more than required).`
         );
       } else if (excessYears === 0) {
         explanations.push(
-          `This candidate has exactly ${applicant.experience} years of experience, precisely meeting the ${jobRequirements.yearsOfExperience}-year requirement.`
+          `This candidate has exactly ${roundedExperience} years of experience, precisely meeting the ${jobRequirements.yearsOfExperience}-year requirement.`
         );
       } else {
         explanations.push(
-          `This candidate has ${applicant.experience} years of experience, which is ${Math.abs(excessYears)} ${Math.abs(excessYears) === 1 ? 'year' : 'years'} below the ${jobRequirements.yearsOfExperience}-year requirement.`
+          `This candidate has ${roundedExperience} years of experience, which is ${Math.abs(excessYears)} ${Math.abs(excessYears) === 1 ? 'year' : 'years'} below the ${jobRequirements.yearsOfExperience}-year requirement.`
         );
       }
     }
@@ -158,9 +218,29 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
       const educationLower = applicant.education.toLowerCase();
       const requiredLower = jobRequirements.degreeRequirement.toLowerCase();
 
-      if (applicant.educationScore >= 80) {
+      // Check if requirement has OR conditions (e.g., "Office Administration or Public Administration")
+      const degreeOptions = jobRequirements.degreeRequirement.split(/ or /i).map(opt => opt.trim());
+
+      // Check if applicant's education matches any OR option
+      let matchesOrCondition = false;
+      let bestMatchScore = 0;
+
+      for (const option of degreeOptions) {
+        const similarity = calculateStringSimilarity(applicant.education, option);
+        bestMatchScore = Math.max(bestMatchScore, similarity);
+
+        // Consider it a match if similarity >= 85% (matches algorithm normalization threshold)
+        if (similarity >= 85) {
+          matchesOrCondition = true;
+          break;
+        }
+      }
+
+      // Generate explanation based on both OR matching AND score thresholds
+      // If matches any OR condition with 85%+ similarity, treat as "meets requirement"
+      if (matchesOrCondition || applicant.educationScore >= 80) {
         explanations.push(
-          `Their ${applicant.education} fully meets or exceeds the ${jobRequirements.degreeRequirement} requirement.`
+          `Their ${applicant.education} meets the ${jobRequirements.degreeRequirement} requirement.`
         );
       } else if (applicant.educationScore >= 50) {
         explanations.push(
@@ -218,7 +298,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
           <Icon className={`w-5 h-5 ${color}`} />
           <span className="font-medium text-gray-700">{label}</span>
         </div>
-        <span className={`text-lg font-bold ${color}`}>{score.toFixed(1)}%</span>
+        <span className={`text-lg font-bold ${color}`}>{Math.round(score * 10) / 10}%</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
         <div
@@ -323,7 +403,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
         return 'Only applicant for this position';
       }
       if (applicant.experience && jobRequirements && applicant.experience > jobRequirements.yearsOfExperience) {
-        const excess = applicant.experience - jobRequirements.yearsOfExperience;
+        const excess = roundExperience(applicant.experience - jobRequirements.yearsOfExperience);
         return `Top-ranked candidate - Exceeds experience requirement by ${excess} ${excess === 1 ? 'year' : 'years'}`;
       }
       return 'Top-ranked candidate with highest overall qualifications';
@@ -463,15 +543,29 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                 {jobRequirements && (
                   <span className="ml-2 font-semibold">
                     {applicant.experience > jobRequirements.yearsOfExperience ? (
-                      <span className="text-green-600">
-                        (+{applicant.experience - jobRequirements.yearsOfExperience} {applicant.experience - jobRequirements.yearsOfExperience === 1 ? 'year' : 'years'} above minimum) ⭐
-                      </span>
+                      <>
+                        {(() => {
+                          const excess = roundExperience(applicant.experience - jobRequirements.yearsOfExperience);
+                          return (
+                            <span className="text-green-600">
+                              (+{excess} {excess === 1 ? 'year' : 'years'} above minimum) ⭐
+                            </span>
+                          );
+                        })()}
+                      </>
                     ) : applicant.experience === jobRequirements.yearsOfExperience ? (
                       <span className="text-blue-600">(Exactly meets requirement) ✓</span>
                     ) : (
-                      <span className="text-red-600">
-                        (-{jobRequirements.yearsOfExperience - applicant.experience} {jobRequirements.yearsOfExperience - applicant.experience === 1 ? 'year' : 'years'} below minimum) ⚠
-                      </span>
+                      <>
+                        {(() => {
+                          const shortage = roundExperience(jobRequirements.yearsOfExperience - applicant.experience);
+                          return (
+                            <span className="text-red-600">
+                              (-{shortage} {shortage === 1 ? 'year' : 'years'} below minimum) ⚠
+                            </span>
+                          );
+                        })()}
+                      </>
                     )}
                   </span>
                 )}
@@ -652,13 +746,13 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                       <span className="text-gray-400">→</span>
                       <span className="text-gray-600">Has:</span>
                       <span className="font-medium">{applicant.education || 'Not specified'}</span>
-                      {applicant.educationScore >= 80 && (
+                      {applicant.educationScore >= 75 && (
                         <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
                       )}
-                      {applicant.educationScore >= 50 && applicant.educationScore < 80 && (
+                      {applicant.educationScore >= 40 && applicant.educationScore < 75 && (
                         <AlertCircle className="w-5 h-5 text-yellow-500 ml-2" />
                       )}
-                      {applicant.educationScore < 50 && (
+                      {applicant.educationScore < 40 && (
                         <XCircle className="w-5 h-5 text-red-500 ml-2" />
                       )}
                     </div>
@@ -838,7 +932,7 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                     <span className="text-green-600 mt-0.5">✓</span>
                     <span>
                       {applicant.experience && jobRequirements && applicant.experience > jobRequirements.yearsOfExperience
-                        ? `${applicant.experience - jobRequirements.yearsOfExperience} years above required experience`
+                        ? `${roundExperience(applicant.experience - jobRequirements.yearsOfExperience)} years above required experience`
                         : 'Meets experience requirement'}
                     </span>
                   </div>

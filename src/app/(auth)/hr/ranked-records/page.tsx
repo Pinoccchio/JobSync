@@ -155,6 +155,12 @@ export default function RankedRecordsPage() {
             statusHistory: app.status_history || [],
             matchedSkillsCount: app.matched_skills_count,
             matchedEligibilitiesCount: app.matched_eligibilities_count,
+            _extracted: app._extracted || {
+              skills: app.applicant_profiles?.skills || [],
+              eligibilities: app.applicant_profiles?.eligibilities || [],
+              total_years_experience: app.applicant_profiles?.total_years_experience || 0,
+              highest_educational_attainment: app.applicant_profiles?.highest_educational_attainment || 'Not specified',
+            },
             _raw: app,
           }))
         );
@@ -770,10 +776,10 @@ export default function RankedRecordsPage() {
       eligibilityScore: raw?.eligibility_score || 0,
       algorithmUsed: raw?.algorithm_used || 'Unknown',
       reasoning: raw?.ranking_reasoning || 'No reasoning available',
-      education: raw?.applicant_profiles?.highest_educational_attainment,
-      experience: raw?.applicant_profiles?.total_years_experience,
-      skills: raw?.applicant_profiles?.skills || [],
-      eligibilities: (raw?.applicant_profiles?.eligibilities || []).map((e: any) => e.eligibilityTitle || e),
+      education: raw?._extracted?.highest_educational_attainment || raw?.applicant_profiles?.highest_educational_attainment,
+      experience: raw?._extracted?.total_years_experience || raw?.applicant_profiles?.total_years_experience,
+      skills: raw?._extracted?.skills || raw?.applicant_profiles?.skills || [],
+      eligibilities: (raw?._extracted?.eligibilities || raw?.applicant_profiles?.eligibilities || []).map((e: any) => e.eligibilityTitle || e),
       algorithmDetails: raw?.algorithm_details ? (
         typeof raw.algorithm_details === 'string'
           ? JSON.parse(raw.algorithm_details)
