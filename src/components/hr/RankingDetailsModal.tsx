@@ -275,14 +275,18 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
       }
 
       // Generate explanation based on both OR matching AND score thresholds
-      // If matches any OR condition with 85%+ similarity, treat as "meets requirement"
+      // Tiered system: 80% = meets, 60% = related field, 40% = same level, <40% = does not meet
       if (matchesOrCondition || applicant.educationScore >= 80) {
         explanations.push(
           `Their ${applicant.education} meets the ${jobRequirements.degreeRequirement} requirement.`
         );
-      } else if (applicant.educationScore >= 50) {
+      } else if (applicant.educationScore >= 60) {
         explanations.push(
-          `Their ${applicant.education} partially meets the ${jobRequirements.degreeRequirement} requirement.`
+          `Their ${applicant.education} partially meets the ${jobRequirements.degreeRequirement} requirement (related field).`
+        );
+      } else if (applicant.educationScore >= 40) {
+        explanations.push(
+          `Their ${applicant.education} shows the same degree level but different specialization from the ${jobRequirements.degreeRequirement} requirement.`
         );
       } else {
         explanations.push(
@@ -784,10 +788,10 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                       <span className="text-gray-400">→</span>
                       <span className="text-gray-600">Has:</span>
                       <span className="font-medium">{applicant.education || 'Not specified'}</span>
-                      {applicant.educationScore >= 75 && (
+                      {applicant.educationScore >= 80 && (
                         <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
                       )}
-                      {applicant.educationScore >= 40 && applicant.educationScore < 75 && (
+                      {applicant.educationScore >= 40 && applicant.educationScore < 80 && (
                         <AlertCircle className="w-5 h-5 text-yellow-500 ml-2" />
                       )}
                       {applicant.educationScore < 40 && (

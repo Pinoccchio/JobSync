@@ -318,7 +318,14 @@ export function algorithm1_WeightedSum(
 
   if (jobLevel && applicantLevel) {
     if (jobLevel === applicantLevel) {
-      educationScore = Math.max(educationScore, 75); // Same level gets at least 75%
+      // Tiered floor based on existing similarity:
+      // - If fields are somewhat similar (40%+), boost to 60% (related but not exact match)
+      // - If completely different fields (<40%), floor at 40% (same level, different specialization)
+      if (educationScore >= 40) {
+        educationScore = Math.max(educationScore, 60);
+      } else {
+        educationScore = Math.max(educationScore, 40);
+      }
     }
 
     // Higher degree than required gets bonus
@@ -331,12 +338,18 @@ export function algorithm1_WeightedSum(
     }
   }
 
-  // Check for related fields (IT/CS, Engineering fields, etc.)
+  // Check for related fields (IT/CS, Engineering, Business/Admin fields, etc.)
   const relatedFields: Record<string, string[]> = {
     'information technology': ['computer science', 'software engineering', 'information systems'],
     'computer science': ['information technology', 'software engineering', 'computer engineering'],
     'civil engineering': ['architecture', 'structural engineering', 'construction management'],
     'nursing': ['midwifery', 'health sciences', 'medical technology'],
+    // Business & Administration cluster
+    // Note: Accounting and Office/Public Admin are DIFFERENT specializations, not related
+    'accounting': ['finance', 'business administration'], // Financial/bookkeeping focus
+    'office administration': ['public administration', 'business administration', 'secretarial'], // Clerical/admin focus
+    'public administration': ['office administration', 'business administration', 'political science'], // Government/policy focus
+    'business administration': ['management', 'organizational development'], // General business management
   };
 
   for (const [field, related] of Object.entries(relatedFields)) {
@@ -577,7 +590,14 @@ export function algorithm2_SkillExperienceComposite(
 
   if (jobLevel && applicantLevel) {
     if (jobLevel === applicantLevel) {
-      educationScore = Math.max(educationScore, 75);
+      // Tiered floor based on existing similarity (consistent with Algorithm 1):
+      // - If fields are somewhat similar (40%+), boost to 60% (related but not exact match)
+      // - If completely different fields (<40%), floor at 40% (same level, different specialization)
+      if (educationScore >= 40) {
+        educationScore = Math.max(educationScore, 60);
+      } else {
+        educationScore = Math.max(educationScore, 40);
+      }
     }
 
     const jobLevelIndex = degreeLevels.indexOf(jobLevel);
@@ -762,7 +782,14 @@ export function algorithm3_EligibilityEducationTiebreaker(
 
   if (jobLevel && applicantLevel) {
     if (jobLevel === applicantLevel) {
-      educationScore = Math.max(educationScore, 85);
+      // Tiered floor based on existing similarity (consistent with Algorithm 1 & 2):
+      // - If fields are somewhat similar (40%+), boost to 60% (related but not exact match)
+      // - If completely different fields (<40%), floor at 40% (same level, different specialization)
+      if (educationScore >= 40) {
+        educationScore = Math.max(educationScore, 60);
+      } else {
+        educationScore = Math.max(educationScore, 40);
+      }
     }
 
     const jobLevelIndex = degreeLevels.indexOf(jobLevel);

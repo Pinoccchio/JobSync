@@ -1,4 +1,4 @@
- POST /api/log 200 in 331ms
+ POST /api/log 200 in 816ms
 Applications query result: {
   applications: [
     {
@@ -18,18 +18,18 @@ Applications query result: {
       applicant_pds: [Object]
     },
     {
-      id: '6aa96fe0-4cc7-4649-888f-9d71cdf927ed',
-      applicant_id: 'ca532994-090e-46ca-a5ae-9a2ba4390906',
-      applicant_profile_id: 'adc447a5-3ccb-4d5c-afff-556dd1138955',
-      pds_id: 'f7cc4ec3-69ff-4ed6-a490-470d34dd6063',
-      applicant_profiles: [Object],
-      applicant_pds: [Object]
-    },
-    {
       id: '7f48da81-3f6a-4eb0-8011-785d377b3f27',
       applicant_id: '89eda496-ce9e-4103-adda-5f25401d4aba',
       applicant_profile_id: 'b7f8d884-6e0a-4947-94c8-a274d404d56e',
       pds_id: '95c3bab1-ced0-4640-91ba-a58d52b8e229',
+      applicant_profiles: [Object],
+      applicant_pds: [Object]
+    },
+    {
+      id: '6aa96fe0-4cc7-4649-888f-9d71cdf927ed',
+      applicant_id: 'ca532994-090e-46ca-a5ae-9a2ba4390906',
+      applicant_profile_id: 'adc447a5-3ccb-4d5c-afff-556dd1138955',
+      pds_id: 'f7cc4ec3-69ff-4ed6-a490-470d34dd6063',
       applicant_profiles: [Object],
       applicant_pds: [Object]
     },
@@ -111,24 +111,6 @@ Applications query result: {
   📦 Data Source: PDS (Web Form)
 ═══════════════════════════════════════════════════
 
-📝 Processing 1 work experience records for Tres Santos
-  ✓ Work experience: Accounting Clerk - 0.6 years
-📊 Total work experience: 0.6 years
-  ✓ Extracted 4 skills from PDS: [ 'Word', 'Excel', 'Google Suite', 'basic PDF editing' ]
-  ✓ Extracted 1 eligibilities from PDS: [ 'Career Service Subprofessional' ]
-  ✓ Extracted 1 work experience titles: [ 'Accounting Clerk' ]
-
-═══════════════════════════════════════════════════
-📊 FINAL EXTRACTED DATA for Tres Santos
-═══════════════════════════════════════════════════
-  🎓 Education: Bachelor of Science in Business Administration
-  💼 Total Experience: 0.6 years
-  📝 Work Titles: 1 (Accounting Clerk)
-  🔧 Skills: 4 (Word, Excel, Google Suite, basic PDF editing)
-  🏆 Eligibilities: 1 (Career Service Subprofessional)
-  📦 Data Source: PDS (Web Form)
-═══════════════════════════════════════════════════
-
 📝 Processing 1 work experience records for Anika Dela Cruz
 ⚠️ Work experience missing dates: {
   work: {
@@ -169,6 +151,24 @@ Applications query result: {
     "departmentAgencyOfficeCompany": ""
   }
 ]
+═══════════════════════════════════════════════════
+
+📝 Processing 1 work experience records for Tres Santos
+  ✓ Work experience: Accounting Clerk - 0.6 years
+📊 Total work experience: 0.6 years
+  ✓ Extracted 4 skills from PDS: [ 'Word', 'Excel', 'Google Suite', 'basic PDF editing' ]
+  ✓ Extracted 1 eligibilities from PDS: [ 'Career Service Subprofessional' ]
+  ✓ Extracted 1 work experience titles: [ 'Accounting Clerk' ]
+
+═══════════════════════════════════════════════════
+📊 FINAL EXTRACTED DATA for Tres Santos
+═══════════════════════════════════════════════════
+  🎓 Education: Bachelor of Science in Business Administration
+  💼 Total Experience: 0.6 years
+  📝 Work Titles: 1 (Accounting Clerk)
+  🔧 Skills: 4 (Word, Excel, Google Suite, basic PDF editing)
+  🏆 Eligibilities: 1 (Career Service Subprofessional)
+  📦 Data Source: PDS (Web Form)
 ═══════════════════════════════════════════════════
 
 📝 Processing 1 work experience records for Juan Antonio
@@ -239,8 +239,8 @@ Applications query result: {
 💾 Saving extracted data to applicant_profiles...
 ✅ Updated profile for Dos Fernandez
 ✅ Updated profile for Maria Lourdes
-✅ Updated profile for Tres Santos
 ✅ Updated profile for Anika Dela Cruz
+✅ Updated profile for Tres Santos
 ✅ Updated profile for Juan Antonio
 ✅ Updated profile for Paolo Reyes
 ✅ Updated profile for Jericho Ramos
@@ -275,20 +275,6 @@ Ranking 7 applicants for job: Office Clerk
 }
 🔍 [Algorithm 1] Eligibility matching: {
   jobEligibilities: [ 'career service subprofessional', 'career service professional' ],
-  applicantEligibilities: [ 'career service subprofessional' ],
-  matchedEligibilities: [ 'career service subprofessional' ],
-  matchedCount: 1,
-  totalScore: 190
-}
-🔍 [Algorithm 1] Eligibility matching: {
-  jobEligibilities: [ 'career service subprofessional', 'career service professional' ],
-  applicantEligibilities: [ 'career service subprofessional' ],
-  matchedEligibilities: [ 'career service subprofessional' ],
-  matchedCount: 1,
-  totalScore: 190
-}
-🔍 [Algorithm 1] Eligibility matching: {
-  jobEligibilities: [ 'career service subprofessional', 'career service professional' ],
   applicantEligibilities: [ 'career service professional' ],
   matchedEligibilities: [ 'career service professional' ],
   matchedCount: 1,
@@ -298,6 +284,20 @@ Ranking 7 applicants for job: Office Clerk
   jobEligibilities: [ 'career service subprofessional', 'career service professional' ],
   applicantEligibilities: [ 'career service professional' ],
   matchedEligibilities: [ 'career service professional' ],
+  matchedCount: 1,
+  totalScore: 190
+}
+🔍 [Algorithm 1] Eligibility matching: {
+  jobEligibilities: [ 'career service subprofessional', 'career service professional' ],
+  applicantEligibilities: [ 'career service subprofessional' ],
+  matchedEligibilities: [ 'career service subprofessional' ],
+  matchedCount: 1,
+  totalScore: 190
+}
+🔍 [Algorithm 1] Eligibility matching: {
+  jobEligibilities: [ 'career service subprofessional', 'career service professional' ],
+  applicantEligibilities: [ 'career service subprofessional' ],
+  matchedEligibilities: [ 'career service subprofessional' ],
   matchedCount: 1,
   totalScore: 190
 }
@@ -346,9 +346,9 @@ Ranking 7 applicants for job: Office Clerk
 🔍 Checking for tied candidates...
    ✨ No tied candidates found - all scores are unique!
 Error generating Gemini insights: Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent: [429 Too Many Requests] You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit.
-* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0
 * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0
-Please retry in 49.380665225s. [{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count","quotaId":"GenerateContentInputTokensPerModelPerMinute-FreeTier","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"}},{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaDimensions":{"model":"gemini-2.0-flash-exp","location":"global"}}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"49s"}]
+* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0
+Please retry in 40.31223705s. [{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"}},{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count","quotaId":"GenerateContentInputTokensPerModelPerMinute-FreeTier","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"}}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"40s"}]
     at async addGeminiInsights (src\lib\gemini\rankApplicants.ts:291:20)
     at async rankApplicantsForJob (src\lib\gemini\rankApplicants.ts:241:7)
     at async POST (src\app\api\jobs\[id]\rank\route.ts:423:30)
@@ -364,9 +364,9 @@ Please retry in 49.380665225s. [{"@type":"type.googleapis.com/google.rpc.Help","
   errorDetails: [Array]
 }
 Gemini AI insights failed: Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent: [429 Too Many Requests] You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit.
-* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0
 * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0
-Please retry in 49.380665225s. [{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count","quotaId":"GenerateContentInputTokensPerModelPerMinute-FreeTier","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"}},{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaDimensions":{"model":"gemini-2.0-flash-exp","location":"global"}}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"49s"}]
+* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0
+Please retry in 40.31223705s. [{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"}},{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count","quotaId":"GenerateContentInputTokensPerModelPerMinute-FreeTier","quotaDimensions":{"location":"global","model":"gemini-2.0-flash-exp"}}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"40s"}]
     at async addGeminiInsights (src\lib\gemini\rankApplicants.ts:291:20)
     at async rankApplicantsForJob (src\lib\gemini\rankApplicants.ts:241:7)
     at async POST (src\app\api\jobs\[id]\rank\route.ts:423:30)
@@ -393,15 +393,15 @@ Please retry in 49.380665225s. [{"@type":"type.googleapis.com/google.rpc.Help","
   matchedEligibilitiesCount: 1,
   eligibilityScore: 68
 }
-🔍 [API] Preparing update for Tres Santos: {
+🔍 [API] Preparing update for Anika Dela Cruz: {
   rank: 3,
-  matchedSkillsCount: 3,
+  matchedSkillsCount: 1,
   matchedEligibilitiesCount: 1,
   eligibilityScore: 68
 }
-🔍 [API] Preparing update for Anika Dela Cruz: {
+🔍 [API] Preparing update for Tres Santos: {
   rank: 4,
-  matchedSkillsCount: 1,
+  matchedSkillsCount: 3,
   matchedEligibilitiesCount: 1,
   eligibilityScore: 68
 }
@@ -423,4 +423,5 @@ Please retry in 49.380665225s. [{"@type":"type.googleapis.com/google.rpc.Help","
   matchedEligibilitiesCount: 1,
   eligibilityScore: 68
 }
- POST /api/jobs/baae2b04-ccfd-4266-90d7-6ca33811ab84/rank 200 in 6115ms
+ POST /api/jobs/baae2b04-ccfd-4266-90d7-6ca33811ab84/rank 200 in 4954ms
+ GET /api/applications 200 in 1694ms
