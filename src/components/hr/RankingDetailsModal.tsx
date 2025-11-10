@@ -79,6 +79,33 @@ function roundExperience(years: number): number {
   return Math.round(years * 10) / 10;
 }
 
+/**
+ * Extract the core field from a degree string (what comes after "in" or "of")
+ * This normalizes different degree prefixes to compare only the actual field of study.
+ * Matches the same logic used in the ranking algorithms for consistency.
+ *
+ * @param degree - Full degree string
+ * @returns The core field of study
+ *
+ * @example
+ * extractDegreeField("Bachelor of Science in Information Technology") // "Information Technology"
+ * extractDegreeField("Bachelor's Degree in Computer Science") // "Computer Science"
+ * extractDegreeField("BS in IT") // "IT"
+ * extractDegreeField("Master of Arts") // "Arts"
+ */
+function extractDegreeField(degree: string): string {
+  // Extract field after "in" (most common pattern)
+  const inMatch = degree.match(/\bin\s+(.+)$/i);
+  if (inMatch) return inMatch[1].trim();
+
+  // Fallback to field after "of" (e.g., "Bachelor of Arts")
+  const ofMatch = degree.match(/\bof\s+(.+)$/i);
+  if (ofMatch) return ofMatch[1].trim();
+
+  // If no pattern matches, return full degree
+  return degree.trim();
+}
+
 interface Statistics {
   min: number;
   max: number;
@@ -225,15 +252,26 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
       let matchesOrCondition = false;
       let bestMatchScore = 0;
 
-      for (const option of degreeOptions) {
-        const similarity = calculateStringSimilarity(applicant.education, option);
-        bestMatchScore = Math.max(bestMatchScore, similarity);
+      if (degreeOptions.length > 1) {
+        // OR condition detected - compare core fields only to handle degree prefix variations
+        // This ensures "Bachelor's Degree in IT" matches "BS in IT or CS" → 100%
+        const applicantField = extractDegreeField(applicant.education);
 
-        // Consider it a match if similarity >= 85% (matches algorithm normalization threshold)
-        if (similarity >= 85) {
-          matchesOrCondition = true;
-          break;
+        for (const option of degreeOptions) {
+          const requiredField = extractDegreeField(option);
+          const similarity = calculateStringSimilarity(requiredField, applicantField);
+          bestMatchScore = Math.max(bestMatchScore, similarity);
+
+          // Consider it a match if similarity >= 85% (matches algorithm normalization threshold)
+          if (similarity >= 85) {
+            matchesOrCondition = true;
+            break;
+          }
         }
+      } else {
+        // Non-OR condition - compare full strings
+        bestMatchScore = calculateStringSimilarity(applicant.education, jobRequirements.degreeRequirement);
+        matchesOrCondition = bestMatchScore >= 85;
       }
 
       // Generate explanation based on both OR matching AND score thresholds

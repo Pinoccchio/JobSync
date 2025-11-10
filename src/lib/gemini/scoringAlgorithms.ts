@@ -103,8 +103,60 @@ function stringSimilarity(str1: string, str2: string): number {
 }
 
 /**
+ * Clean degree requirement string by removing contaminating text
+ * Removes eligibilities, skills, or experience text that was mistakenly appended
+ *
+ * @param degreeReq - Raw degree requirement string (may contain contaminating text)
+ * @returns Cleaned degree requirement string
+ *
+ * @example
+ * cleanDegreeRequirement("BS in IT or CS Eligibilities: A+, Network+")
+ * // "BS in IT or CS"
+ *
+ * @example
+ * cleanDegreeRequirement("Bachelor in Engineering Skills: AutoCAD, MATLAB")
+ * // "Bachelor in Engineering"
+ */
+function cleanDegreeRequirement(degreeReq: string): string {
+  // Remove anything after "Eligibilities:", "Skills:", or "Experience:"
+  // This handles cases where job data was manually entered with extra text
+  const cleaned = degreeReq.split(/\s+(Eligibilities|Skills|Experience):/i)[0].trim();
+  return cleaned;
+}
+
+/**
+ * Extract the core field from a degree string (what comes after "in" or "of")
+ * This normalizes different degree prefixes to compare only the actual field of study.
+ *
+ * @param degree - Full degree string
+ * @returns The core field of study
+ *
+ * @example
+ * extractDegreeField("Bachelor of Science in Information Technology") // "Information Technology"
+ * extractDegreeField("Bachelor's Degree in Computer Science") // "Computer Science"
+ * extractDegreeField("BS in IT") // "IT"
+ * extractDegreeField("Master of Arts") // "Arts"
+ */
+function extractDegreeField(degree: string): string {
+  // Extract field after "in" (most common pattern)
+  const inMatch = degree.match(/\bin\s+(.+)$/i);
+  if (inMatch) return inMatch[1].trim();
+
+  // Fallback to field after "of" (e.g., "Bachelor of Arts")
+  const ofMatch = degree.match(/\bof\s+(.+)$/i);
+  if (ofMatch) return ofMatch[1].trim();
+
+  // If no pattern matches, return full degree
+  return degree.trim();
+}
+
+/**
  * Match degree requirement that may contain "OR" conditions
  * Handles requirements like "Bachelor of Science in Office Administration or Public Administration"
+ *
+ * For OR conditions, extracts and compares core fields only to handle degree prefix variations:
+ * - "Bachelor's Degree in IT" vs "BS in IT or CS" → compares "IT" vs "IT" → 100%
+ * - "Bachelor of Science in IT" vs "BS in IT or CS" → compares "IT" vs "IT" → 100%
  *
  * @param jobDegree - The job's degree requirement (may contain "or" to specify alternatives)
  * @param applicantDegree - The applicant's degree
@@ -114,28 +166,46 @@ function stringSimilarity(str1: string, str2: string): number {
  * matchDegreeRequirement(
  *   "Bachelor of Science in Office Administration or Public Administration",
  *   "Bachelor of Science in Public Administration"
- * ) // Returns ~100 (matches second option)
+ * ) // Returns 100 (matches second option)
+ *
+ * @example
+ * matchDegreeRequirement(
+ *   "Bachelor of Science in Information Technology or Computer Science",
+ *   "Bachelor's Degree in Information Technology"
+ * ) // Returns 100 (core field "Information Technology" matches first option)
  */
 function matchDegreeRequirement(jobDegree: string, applicantDegree: string): number {
+  // Clean job degree requirement to remove contaminating text (e.g., eligibilities appended to degree)
+  const cleanedJobDegree = cleanDegreeRequirement(jobDegree);
+
   // Split by " or " to handle multiple acceptable degrees
-  const degreeOptions = jobDegree.split(/ or /i);
-  let maxScore = 0;
+  const degreeOptions = cleanedJobDegree.split(/ or /i);
 
-  for (const option of degreeOptions) {
-    const trimmedOption = option.trim();
-    const similarity = stringSimilarity(trimmedOption, applicantDegree);
+  if (degreeOptions.length > 1) {
+    // OR condition detected - compare core fields only to handle degree prefix variations
+    // This ensures "Bachelor's Degree in IT" matches "BS in IT or CS" → 100%
+    const applicantField = extractDegreeField(applicantDegree);
+    let maxScore = 0;
 
-    // ✅ FIX: Normalize OR conditions - treat high similarity (≥85%) as perfect match
-    // This ensures "Office Administration" and "Public Administration" both score 100%
-    // when requirement is "Office Administration or Public Administration"
-    if (degreeOptions.length > 1 && similarity >= 85) {
-      return 100; // Perfect match for any OR option with high similarity
+    for (const option of degreeOptions) {
+      const requiredField = extractDegreeField(option.trim());
+      const similarity = stringSimilarity(requiredField, applicantField);
+
+      // ✅ FIX: Normalize OR conditions - treat high similarity (≥85%) as perfect match
+      // This ensures "Information Technology" and "Information Technology" score 100%
+      // even if full degree strings differ ("Bachelor's Degree" vs "Bachelor of Science")
+      if (similarity >= 85) {
+        return 100; // Perfect match for any OR option with high similarity
+      }
+
+      maxScore = Math.max(maxScore, similarity);
     }
 
-    maxScore = Math.max(maxScore, similarity);
+    return maxScore;
   }
 
-  return maxScore;
+  // Non-OR condition - compare full strings (existing behavior)
+  return stringSimilarity(cleanedJobDegree, applicantDegree);
 }
 
 /**

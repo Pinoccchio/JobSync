@@ -23,7 +23,12 @@ function extractPDSData(pds: any, profile: any) {
   // Extract skills from PDS other_information or fallback to profile
   let skills: string[] = profile?.skills || [];
   if (pds?.other_information?.skills && Array.isArray(pds.other_information.skills)) {
-    skills = pds.other_information.skills;
+    skills = pds.other_information.skills.map((s: any) => {
+      if (typeof s === 'string') return s.trim();
+      if (s && s.skillName) return String(s.skillName).trim();
+      if (s && s.name) return String(s.name).trim();
+      return '';
+    }).filter((s: string) => s.length > 0);
   }
 
   // Extract eligibilities from PDS eligibility array or fallback to profile
