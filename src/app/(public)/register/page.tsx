@@ -165,7 +165,7 @@ export default function RegisterPage() {
           {/* Left Section - Logo & Info */}
           <div className="flex flex-col items-center justify-center text-center">
             <Image
-              src="/JS-logo.png"
+              src="/logo-no-bg.png"
               alt="Municipality of Asuncion Logo"
               width={280}
               height={280}
