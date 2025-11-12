@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
+import { generateCSCFormatPDF } from '@/lib/pds/pdfGeneratorCSC';
 import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
 
 export async function GET(
@@ -61,15 +62,18 @@ export async function GET(
 
     const applicantName = applicantProfile?.full_name || 'Unknown Applicant';
 
-    // Read includeSignature and useCurrentDate from query parameters
+    // Read format, includeSignature and useCurrentDate from query parameters
+    const format = request.nextUrl.searchParams.get('format') || 'modern'; // 'csc' | 'modern'
     const includeSignature = request.nextUrl.searchParams.get('includeSignature') === 'true';
     const useCurrentDate = request.nextUrl.searchParams.get('useCurrentDate') === 'true';
 
     // Transform database format (snake_case) to application format (camelCase)
     const transformedPDSData = transformPDSFromDatabase(pdsData);
 
-    // Generate PDF using pdfGenerator (returnDoc = true to get the jsPDF object)
-    const doc = await generatePDSPDF(transformedPDSData, includeSignature, true, useCurrentDate);
+    // Generate PDF using appropriate generator based on format
+    const doc = format === 'csc'
+      ? await generateCSCFormatPDF(transformedPDSData, includeSignature, true, useCurrentDate)
+      : await generatePDSPDF(transformedPDSData, includeSignature, true, useCurrentDate);
 
     if (!doc) {
       return NextResponse.json(
@@ -80,10 +84,11 @@ export async function GET(
 
     const pdfBuffer = doc.output('arraybuffer');
 
-    // Create filename
+    // Create filename with format indicator
     const surname = pdsData.personal_info?.surname || applicantName.split(' ')[0] || 'Unknown';
     const firstName = pdsData.personal_info?.firstName || applicantName.split(' ').slice(1).join('_') || 'User';
-    const fileName = `PDS_${surname}_${firstName}_${new Date().getTime()}.pdf`;
+    const formatLabel = format === 'csc' ? 'CSC' : 'Modern';
+    const fileName = `PDS_${formatLabel}_${surname}_${firstName}_${new Date().getTime()}.pdf`;
 
     // Return PDF as downloadable file
     return new NextResponse(pdfBuffer, {

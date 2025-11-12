@@ -2315,6 +2315,32 @@ JobSync uses **Next.js API Routes** (serverless functions) for backend logic.
 }
 ```
 
+#### GET `/api/pds/[id]/download` (Authenticated)
+
+**Description**: Download PDS as PDF in selected format (CSC official or modern)
+
+**Authorization**: User can download their own PDS, or HR/ADMIN can download any PDS
+
+**Query Parameters**:
+- `format` (string): `"csc"` or `"modern"` (default: `"modern"`)
+- `includeSignature` (boolean): Include digital signature (default: `false`)
+- `useCurrentDate` (boolean): Use current date instead of PDS date (default: `false`)
+
+**Response** (200 OK):
+- Content-Type: `application/pdf`
+- Content-Disposition: `attachment; filename="PDS_CSC_Surname_FirstName_timestamp.pdf"`
+- Binary PDF file
+
+**Example**:
+```
+GET /api/pds/abc123/download?format=csc&includeSignature=true&useCurrentDate=false
+```
+
+**Errors**:
+- 401 Unauthorized: User not authenticated
+- 403 Forbidden: User not authorized to download this PDS
+- 404 Not Found: PDS record not found
+
 ### 9.7 Notification Endpoints
 
 #### GET `/api/notifications` (Authenticated)
@@ -2576,6 +2602,93 @@ JobSync uses **Next.js API Routes** (serverless functions) for backend logic.
 │  - Increment unread count badge                         │
 │  - Play notification sound (optional)                   │
 └─────────────────────────────────────────────────────────┘
+```
+
+### 10.3 PDS PDF Generation Flow
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  User Action: Click "Download PDS"                       │
+│  (Applicant PDS page or HR viewing applicant PDS)        │
+└──────┬───────────────────────────────────────────────────┘
+       │ 1. Open PDSDownloadModal
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  PDSDownloadModal.tsx                                    │
+│  - Select format: "csc" (official) or "modern"           │
+│  - Options:                                              │
+│    □ Include digital signature                           │
+│    □ Use current date (instead of PDS date)              │
+│  - Click "Download PDF"                                  │
+└──────┬───────────────────────────────────────────────────┘
+       │ 2. Build query params
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  Client-side Request                                     │
+│  GET /api/pds/[id]/download                              │
+│  ?format=csc&includeSignature=true&useCurrentDate=false  │
+└──────┬───────────────────────────────────────────────────┘
+       │ 3. Server-side processing
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  API Route: /api/pds/[id]/download/route.ts             │
+│  - Authenticate user (getUser)                           │
+│  - Fetch PDS record from applicant_pds table             │
+│  - Authorization check:                                  │
+│    • User is PDS owner OR                                │
+│    • User is HR/ADMIN                                    │
+│  - Transform database format (snake_case → camelCase)    │
+└──────┬───────────────────────────────────────────────────┘
+       │ 4. Generate PDF based on format
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  If format === "csc":                                    │
+│    generateCSCFormatPDF(pdsData, options)                │
+│      → lib/pds/pdfGeneratorCSC.ts                        │
+│                                                           │
+│  Else (format === "modern"):                             │
+│    generatePDSPDF(pdsData, options)                      │
+│      → lib/pds/pdfGenerator.ts                           │
+└──────┬───────────────────────────────────────────────────┘
+       │ 5. PDF generation (jsPDF)
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  PDF Generator Process                                   │
+│  - Initialize jsPDF document (A4, portrait)              │
+│  - Set fonts (helvetica, times)                          │
+│  - Render sections:                                      │
+│    • Personal Information (I)                            │
+│    • Family Background (II)                              │
+│    • Educational Background (III)                        │
+│    • Civil Service Eligibility (IV)                      │
+│    • Work Experience (V)                                 │
+│    • Voluntary Work (VI) - Dynamic row heights           │
+│    • Learning & Development (VII)                        │
+│    • Other Information (VIII)                            │
+│  - Apply page breaks as needed                           │
+│  - Add signature if includeSignature=true                │
+│  - Generate binary buffer: doc.output('arraybuffer')     │
+└──────┬───────────────────────────────────────────────────┘
+       │ 6. Return PDF response
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  NextResponse                                            │
+│  - Content-Type: application/pdf                         │
+│  - Content-Disposition: attachment                       │
+│  - Filename: PDS_CSC_Surname_FirstName_timestamp.pdf     │
+│  - Body: arraybuffer (binary PDF data)                   │
+└──────┬───────────────────────────────────────────────────┘
+       │ 7. Browser download
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  Client-side Download Handler                            │
+│  - Receive PDF blob from response                        │
+│  - Create object URL: URL.createObjectURL(blob)          │
+│  - Create <a> element with download attribute            │
+│  - Programmatically click to trigger download            │
+│  - Cleanup: Remove element, revoke object URL            │
+│  - Close modal, show success toast                       │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -3010,6 +3123,294 @@ type JobInsert = Database['public']['Tables']['jobs']['Insert'];
 - `refactor:` Code refactoring
 - `test:` Add tests
 - `chore:` Maintenance
+
+### 12.8 CSC Format PDF Generator Implementation
+
+#### Overview
+
+The CSC (Civil Service Commission) Format PDF Generator replicates the official **CS Form No. 212, Revised 2025** with box-based layout for government compliance. This generator was implemented to provide applicants with a PDF format suitable for submission to government panels and HR offices.
+
+**File Location**: `src/lib/pds/pdfGeneratorCSC.ts` (2,000+ lines)
+
+**Key Features**:
+- Official CSC box-based layout
+- Dynamic row heights for multi-line text
+- Digital signature support
+- Nested object field mapping
+- Type-safe rendering with TypeScript
+
+#### Technical Architecture
+
+**PDF Library**: jsPDF 3.0.3
+
+**Document Configuration**:
+```typescript
+const doc = new jsPDF({
+  orientation: 'portrait',
+  unit: 'mm',
+  format: 'a4',
+});
+```
+
+**Font Stack**:
+- **Helvetica**: Body text, labels (sizes: 6-10pt)
+- **Times**: Headers and official text
+
+**Layout Constants**:
+```typescript
+const margin = 10;              // Left/right margins
+const pageWidth = 210;           // A4 width (mm)
+const pageHeight = 297;          // A4 height (mm)
+const contentWidth = 190;        // Usable width
+const lineHeight = 3;            // Line spacing (mm)
+```
+
+#### Critical Field Mappings
+
+The CSC generator uses **nested object access** with optional chaining to safely access database fields. This is crucial because PDS data is stored with nested structures.
+
+**Family Background (Section II)**:
+
+```typescript
+// Spouse fields - nested under fb.spouse
+yPosition = drawLabelValueBox('22. SPOUSE\'S SURNAME',
+  fb.spouse?.surname || 'N/A', margin, yPosition, 40, contentWidth - 40);
+yPosition = drawLabelValueBox('    FIRST NAME',
+  fb.spouse?.firstName || 'N/A', margin, yPosition, 40, contentWidth - 40);
+yPosition = drawLabelValueBox('    MIDDLE NAME',
+  fb.spouse?.middleName || 'N/A', margin, yPosition, 40, contentWidth - 40);
+
+// Father fields - nested under fb.father
+yPosition = drawLabelValueBox('23. FATHER\'S SURNAME',
+  fb.father?.surname || 'N/A', margin, yPosition, 40, contentWidth - 40);
+
+// Mother fields - nested under fb.mother
+// IMPORTANT: Uses "surname" not "maidenSurname"
+yPosition = drawLabelValueBox('24. MOTHER\'S MAIDEN SURNAME',
+  fb.mother?.surname || 'N/A', margin, yPosition, 40, contentWidth - 40);
+
+// Children - uses "fullName" not "name"
+doc.text((child.fullName || '').toUpperCase(), margin + 1, yPosition + 4);
+```
+
+**Work Experience (Section V)**:
+
+```typescript
+// Monthly salary requires type conversion (number → string)
+doc.text(
+  work.monthlySalary ? String(work.monthlySalary) : 'N/A',
+  xPositions.salary + 1,
+  yPosition + 6
+);
+```
+
+**Voluntary Work (Section VI)**:
+
+```typescript
+// Organization fields
+const orgAddress = [
+  vol.organizationName,        // Not "nameOfOrganization"
+  vol.organizationAddress      // Not "address"
+].filter(Boolean).join(', ');
+```
+
+**Digital Signature (Section VIII)**:
+
+```typescript
+// Nested under otherInformation.declaration
+if (includeSignature && pdsData.otherInformation?.declaration?.signatureData) {
+  const signatureData = pdsData.otherInformation.declaration.signatureData;
+  doc.addImage(signatureData, 'PNG', signatureX, signatureY, signatureWidth, signatureHeight);
+}
+```
+
+#### Dynamic Row Height Algorithm
+
+**Problem**: Fixed-height rows (10mm) cannot accommodate multi-line text, causing text to overflow and overlap adjacent rows.
+
+**Solution**: Calculate row height dynamically based on actual text content.
+
+**Implementation** (Section VI - Voluntary Work):
+
+```typescript
+pdsData.voluntaryWork?.forEach((vol) => {
+  // Step 1: Pre-calculate text splits for all columns
+  const orgAddress = [vol.organizationName, vol.organizationAddress]
+    .filter(Boolean).join(', ');
+  const orgLines = doc.splitTextToSize(orgAddress || 'N/A', volColWidths.org - 2);
+
+  // Temporarily set font size for accurate calculation
+  doc.setFontSize(6);
+  const posLines = doc.splitTextToSize(
+    vol.positionNatureOfWork || 'N/A',
+    volColWidths.position - 2
+  );
+  doc.setFontSize(7); // Restore
+
+  // Step 2: Find maximum lines among all columns
+  const maxLines = Math.max(orgLines.length, posLines.length, 2);
+
+  // Step 3: Calculate dynamic row height
+  const paddingTop = 4;        // mm
+  const lineHeight = 3;        // mm per line
+  const paddingBottom = 2;     // mm
+  const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
+
+  // Step 4: Check if page break needed
+  checkPageBreak(rowHeight);
+
+  // Step 5: Draw boxes with dynamic height
+  drawBox(margin, yPosition, volColWidths.org, rowHeight);
+  drawBox(margin + volColWidths.org, yPosition, volColWidths.period, rowHeight);
+  // ... (other columns)
+
+  // Step 6: Render text within boxes
+  orgLines.forEach((line: string, index: number) => {
+    doc.text(line, margin + 1, yPosition + 4 + index * 2.5);
+  });
+
+  // Step 7: Advance y-position by dynamic height
+  yPosition += rowHeight;
+});
+```
+
+**Formula**:
+```
+rowHeight = paddingTop + (maxLines × lineHeight) + paddingBottom
+rowHeight = 4mm + (maxLines × 3mm) + 2mm
+
+Example:
+- 2 lines: 4 + (2 × 3) + 2 = 12mm
+- 5 lines: 4 + (5 × 3) + 2 = 21mm
+- 7 lines: 4 + (7 × 3) + 2 = 25mm
+```
+
+**Why This Works**:
+- Pre-calculation ensures accurate line counts before drawing
+- Font size temporarily adjusted for column-specific text wrapping
+- Minimum 2 lines prevents boxes from being too small
+- Dynamic height applies to all columns uniformly
+
+#### Helper Functions
+
+**`drawBox(x, y, width, height)`**
+- Draws bordered rectangles for CSC box-based layout
+- Uses `doc.rect(x, y, width, height, 'S')` for stroked rectangles
+
+**`drawLabelValueBox(label, value, x, y, labelWidth, valueWidth)`**
+- Renders label-value pairs in adjacent boxes
+- Returns updated y-position for vertical stacking
+
+**`checkPageBreak(requiredHeight)`**
+- Monitors remaining page space
+- Adds new page if content would overflow
+- Recalculates y-position after page break
+
+**`formatDateOnly(dateString)`**
+- Converts ISO date to MM/DD/YYYY format
+- Handles null/undefined gracefully
+
+#### Common Pitfalls & Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| **Field shows "N/A" despite data** | Using flat field name instead of nested object | Use optional chaining: `fb.spouse?.surname` |
+| **Type error: "not recognized as string"** | jsPDF requires string, database has number | Apply type conversion: `String(value)` |
+| **Text garbling/overlapping** | Fixed row height too small for multi-line text | Implement dynamic row height calculation |
+| **Mother's surname missing** | Using `maidenSurname` instead of `surname` | Database uses `fb.mother?.surname` |
+| **Children names missing** | Using `name` instead of `fullName` | Database uses `child.fullName` |
+| **Signature not rendering** | Wrong nested path | Use `otherInformation?.declaration?.signatureData` |
+| **Inaccurate text wrapping** | Font size mismatch during calculation | Set font size before `splitTextToSize()` |
+
+#### Type Safety
+
+**Input Type**: `PDSData` (from `src/types/pds.types.ts`)
+
+**Key Type Definitions**:
+```typescript
+interface FamilyBackground {
+  spouse?: {
+    surname: string;
+    firstName: string;
+    middleName: string;
+    nameExtension?: string;
+    occupation?: string;
+    employerBusinessName?: string;
+    businessAddress?: string;
+    telephoneNo?: string;
+  };
+
+  father: {
+    surname: string;
+    firstName: string;
+    middleName: string;
+    nameExtension?: string;
+  };
+
+  mother: {
+    surname: string;          // ← NOT maidenSurname
+    firstName: string;
+    middleName: string;
+  };
+
+  children: Array<{
+    fullName: string;          // ← NOT name
+    dateOfBirth: string;
+  }>;
+}
+
+interface VoluntaryWork {
+  organizationName: string;    // ← NOT nameOfOrganization
+  organizationAddress?: string;
+  positionNatureOfWork?: string;
+  periodOfInvolvement?: {
+    from: string;
+    to: string;
+  };
+  numberOfHours?: number;
+}
+```
+
+#### Testing Recommendations
+
+**Test Cases**:
+
+1. **Short Content (1-2 lines)**
+   - Verify minimum row height applied
+   - Check proper box sizing
+
+2. **Medium Content (3-4 lines)**
+   - Validate dynamic height calculation
+   - Ensure no text overflow
+
+3. **Long Content (6-7 lines)**
+   - Test maximum line scenarios
+   - Verify page break handling
+
+4. **All Field Types**
+   - Nested objects (spouse, father, mother)
+   - Arrays (children, work experience)
+   - Optional fields (signature, extension names)
+   - Numeric fields (salary, hours)
+
+5. **Edge Cases**
+   - Empty arrays (no children, no voluntary work)
+   - Missing optional fields
+   - Very long text strings (200+ characters)
+   - Special characters in names
+
+**Test Data**: Use user `janmikoguevarra@gmail.com` (complete PDS with all sections populated)
+
+#### References
+
+- **Official Form**: CS Form No. 212, Revised 2025 (Civil Service Commission)
+- **jsPDF Documentation**: https://github.com/parallax/jsPDF
+- **Related Files**:
+  - Modern Generator: `src/lib/pds/pdfGenerator.ts` (reference implementation)
+  - Type Definitions: `src/types/pds.types.ts`
+  - Data Transformer: `src/lib/utils/dataTransformers.ts`
+  - Download Modal: `src/components/PDS/PDSDownloadModal.tsx`
+  - API Route: `src/app/api/pds/[id]/download/route.ts`
 
 ---
 

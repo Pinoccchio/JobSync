@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { PDSDownloadModal } from '@/components/PDS/PDSDownloadModal';
 import { formatAddress, formatPermanentAddress } from '@/lib/utils/formatAddress';
 import { ensureArray, ensureString } from '@/lib/utils/dataTransformers';
 import { createClient } from '@/lib/supabase/client';
@@ -28,8 +29,7 @@ interface PDSViewModalProps {
 }
 
 export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSViewModalProps) {
-  const [includeSignature, setIncludeSignature] = useState(false);
-  const [useCurrentDate, setUseCurrentDate] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [loadingSignature, setLoadingSignature] = useState(false);
 
@@ -76,9 +76,9 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
   const voluntaryWork = ensureArray(pdsData.voluntary_work);
   let otherInformation = pdsData.other_information || {};
 
-  const handleDownloadPDF = () => {
+  const handleDownloadClick = () => {
     if (pdsData.id) {
-      window.open(`/api/pds/${pdsData.id}/download?includeSignature=${includeSignature}&useCurrentDate=${useCurrentDate}`, '_blank');
+      setIsDownloadModalOpen(true);
     }
   };
 
@@ -111,51 +111,11 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
             </div>
           </div>
           <div>
-            {/* Signature inclusion checkbox */}
-            {(pdsData.signature_url || otherInformation.declaration?.signatureUrl || otherInformation.declaration?.signatureData) && (
-              <div className="mb-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeSignature}
-                    onChange={(e) => setIncludeSignature(e.target.checked)}
-                    className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-900">
-                      Include digital signature in PDF
-                    </span>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      Check this if submitting digitally. Leave unchecked for traditional wet signature.
-                    </p>
-                  </div>
-                </label>
-              </div>
-            )}
-            {/* Date option checkbox */}
-            <div className="mb-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useCurrentDate}
-                  onChange={(e) => setUseCurrentDate(e.target.checked)}
-                  className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-gray-900">
-                    Use current date in PDF
-                  </span>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    Check to use today's date. Leave unchecked to use original PDS creation date.
-                  </p>
-                </div>
-              </label>
-            </div>
             <Button
               variant="primary"
               size="sm"
               icon={Download}
-              onClick={handleDownloadPDF}
+              onClick={handleDownloadClick}
               title="Download PDS as PDF"
             >
               Download PDS as PDF
@@ -802,6 +762,15 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
           </div>
         </div>
       </div>
+
+      {/* Format Selection Modal */}
+      {pdsData.id && (
+        <PDSDownloadModal
+          isOpen={isDownloadModalOpen}
+          onClose={() => setIsDownloadModalOpen(false)}
+          pdsId={pdsData.id}
+        />
+      )}
     </Modal>
   );
 }

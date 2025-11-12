@@ -3,41 +3,37 @@ import React, { useState } from 'react';
 import { PDSData } from '@/types/pds.types';
 import { Button } from '@/components/ui/Button';
 import { Edit, CheckCircle, Download } from 'lucide-react';
-import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
+import { PDSDownloadModal } from '@/components/PDS/PDSDownloadModal';
 
 interface ReviewSubmitProps {
   pdsData: Partial<PDSData>;
+  pdsId?: string; // Optional - needed for downloading after save
   onEdit: (sectionIndex: number) => void;
   onSubmit: () => void;
 }
 
 export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
   pdsData,
+  pdsId,
   onEdit,
   onSubmit,
 }) => {
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [includeSignature, setIncludeSignature] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   const isComplete = () => {
     return (
       pdsData.personalInfo?.surname &&
-      pdsData.familyBackground?.father &&
+      pdsData.familyBackground?.fatherSurname &&
       (pdsData.educationalBackground?.length || 0) > 0 &&
       pdsData.otherInformation?.declaration?.agreed
     );
   };
 
-  const handleDownloadPDF = async () => {
-    try {
-      setIsDownloading(true);
-      await generatePDSPDF(pdsData, includeSignature);
-      // Success - PDF downloaded
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      alert('Failed to generate PDF. Please try again.');
-    } finally {
-      setIsDownloading(false);
+  const handleDownloadClick = () => {
+    if (pdsId) {
+      setIsDownloadModalOpen(true);
+    } else {
+      alert('Please save your PDS first before downloading.');
     }
   };
 
@@ -484,11 +480,11 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             variant="secondary"
             size="lg"
             icon={Download}
-            onClick={handleDownloadPDF}
-            disabled={isDownloading || !pdsData.personalInfo?.surname}
+            onClick={handleDownloadClick}
+            disabled={!pdsId || !pdsData.personalInfo?.surname}
             className="w-full"
           >
-            {isDownloading ? 'Generating PDF...' : 'Download PDS as PDF'}
+            Download PDS as PDF
           </Button>
 
           <Button
@@ -510,6 +506,15 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
           You can still edit your PDS later if needed. You can also download your PDS as a PDF document for printing or offline use.
         </p>
       </div>
+
+      {/* Download Format Selection Modal */}
+      {pdsId && (
+        <PDSDownloadModal
+          isOpen={isDownloadModalOpen}
+          onClose={() => setIsDownloadModalOpen(false)}
+          pdsId={pdsId}
+        />
+      )}
     </div>
   );
 };
