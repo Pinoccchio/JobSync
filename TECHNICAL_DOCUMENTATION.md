@@ -274,9 +274,9 @@ Score = w₁·E + w₂·X + w₃·S + w₄·L
 
 **Weights** (sum to 1.0):
 - `w₁ = 0.30` (30% weight for education)
-- `w₂ = 0.25` (25% weight for experience)
-- `w₃ = 0.25` (25% weight for skills)
-- `w₄ = 0.20` (20% weight for eligibility)
+- `w₂ = 0.20` (20% weight for experience)
+- `w₃ = 0.20` (20% weight for skills)
+- `w₄ = 0.30` (30% weight for eligibility)
 
 #### Theoretical Basis
 
@@ -350,10 +350,10 @@ Score = α·S·exp(β·X) + γ·E + δ·L
 - `L` = Eligibility match (0-100%)
 
 **Coefficients**:
-- `α = 0.40` (40% weight for skill-experience composite)
+- `α = 0.30` (30% weight for skill-experience composite)
 - `β = 0.5` (exponential decay rate)
 - `γ = 0.35` (35% weight for education)
-- `δ = 0.25` (25% weight for eligibility)
+- `δ = 0.35` (35% weight for eligibility)
 
 #### Theoretical Basis
 
@@ -372,7 +372,7 @@ const composite = skillsScore * Math.exp(beta * min(experienceRatio, 2))
                   / Math.exp(beta * 2);
 
 // Final score
-totalScore = 0.40 * composite + 0.35 * educationScore + 0.25 * eligibilityScore;
+totalScore = 0.30 * composite + 0.35 * educationScore + 0.35 * eligibilityScore;
 ```
 
 **Why exponential?**
@@ -1213,13 +1213,13 @@ CREATE TABLE audit_trail (
                   │ (76 users)  │
                   └──────┬──────┘
                          │
-        ┌────────────────┼────────────────┬──────────────────┐
-        │                │                │                  │
-        ▼                ▼                ▼                  ▼
-┌───────────────┐ ┌──────────────┐ ┌────────────────┐ ┌──────────────┐
-│     jobs      │ │ applicant_   │ │   training_    │ │ announce-    │
-│  (14 jobs)    │ │   profiles   │ │   programs     │ │   ments      │
-│               │ │ (56 profiles)│ │  (54 programs) │ │ (53 posts)   │
+        ┌────────────────┼────────────────┬──────────────────┬──────────────┐
+        │                │                │                  │              │
+        ▼                ▼                ▼                  ▼              ▼
+┌───────────────┐ ┌──────────────┐ ┌────────────────┐ ┌──────────────┐ ┌──────────────┐
+│     jobs      │ │ applicant_   │ │   training_    │ │ announce-    │ │ notifications│
+│  (14 jobs)    │ │   profiles   │ │   programs     │ │   ments      │ │ (284 notifs) │
+│               │ │ (56 profiles)│ │  (54 programs) │ │ (53 posts)   │ └──────────────┘
 └───────┬───────┘ └──────┬───────┘ └────────┬───────┘ └──────────────┘
         │                │                  │
         │                │                  │
@@ -3820,7 +3820,7 @@ npm audit fix
 
 #### Algorithm 1: Weighted Sum Model
 
-**Formula**: `Score = 0.30×E + 0.25×X + 0.25×S + 0.20×L`
+**Formula**: `Score = 0.30×E + 0.20×X + 0.20×S + 0.30×L`
 
 **File**: `src/lib/gemini/scoringAlgorithms.ts` (lines 181-385)
 
@@ -3828,7 +3828,7 @@ npm audit fix
 
 #### Algorithm 2: Skill-Experience Composite
 
-**Formula**: `Score = 0.40×(S×e^(0.5×X)) + 0.35×E + 0.25×L`
+**Formula**: `Score = 0.30×(S×e^(0.5×X)) + 0.35×E + 0.35×L`
 
 **File**: `src/lib/gemini/scoringAlgorithms.ts` (lines 387-549)
 

@@ -47,17 +47,17 @@ Where:
 ```javascript
 const weights = {
   education: 0.30,    // 30%
-  experience: 0.25,   // 25%
-  skills: 0.25,       // 25%
-  eligibility: 0.20   // 20%
+  experience: 0.20,   // 20%
+  skills: 0.20,       // 20%
+  eligibility: 0.30   // 30%
 };
 ```
 
 **Rationale for Weights:**
 - **Education (30%):** Highest weight because government positions have strict degree requirements
-- **Experience (25%):** Proven track record is valuable but not deterministic
-- **Skills (25%):** Technical competency is equally important as experience
-- **Eligibility (20%):** Certifications are important but not always required
+- **Eligibility (30%):** Professional licenses and certifications are critical for government positions
+- **Experience (20%):** Proven track record is valuable, balanced with other factors
+- **Skills (20%):** Technical competency complements eligibility and education
 
 ### Component Scoring Logic
 
@@ -72,14 +72,27 @@ if (applicantDegree matches jobDegree exactly) {
 }
 ```
 
-#### Experience Score
-```javascript
-experienceScore = min((applicantYears / requiredYears) × 100, 100);
+#### Experience Score (70% Years + 30% Job Title Relevance)
 
-// Bonus for exceeding requirements
-if (applicantYears > requiredYears) {
-  experienceScore = min(experienceScore + 10, 100);
+**Years Component - 3-Tier System:**
+```javascript
+// Based on job requirement (not fixed thresholds)
+if (applicantYears >= requiredYears) {
+  yearsScore = 100;  // Tier 1: Meets/exceeds requirement → 70% contribution
+} else if (applicantYears > 0) {
+  yearsScore = 66.7; // Tier 2: Has experience but doesn't meet → 46.7% contribution
+} else {
+  yearsScore = 33.3; // Tier 3: No experience → 23.3% contribution
 }
+```
+
+**Job Title Relevance Component (30%):**
+- String similarity matching between applicant's job titles and position title
+- Ranges from 0-100% based on best match
+
+**Final Experience Score:**
+```javascript
+experienceScore = (yearsScore * 0.7) + (relevanceScore * 0.3);
 ```
 
 #### Skills Score (Jaccard Similarity)
@@ -122,13 +135,13 @@ This paper established the mathematical foundation for weighted sum models in de
 **Calculation:**
 ```
 Education:   70  (related field)
-Experience:  100 (exceeds + bonus: (5/3)×100 + 10 = 100)
+Experience:  85  (Tier 1: meets requirement → 100 years × 0.7 + 50 relevance × 0.3 = 85)
 Skills:      66.7 (2 out of 3 matched)
 Eligibility: 50  (none required)
 
-Final Score = 0.30×70 + 0.25×100 + 0.25×66.7 + 0.20×50
-            = 21 + 25 + 16.68 + 10
-            = 72.68
+Final Score = 0.30×70 + 0.20×85 + 0.20×66.7 + 0.30×50
+            = 21 + 17 + 13.34 + 15
+            = 66.34
 ```
 
 ---
@@ -150,10 +163,10 @@ Where:
 - **X** = Experience adequacy (applicantYears / requiredYears)
 - **E** = Education match
 - **L** = License match
-- **α** = 0.40 (composite weight)
+- **α** = 0.30 (composite weight)
 - **β** = 0.5 (decay rate)
 - **γ** = 0.35 (education weight)
-- **δ** = 0.25 (eligibility weight)
+- **δ** = 0.35 (eligibility weight)
 
 ### Why Exponential Decay?
 
@@ -201,9 +214,9 @@ Education: 75 (Bachelor's match, slightly higher than Algo 1)
 
 Eligibility: 50
 
-Final Score = 0.40×56.1 + 0.35×75 + 0.25×50
-            = 22.44 + 26.25 + 12.5
-            = 61.19
+Final Score = 0.30×56.1 + 0.35×75 + 0.35×50
+            = 16.83 + 26.25 + 17.5
+            = 60.58
 ```
 
 ---

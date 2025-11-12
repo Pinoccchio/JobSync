@@ -370,10 +370,17 @@ export function algorithm1_WeightedSum(
   const requiredYears = job.yearsOfExperience || 1;
   const applicantYears = applicant.totalYearsExperience || 0;
 
-  // Years component (70% weight)
-  let yearsScore = Math.min((applicantYears / requiredYears) * 100, 100);
-  if (applicantYears > requiredYears) {
-    yearsScore = Math.min(yearsScore + 10, 100); // Bonus for exceeding requirements
+  // Years component (70% weight) - 3-tier system based on job requirement
+  let yearsScore;
+  if (applicantYears >= requiredYears) {
+    // Tier 1: Meets or exceeds requirement → 100% of years component
+    yearsScore = 100;
+  } else if (applicantYears > 0) {
+    // Tier 2: Has some experience but doesn't meet requirement → 66.7% of years component
+    yearsScore = 66.7;
+  } else {
+    // Tier 3: No experience → 33.3% of years component
+    yearsScore = 33.3;
   }
 
   // Job title relevance component (30% weight)
@@ -495,7 +502,7 @@ export function algorithm1_WeightedSum(
   }
 
   // Weighted sum calculation
-  const weights = { education: 0.30, experience: 0.25, skills: 0.25, eligibility: 0.20 };
+  const weights = { education: 0.30, experience: 0.20, skills: 0.20, eligibility: 0.30 };
   const totalScore =
     weights.education * educationScore +
     weights.experience * experienceScore +
@@ -509,7 +516,7 @@ export function algorithm1_WeightedSum(
     eligibilityScore,
     totalScore: Math.round(totalScore * 100) / 100,
     algorithmUsed: 'Weighted Sum Model',
-    reasoning: `Education (30%): ${educationScore.toFixed(1)}, Experience (25%): ${experienceScore.toFixed(1)}, Skills (25%): ${skillsScore.toFixed(1)}, Eligibility (20%): ${eligibilityScore.toFixed(1)}`,
+    reasoning: `Education (30%): ${educationScore.toFixed(1)}, Experience (20%): ${experienceScore.toFixed(1)}, Skills (20%): ${skillsScore.toFixed(1)}, Eligibility (30%): ${eligibilityScore.toFixed(1)}`,
     matchedSkillsCount,
     matchedEligibilitiesCount
   };
@@ -525,10 +532,10 @@ export function algorithm1_WeightedSum(
  * - X = Experience adequacy (years/required)
  * - E = Education match
  * - L = License match
- * - α = 0.40 (skills-experience composite weight)
+ * - α = 0.30 (skills-experience composite weight)
  * - β = 0.5 (decay rate)
  * - γ = 0.35 (education weight)
- * - δ = 0.25 (eligibility weight)
+ * - δ = 0.35 (eligibility weight)
  *
  * This algorithm prioritizes candidates with both relevant skills AND experience.
  */
@@ -546,8 +553,18 @@ export function algorithm2_SkillExperienceComposite(
   const applicantYears = applicant.totalYearsExperience || 0;
   const experienceRatio = applicantYears / requiredYears;
 
-  // Years component
-  let yearsScore = Math.min(experienceRatio * 100, 100);
+  // Years component - 3-tier system based on job requirement
+  let yearsScore;
+  if (applicantYears >= requiredYears) {
+    // Tier 1: Meets or exceeds requirement → 100% of years component
+    yearsScore = 100;
+  } else if (applicantYears > 0) {
+    // Tier 2: Has some experience but doesn't meet requirement → 66.7% of years component
+    yearsScore = 66.7;
+  } else {
+    // Tier 3: No experience → 33.3% of years component
+    yearsScore = 33.3;
+  }
 
   // Job title relevance component
   let relevanceScore = 50;
@@ -682,7 +699,7 @@ export function algorithm2_SkillExperienceComposite(
   }
 
   // Composite calculation
-  const totalScore = 0.40 * composite + 0.35 * educationScore + 0.25 * eligibilityScore;
+  const totalScore = 0.30 * composite + 0.35 * educationScore + 0.35 * eligibilityScore;
 
   return {
     educationScore,
@@ -691,7 +708,7 @@ export function algorithm2_SkillExperienceComposite(
     eligibilityScore,
     totalScore: Math.round(totalScore * 100) / 100,
     algorithmUsed: 'Skill-Experience Composite',
-    reasoning: `Skill-Experience Composite (40%): ${composite.toFixed(1)}, Education (35%): ${educationScore.toFixed(1)}, Eligibility (25%): ${eligibilityScore.toFixed(1)}`,
+    reasoning: `Skill-Experience Composite (30%): ${composite.toFixed(1)}, Education (35%): ${educationScore.toFixed(1)}, Eligibility (35%): ${eligibilityScore.toFixed(1)}`,
     matchedSkillsCount,
     matchedEligibilitiesCount
   };
@@ -809,8 +826,18 @@ export function algorithm3_EligibilityEducationTiebreaker(
   const requiredYears = job.yearsOfExperience || 1;
   const applicantYears = applicant.totalYearsExperience || 0;
 
-  // Years component
-  let yearsScore = Math.min((applicantYears / requiredYears) * 100, 100);
+  // Years component - 3-tier system based on job requirement
+  let yearsScore;
+  if (applicantYears >= requiredYears) {
+    // Tier 1: Meets or exceeds requirement → 100% of years component
+    yearsScore = 100;
+  } else if (applicantYears > 0) {
+    // Tier 2: Has some experience but doesn't meet requirement → 66.7% of years component
+    yearsScore = 66.7;
+  } else {
+    // Tier 3: No experience → 33.3% of years component
+    yearsScore = 33.3;
+  }
 
   // Job title relevance
   let relevanceScore = 50;

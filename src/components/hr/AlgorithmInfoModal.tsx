@@ -124,7 +124,7 @@ function Algorithm1Content() {
         <div className="space-y-3 text-sm">
           <div className="bg-white rounded-lg p-3">
             <p className="font-mono text-gray-800 mb-2">
-              <strong>Formula:</strong> Score = (0.30 × E) + (0.25 × X) + (0.25 × S) + (0.20 × L)
+              <strong>Formula:</strong> Score = (0.30 × E) + (0.20 × X) + (0.20 × S) + (0.30 × L)
             </p>
             <ul className="space-y-1 text-gray-600">
               <li><strong>E</strong> = Education match (0-100)</li>
@@ -138,9 +138,9 @@ function Algorithm1Content() {
             <p><strong>Weight Distribution:</strong></p>
             <ul className="space-y-1 ml-4">
               <li>• <strong>30%</strong> - Education (highest priority for government positions)</li>
-              <li>• <strong>25%</strong> - Experience (proven track record)</li>
-              <li>• <strong>25%</strong> - Skills (technical competency)</li>
-              <li>• <strong>20%</strong> - Eligibility (certifications and licenses)</li>
+              <li>• <strong>20%</strong> - Experience (proven track record, balanced with other factors)</li>
+              <li>• <strong>20%</strong> - Skills (technical competency)</li>
+              <li>• <strong>30%</strong> - Eligibility (professional licenses are critical for government positions)</li>
             </ul>
             <p className="text-xs text-gray-500 italic mt-2">Note: Weights sum to 100% for proper normalization</p>
           </div>
@@ -209,7 +209,7 @@ function Algorithm2Content() {
         <div className="space-y-3 text-sm">
           <div className="bg-white rounded-lg p-3">
             <p className="font-mono text-gray-800 mb-2">
-              <strong>Formula:</strong> Score = (0.40 × S × e<sup>βX</sup>) + (0.35 × E) + (0.25 × L)
+              <strong>Formula:</strong> Score = (0.30 × S × e<sup>βX</sup>) + (0.35 × E) + (0.35 × L)
             </p>
             <ul className="space-y-1 text-gray-600">
               <li><strong>S</strong> = Skills match ratio (using Sørensen-Dice coefficient)</li>
@@ -243,7 +243,7 @@ function Algorithm2Content() {
         </h4>
         <div className="space-y-2 text-gray-700">
           <p>✓ <strong>Realistic:</strong> Captures diminishing returns of experience</p>
-          <p>✓ <strong>Skills-Focused:</strong> Prioritizes practical competencies (40% weight)</p>
+          <p>✓ <strong>Skills-Focused:</strong> Prioritizes practical competencies (30% weight)</p>
           <p>✓ <strong>Balanced:</strong> Prevents over-qualification bias</p>
           <p>✓ <strong>Research-Based:</strong> Uses cognitive psychology principles</p>
         </div>
