@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { PDSData } from '@/types/pds.types';
 import { formatDateOnly } from '@/lib/utils/dateFormatters';
+import { ensureArray } from '@/lib/utils/dataTransformers';
 
 /**
  * Generate a CSC-compliant PDF document from PDS data
@@ -327,13 +328,37 @@ export async function generateCSCFormatPDF(
       yPosition += 6;
 
       fb.children.forEach((child) => {
-        drawBox(margin, yPosition, contentWidth * 0.7, 6);
-        drawBox(margin + contentWidth * 0.7, yPosition, contentWidth * 0.3, 6);
+        // Calculate required height for child name BEFORE drawing
+        doc.setFontSize(8); // Ensure 8pt font for accurate text splitting
+        const nameLines = doc.splitTextToSize((child.fullName || 'N/A').toUpperCase(), contentWidth * 0.7 - 2);
+
+        // Find maximum lines
+        const maxLines = Math.max(nameLines.length, 1); // Minimum 1 line
+
+        // Calculate dynamic row height
+        const lineHeight = 3.5; // mm per line (for 8pt font with descenders)
+        const paddingTop = 2; // mm - initial text offset
+        const paddingBottom = 2; // mm - bottom padding
+        const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
+
+        checkPageBreak(rowHeight);
+
+        drawBox(margin, yPosition, contentWidth * 0.7, rowHeight);
+        drawBox(margin + contentWidth * 0.7, yPosition, contentWidth * 0.3, rowHeight);
+
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
-        doc.text((child.fullName || '').toUpperCase(), margin + 1, yPosition + 4);
-        doc.text(formatDateOnly(child.dateOfBirth) || 'N/A', margin + contentWidth * 0.7 + 1, yPosition + 4);
-        yPosition += 6;
+
+        // Name - already split above
+        nameLines.forEach((line: string, index: number) => {
+          doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
+        });
+
+        // Date of Birth - centered vertically for single line
+        const dobYOffset = maxLines === 1 ? 4 : paddingTop + 1;
+        doc.text(formatDateOnly(child.dateOfBirth) || 'N/A', margin + contentWidth * 0.7 + 1, yPosition + dobYOffset);
+
+        yPosition += rowHeight;
       });
     }
   }
@@ -395,9 +420,23 @@ export async function generateCSCFormatPDF(
 
   if (pdsData.educationalBackground && pdsData.educationalBackground.length > 0) {
     pdsData.educationalBackground.forEach((edu) => {
-      checkPageBreak(10);
+      // Calculate required height for each column BEFORE drawing
+      doc.setFontSize(7); // Ensure 7pt font for accurate text splitting
+      const schoolLines = doc.splitTextToSize(edu.nameOfSchool || 'N/A', colWidths.school - 2);
+      const courseLines = doc.splitTextToSize(edu.basicEducationDegreeCourse || 'N/A', colWidths.course - 2);
 
-      const rowHeight = 10;
+      // Find maximum lines among all columns
+      const maxLines = Math.max(schoolLines.length, courseLines.length, 2); // Minimum 2 lines
+
+      // Calculate dynamic row height
+      const lineHeight = 3.5; // mm per line (increased for 7pt font with descenders)
+      const paddingTop = 3; // mm - initial text offset
+      const paddingBottom = 3; // mm - bottom padding (increased to prevent text overlap with border)
+      const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
+
+      checkPageBreak(rowHeight);
+
+      // Draw boxes with dynamic height
       drawBox(margin, yPosition, colWidths.level, rowHeight);
       drawBox(margin + colWidths.level, yPosition, colWidths.school, rowHeight);
       drawBox(margin + colWidths.level + colWidths.school, yPosition, colWidths.course, rowHeight);
@@ -408,32 +447,31 @@ export async function generateCSCFormatPDF(
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
 
-      // Level
-      doc.text(edu.level || '', margin + 1, yPosition + 6);
+      // Level - centered vertically for single line
+      const levelYOffset = maxLines === 2 ? 6 : 5;
+      doc.text(edu.level || '', margin + 1, yPosition + levelYOffset);
 
-      // School name (wrap if needed)
-      const schoolLines = doc.splitTextToSize(edu.nameOfSchool || 'N/A', colWidths.school - 2);
+      // School name - already split above
       schoolLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + colWidths.level + 1, yPosition + 4 + index * 3);
+        doc.text(line, margin + colWidths.level + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Course
-      const courseLines = doc.splitTextToSize(edu.basicEducationDegreeCourse || 'N/A', colWidths.course - 2);
+      // Course - already split above
       courseLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + colWidths.level + colWidths.school + 1, yPosition + 4 + index * 3);
+        doc.text(line, margin + colWidths.level + colWidths.school + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Period
+      // Period - centered vertically for single line
       const period = edu.periodOfAttendance
         ? `${edu.periodOfAttendance.from || ''}-${edu.periodOfAttendance.to || ''}`
         : 'N/A';
-      doc.text(period, margin + colWidths.level + colWidths.school + colWidths.course + 1, yPosition + 6);
+      doc.text(period, margin + colWidths.level + colWidths.school + colWidths.course + 1, yPosition + levelYOffset);
 
-      // Units
-      doc.text(edu.highestLevelUnitsEarned || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + 1, yPosition + 6);
+      // Units - centered vertically for single line
+      doc.text(edu.highestLevelUnitsEarned || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + 1, yPosition + levelYOffset);
 
-      // Year graduated
-      doc.text(edu.yearGraduated || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + 1, yPosition + 6);
+      // Year graduated - centered vertically for single line
+      doc.text(edu.yearGraduated || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + 1, yPosition + levelYOffset);
 
       yPosition += rowHeight;
     });
@@ -501,9 +539,26 @@ export async function generateCSCFormatPDF(
 
   if (pdsData.eligibility && pdsData.eligibility.length > 0) {
     pdsData.eligibility.forEach((elig) => {
-      checkPageBreak(8);
+      // Calculate required height for each column BEFORE drawing
+      doc.setFontSize(7); // Ensure 7pt font for accurate text splitting
+      const careerLines = doc.splitTextToSize(elig.careerService || 'N/A', eligColWidths.career - 2);
+      const placeLines = doc.splitTextToSize(elig.placeOfExaminationConferment || 'N/A', eligColWidths.placeExam - 2);
+      const licenseLines = doc.splitTextToSize(elig.licenseNumber || 'N/A', eligColWidths.license - 2);
+      const validityText = formatDateOnly(elig.dateOfValidity) || 'N/A';
+      const validityLines = doc.splitTextToSize(validityText, eligColWidths.validity - 2);
 
-      const rowHeight = 8;
+      // Find maximum lines among all columns
+      const maxLines = Math.max(careerLines.length, placeLines.length, licenseLines.length, validityLines.length, 2); // Minimum 2 lines
+
+      // Calculate dynamic row height
+      const lineHeight = 3; // mm per line (for 7pt font)
+      const paddingTop = 3; // mm - initial text offset
+      const paddingBottom = 3; // mm - bottom padding (increased to prevent text overlap with border)
+      const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
+
+      checkPageBreak(rowHeight);
+
+      // Draw boxes with dynamic height
       drawBox(margin, yPosition, eligColWidths.career, rowHeight);
       drawBox(margin + eligColWidths.career, yPosition, eligColWidths.rating, rowHeight);
       drawBox(margin + eligColWidths.career + eligColWidths.rating, yPosition, eligColWidths.dateExam, rowHeight);
@@ -514,30 +569,31 @@ export async function generateCSCFormatPDF(
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
 
-      const careerLines = doc.splitTextToSize(elig.careerService || 'N/A', eligColWidths.career - 2);
+      // Career Service - already split above
       careerLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + 1, yPosition + 4 + index * 2.5);
+        doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      doc.text(elig.rating || 'N/A', margin + eligColWidths.career + 1, yPosition + 5);
-      doc.text(formatDateOnly(elig.dateOfExaminationConferment) || 'N/A', margin + eligColWidths.career + eligColWidths.rating + 1, yPosition + 5);
+      // Rating - centered vertically for single line
+      const singleLineYOffset = maxLines === 2 ? 4 : 5;
+      doc.text(elig.rating || 'N/A', margin + eligColWidths.career + 1, yPosition + singleLineYOffset);
 
-      const placeLines = doc.splitTextToSize(elig.placeOfExaminationConferment || 'N/A', eligColWidths.placeExam - 2);
+      // Date of Examination - centered vertically for single line
+      doc.text(formatDateOnly(elig.dateOfExaminationConferment) || 'N/A', margin + eligColWidths.career + eligColWidths.rating + 1, yPosition + singleLineYOffset);
+
+      // Place of Examination - already split above
       placeLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + 1, yPosition + 4 + index * 2.5);
+        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // License Number with text wrapping
-      const licenseLines = doc.splitTextToSize(elig.licenseNumber || 'N/A', eligColWidths.license - 2);
+      // License Number - already split above
       licenseLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + 1, yPosition + 5 + index * 2.5);
+        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Date of Validity with text wrapping
-      const validityText = formatDateOnly(elig.dateOfValidity) || 'N/A';
-      const validityLines = doc.splitTextToSize(validityText, eligColWidths.validity - 2);
+      // Date of Validity - already split above
       validityLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + 1, yPosition + 5 + index * 2.5);
+        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       yPosition += rowHeight;
@@ -614,9 +670,26 @@ export async function generateCSCFormatPDF(
 
   if (pdsData.workExperience && pdsData.workExperience.length > 0) {
     pdsData.workExperience.forEach((work) => {
-      checkPageBreak(10);
+      // Calculate required height for each column BEFORE drawing
+      doc.setFontSize(6); // Ensure 6pt font for accurate text splitting
+      const posLines = doc.splitTextToSize(work.positionTitle || 'N/A', workColWidths.position - 2);
+      const companyLines = doc.splitTextToSize(work.departmentAgencyOfficeCompany || 'N/A', workColWidths.company - 2);
 
-      const rowHeight = 10;
+      // Period always has 2 lines (from and to dates)
+      const periodLines = 2;
+
+      // Find maximum lines among all columns
+      const maxLines = Math.max(posLines.length, companyLines.length, periodLines, 2); // Minimum 2 lines
+
+      // Calculate dynamic row height
+      const lineHeight = 3; // mm per line (for 6pt font)
+      const paddingTop = 3; // mm - initial text offset
+      const paddingBottom = 3; // mm - bottom padding (increased to prevent text overlap with border)
+      const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
+
+      checkPageBreak(rowHeight);
+
+      // Draw boxes with dynamic height
       drawBox(margin, yPosition, workColWidths.period, rowHeight);
       drawBox(margin + workColWidths.period, yPosition, workColWidths.position, rowHeight);
       drawBox(margin + workColWidths.period + workColWidths.position, yPosition, workColWidths.company, rowHeight);
@@ -628,38 +701,37 @@ export async function generateCSCFormatPDF(
       doc.setFontSize(6);
       doc.setFont('helvetica', 'normal');
 
-      // Period
+      // Period - always 2 lines (from and to dates)
       const period = work.periodOfService
         ? `${formatDateOnly(work.periodOfService.from) || ''}\n${work.periodOfService.to === 'Present' ? 'Present' : formatDateOnly(work.periodOfService.to) || ''}`
         : 'N/A';
-      const periodLines = period.split('\n');
-      periodLines.forEach((line, index) => {
-        doc.text(line, margin + 1, yPosition + 4 + index * 3);
+      const periodLinesArray = period.split('\n');
+      periodLinesArray.forEach((line, index) => {
+        doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Position
-      const posLines = doc.splitTextToSize(work.positionTitle || 'N/A', workColWidths.position - 2);
+      // Position - already split above
       posLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + workColWidths.period + 1, yPosition + 4 + index * 2.5);
+        doc.text(line, margin + workColWidths.period + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Company
-      const companyLines = doc.splitTextToSize(work.departmentAgencyOfficeCompany || 'N/A', workColWidths.company - 2);
+      // Company - already split above
       companyLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + workColWidths.period + workColWidths.position + 1, yPosition + 4 + index * 2.5);
+        doc.text(line, margin + workColWidths.period + workColWidths.position + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Salary - Convert number to string for jsPDF
-      doc.text(work.monthlySalary ? String(work.monthlySalary) : 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + 1, yPosition + 6);
+      // Salary - centered vertically for single line
+      const singleLineYOffset = maxLines === 2 ? 5 : 6;
+      doc.text(work.monthlySalary ? String(work.monthlySalary) : 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + 1, yPosition + singleLineYOffset);
 
-      // Grade
-      doc.text(work.salaryGrade || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + 6);
+      // Grade - centered vertically for single line
+      doc.text(work.salaryGrade || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + singleLineYOffset);
 
-      // Status
-      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + 6);
+      // Status - centered vertically for single line
+      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + singleLineYOffset);
 
-      // Govt Service
-      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status + 1, yPosition + 6);
+      // Govt Service - centered vertically for single line
+      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status + 1, yPosition + singleLineYOffset);
 
       yPosition += rowHeight;
     });
@@ -787,10 +859,10 @@ export async function generateCSCFormatPDF(
 
   // Training table header
   const trainColWidths = {
-    title: contentWidth * 0.30,
-    period: contentWidth * 0.15,
+    title: contentWidth * 0.28,    // Reduced from 0.30 to make room for period
+    period: contentWidth * 0.18,   // Increased from 0.15 to prevent date overlap
     hours: contentWidth * 0.12,
-    type: contentWidth * 0.18,
+    type: contentWidth * 0.17,     // Reduced from 0.18 to maintain 100% total
     sponsor: contentWidth * 0.25,
   };
 
@@ -826,6 +898,7 @@ export async function generateCSCFormatPDF(
   if (pdsData.trainings && pdsData.trainings.length > 0) {
     pdsData.trainings.forEach((training) => {
       // Calculate required height for each column BEFORE drawing
+      doc.setFontSize(7); // Ensure 7pt font for accurate title text splitting
       const titleLines = doc.splitTextToSize(training.title || 'N/A', trainColWidths.title - 2);
 
       // For sponsor, temporarily set font size 6 to calculate accurate split
@@ -839,7 +912,7 @@ export async function generateCSCFormatPDF(
       // Calculate dynamic row height
       const lineHeight = 3; // mm per line
       const paddingTop = 4; // mm - initial text offset
-      const paddingBottom = 2; // mm - bottom padding
+      const paddingBottom = 4; // mm - bottom padding (increased to prevent text overlap with border)
       const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
 
       checkPageBreak(rowHeight);
@@ -858,11 +931,14 @@ export async function generateCSCFormatPDF(
         doc.text(line, margin + 1, yPosition + 4 + index * lineHeight);
       });
 
-      // Period
+      // Period - with text wrapping to prevent overlap
       const period = training.periodOfAttendance
         ? `${formatDateOnly(training.periodOfAttendance.from) || ''} to ${formatDateOnly(training.periodOfAttendance.to) || ''}`
         : 'N/A';
-      doc.text(period, margin + trainColWidths.title + 1, yPosition + 6);
+      const periodLines = doc.splitTextToSize(period, trainColWidths.period - 2);
+      periodLines.forEach((line: string, idx: number) => {
+        doc.text(line, margin + trainColWidths.title + 1, yPosition + 6 + (idx * 3));
+      });
 
       // Hours
       doc.text(training.numberOfHours?.toString() || 'N/A', margin + trainColWidths.title + trainColWidths.period + 1, yPosition + 6);
@@ -901,21 +977,22 @@ export async function generateCSCFormatPDF(
     const oi = pdsData.otherInformation;
 
     // Special Skills/Hobbies - Dynamic row height
-    if (oi.skills && oi.skills.length > 0) {
+    if (ensureArray(oi.skills).length > 0) {
       const labelText = '54. SPECIAL SKILLS AND HOBBIES';
-      const valueText = oi.skills.join(', ');
+      const valueText = ensureArray(oi.skills).join(', ');
       const labelWidth = 50;
       const valueWidth = contentWidth - 50;
 
-      // Pre-calculate text split for value
+      // Pre-calculate text split for both label and value
       doc.setFontSize(7);
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
       const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
-      // Calculate dynamic height
-      const maxLines = Math.max(valueLines.length, 2); // Minimum 2 lines
-      const lineHeight = 3; // mm per line
+      // Calculate dynamic height based on BOTH label and value lines
+      const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
+      const lineHeight = 3.5; // mm per line (for 7pt font with descenders)
       const paddingTop = 4; // mm
-      const paddingBottom = 2; // mm
+      const paddingBottom = 4; // mm - bottom padding (increased to prevent text overlap with border)
       const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
 
       // Check page break
@@ -927,7 +1004,11 @@ export async function generateCSCFormatPDF(
       doc.rect(margin, yPosition, labelWidth, rowHeight, 'F');
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.text(labelText, margin + 1, yPosition + 4);
+
+      // Render label text line by line
+      labelLines.forEach((line: string, index: number) => {
+        doc.text(line, margin + 1, yPosition + paddingTop + index * lineHeight);
+      });
 
       // Draw value box
       drawBox(margin + labelWidth, yPosition, valueWidth, rowHeight);
@@ -935,28 +1016,29 @@ export async function generateCSCFormatPDF(
 
       // Render text lines
       valueLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + labelWidth + 1, yPosition + 4 + index * lineHeight);
+        doc.text(line, margin + labelWidth + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       yPosition += rowHeight;
     }
 
     // Recognitions - Dynamic row height
-    if (oi.recognitions && oi.recognitions.length > 0) {
+    if (ensureArray(oi.recognitions).length > 0) {
       const labelText = '55. NON-ACADEMIC DISTINCTIONS / RECOGNITION';
-      const valueText = oi.recognitions.join(', ');
+      const valueText = ensureArray(oi.recognitions).join(', ');
       const labelWidth = 50;
       const valueWidth = contentWidth - 50;
 
-      // Pre-calculate text split for value
+      // Pre-calculate text split for both label and value
       doc.setFontSize(7);
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
       const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
-      // Calculate dynamic height
-      const maxLines = Math.max(valueLines.length, 2); // Minimum 2 lines
-      const lineHeight = 3; // mm per line
+      // Calculate dynamic height based on BOTH label and value lines
+      const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
+      const lineHeight = 3.5; // mm per line (for 7pt font with descenders)
       const paddingTop = 4; // mm
-      const paddingBottom = 2; // mm
+      const paddingBottom = 4; // mm - bottom padding (increased to prevent text overlap with border)
       const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
 
       // Check page break
@@ -968,7 +1050,11 @@ export async function generateCSCFormatPDF(
       doc.rect(margin, yPosition, labelWidth, rowHeight, 'F');
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.text(labelText, margin + 1, yPosition + 4);
+
+      // Render label text line by line
+      labelLines.forEach((line: string, index: number) => {
+        doc.text(line, margin + 1, yPosition + paddingTop + index * lineHeight);
+      });
 
       // Draw value box
       drawBox(margin + labelWidth, yPosition, valueWidth, rowHeight);
@@ -976,28 +1062,29 @@ export async function generateCSCFormatPDF(
 
       // Render text lines
       valueLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + labelWidth + 1, yPosition + 4 + index * lineHeight);
+        doc.text(line, margin + labelWidth + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       yPosition += rowHeight;
     }
 
     // Memberships - Dynamic row height
-    if (oi.memberships && oi.memberships.length > 0) {
+    if (ensureArray(oi.memberships).length > 0) {
       const labelText = '56. MEMBERSHIP IN ASSOCIATION/ORGANIZATION';
-      const valueText = oi.memberships.join(', ');
+      const valueText = ensureArray(oi.memberships).join(', ');
       const labelWidth = 50;
       const valueWidth = contentWidth - 50;
 
-      // Pre-calculate text split for value
+      // Pre-calculate text split for both label and value
       doc.setFontSize(7);
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
       const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
-      // Calculate dynamic height
-      const maxLines = Math.max(valueLines.length, 2); // Minimum 2 lines
-      const lineHeight = 3; // mm per line
+      // Calculate dynamic height based on BOTH label and value lines
+      const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
+      const lineHeight = 3.5; // mm per line (for 7pt font with descenders)
       const paddingTop = 4; // mm
-      const paddingBottom = 2; // mm
+      const paddingBottom = 4; // mm - bottom padding (increased to prevent text overlap with border)
       const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
 
       // Check page break
@@ -1009,7 +1096,11 @@ export async function generateCSCFormatPDF(
       doc.rect(margin, yPosition, labelWidth, rowHeight, 'F');
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.text(labelText, margin + 1, yPosition + 4);
+
+      // Render label text line by line
+      labelLines.forEach((line: string, index: number) => {
+        doc.text(line, margin + 1, yPosition + paddingTop + index * lineHeight);
+      });
 
       // Draw value box
       drawBox(margin + labelWidth, yPosition, valueWidth, rowHeight);
@@ -1017,7 +1108,7 @@ export async function generateCSCFormatPDF(
 
       // Render text lines
       valueLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + labelWidth + 1, yPosition + 4 + index * lineHeight);
+        doc.text(line, margin + labelWidth + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       yPosition += rowHeight;
@@ -1097,18 +1188,44 @@ export async function generateCSCFormatPDF(
       yPosition += 6;
 
       oi.references.forEach((ref) => {
-        checkPageBreak(8);
+        // Calculate required height for each column BEFORE drawing
+        doc.setFontSize(7); // Ensure 7pt font for accurate text splitting
+        const nameLines = doc.splitTextToSize(ref.name || 'N/A', contentWidth / 3 - 2);
+        const addressLines = doc.splitTextToSize(ref.address || 'N/A', contentWidth / 3 - 2);
 
-        drawBox(margin, yPosition, contentWidth / 3, 8);
-        drawBox(margin + contentWidth / 3, yPosition, contentWidth / 3, 8);
-        drawBox(margin + 2 * contentWidth / 3, yPosition, contentWidth / 3, 8);
+        // Find maximum lines among name and address columns
+        const maxLines = Math.max(nameLines.length, addressLines.length, 1); // Minimum 1 line
+
+        // Calculate dynamic row height
+        const lineHeight = 3.5; // mm per line (for 7pt font with descenders)
+        const paddingTop = 2; // mm - initial text offset
+        const paddingBottom = 2; // mm - bottom padding
+        const rowHeight = paddingTop + (maxLines * lineHeight) + paddingBottom;
+
+        checkPageBreak(rowHeight);
+
+        drawBox(margin, yPosition, contentWidth / 3, rowHeight);
+        drawBox(margin + contentWidth / 3, yPosition, contentWidth / 3, rowHeight);
+        drawBox(margin + 2 * contentWidth / 3, yPosition, contentWidth / 3, rowHeight);
 
         doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.text(ref.name || '', margin + 1, yPosition + 5);
-        doc.text(ref.address || '', margin + contentWidth / 3 + 1, yPosition + 5);
-        doc.text(ref.telephoneNo || '', margin + 2 * contentWidth / 3 + 1, yPosition + 5);
-        yPosition += 8;
+
+        // Name - already split above
+        nameLines.forEach((line: string, index: number) => {
+          doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
+        });
+
+        // Address - already split above
+        addressLines.forEach((line: string, index: number) => {
+          doc.text(line, margin + contentWidth / 3 + 1, yPosition + paddingTop + 1 + index * lineHeight);
+        });
+
+        // Tel No - centered vertically for single line
+        const telYOffset = maxLines === 1 ? 4 : paddingTop + 1;
+        doc.text(ref.telephoneNo || 'N/A', margin + 2 * contentWidth / 3 + 1, yPosition + telYOffset);
+
+        yPosition += rowHeight;
       });
     }
 
