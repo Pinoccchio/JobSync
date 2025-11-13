@@ -1230,8 +1230,8 @@ export async function generateCSCFormatPDF(
     }
 
     // Government Issued ID
-    yPosition = drawLabelValueBox('58. GOVERNMENT ISSUED ID', oi.governmentIssuedId?.idType || 'N/A', margin, yPosition, 40, contentWidth - 40);
-    yPosition = drawLabelValueBox('    ID/LICENSE/PASSPORT NO.', oi.governmentIssuedId?.idNo || 'N/A', margin, yPosition, 40, contentWidth - 40);
+    yPosition = drawLabelValueBox('58. GOVERNMENT ISSUED ID', oi.governmentIssuedId?.type || 'N/A', margin, yPosition, 40, contentWidth - 40);
+    yPosition = drawLabelValueBox('    ID/LICENSE/PASSPORT NO.', oi.governmentIssuedId?.idNumber || 'N/A', margin, yPosition, 40, contentWidth - 40);
     yPosition = drawLabelValueBox('    DATE/PLACE OF ISSUANCE', oi.governmentIssuedId?.dateIssued ? formatDateOnly(oi.governmentIssuedId.dateIssued) : 'N/A', margin, yPosition, 40, contentWidth - 40);
   }
 
@@ -1248,16 +1248,29 @@ export async function generateCSCFormatPDF(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text('IX. DECLARATION', margin + 2, yPosition + 5);
-  yPosition += 7;
+  yPosition += 7 + 3;  // Add 3mm breathing space after header
 
+  // Declaration text with box container and dynamic height
   doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   const declarationText = 'I declare under oath that I have personally accomplished this Personal Data Sheet which is a true, correct and complete statement pursuant to the provisions of pertinent laws, rules and regulations of the Republic of the Philippines. I authorize the agency head/authorized representative to verify/validate the contents stated herein. I agree that any misrepresentation made in this document and its attachments shall cause the filing of administrative/criminal case/s against me.';
   const declLines = doc.splitTextToSize(declarationText, contentWidth - 4);
+  const declPaddingTop = 2;
+  const declPaddingBottom = 2;
+  const declLineHeight = 3; // 3mm per line for 7pt font (consistent with other sections)
+  const declTextHeight = declPaddingTop + (declLines.length * declLineHeight) + declPaddingBottom;
+
+  // Check page break before rendering declaration text
+  checkPageBreak(declTextHeight);
+
+  // Draw container box around declaration text
+  drawBox(margin, yPosition, contentWidth, declTextHeight);
+
+  // Render text lines with proper padding
   declLines.forEach((line: string, index: number) => {
-    doc.text(line, margin + 2, yPosition + index * 4);
+    doc.text(line, margin + 2, yPosition + declPaddingTop + index * declLineHeight);
   });
-  yPosition += declLines.length * 4 + 5;
+  yPosition += declTextHeight + 6; // Add 6mm spacing for better visual separation
 
   // ============================================================================
   // Add page number to last page
@@ -1265,31 +1278,41 @@ export async function generateCSCFormatPDF(
   addPageNumber();
 
   // ============================================================================
-  // Signature section (if included)
+  // Signature and Date section (side by side)
   // ============================================================================
-  if (includeSignature && pdsData.otherInformation?.declaration?.signatureData) {
-    checkPageBreak(30);
+  const signatureBoxWidth = contentWidth / 2 - 1; // Use half width minus 1mm spacing
+  const signatureDateBoxHeight = 30; // Same height for both boxes
+  const yPositionBeforeSignature = yPosition; // Save position for date box
 
-    // Add signature box
-    drawBox(margin, yPosition, contentWidth / 2, 25);
+  // Signature section (if included)
+  if (includeSignature && pdsData.otherInformation?.declaration?.signatureData) {
+    checkPageBreak(signatureDateBoxHeight);
+
+    // Draw signature box (left side)
+    drawBox(margin, yPosition, signatureBoxWidth, signatureDateBoxHeight);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.text('SIGNATURE', margin + 1, yPosition + 5);
+    doc.text('SIGNATURE', margin + 2, yPosition + 6);
 
     try {
-      // Try to add signature image
+      // Try to add signature image with proper centering and padding
       const signatureData = pdsData.otherInformation.declaration.signatureData;
-      if (signatureData.startsWith('data:image') || signatureData.startsWith('http')) {
-        doc.addImage(signatureData, 'PNG', margin + 2, yPosition + 7, 40, 15);
+      if (signatureData && (signatureData.startsWith('data:image') || signatureData.startsWith('http'))) {
+        // Center signature image in box with 5mm side padding
+        const imgX = margin + 5;
+        const imgY = yPosition + 10;
+        const imgWidth = signatureBoxWidth - 10;
+        const imgHeight = 15;
+        doc.addImage(signatureData, 'PNG', imgX, imgY, imgWidth, imgHeight);
       }
     } catch (error) {
       console.error('Error adding signature to PDF:', error);
     }
 
-    yPosition += 25;
+    yPosition += signatureDateBoxHeight;
   }
 
-  // Date accomplished
+  // Date accomplished section (positioned next to signature or standalone)
   const dateAccomplished = useCurrentDate
     ? new Date().toLocaleDateString('en-CA', {
         timeZone: 'Asia/Manila',
@@ -1300,7 +1323,25 @@ export async function generateCSCFormatPDF(
     : pdsData.otherInformation?.declaration?.dateAccomplished || new Date().toISOString().split('T')[0];
 
   const formattedDate = formatDateOnly(dateAccomplished);
-  yPosition = drawLabelValueBox('DATE', formattedDate, margin, yPosition, 30, contentWidth / 2 - 30);
+
+  // Position date box next to signature if signature exists, otherwise below declaration
+  if (includeSignature && pdsData.otherInformation?.declaration?.signatureData) {
+    // Date box on right side, aligned with signature
+    const dateBoxX = margin + signatureBoxWidth + 2; // Position next to signature with 2mm gap
+    const dateBoxWidth = contentWidth - signatureBoxWidth - 2;
+
+    // Draw date box at same Y position as signature
+    drawBox(dateBoxX, yPositionBeforeSignature, dateBoxWidth, signatureDateBoxHeight);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DATE', dateBoxX + 2, yPositionBeforeSignature + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formattedDate, dateBoxX + 2, yPositionBeforeSignature + 15);
+  } else {
+    // No signature, draw date box full width below
+    checkPageBreak(10);
+    yPosition = drawLabelValueBox('DATE', formattedDate, margin, yPosition, 30, contentWidth - 30);
+  }
 
   // ============================================================================
   // Download or return
