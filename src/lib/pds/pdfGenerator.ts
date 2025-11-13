@@ -296,25 +296,27 @@ export async function generatePDSPDF(pdsData: Partial<PDSData>, includeSignature
       `${formatDateOnly(work.periodOfService?.from)} - ${formatDateOnly(work.periodOfService?.to)}`,
       work.monthlySalary || 'N/A',
       work.salaryGrade || 'N/A',
+      work.stepIncrement || 'N/A',
       work.statusOfAppointment || 'N/A',
       work.governmentService ? 'Yes' : 'No',
     ]);
 
     autoTable(doc, {
       startY: yPosition,
-      head: [['Position', 'Company/Agency', 'Period', 'Salary', 'SG', 'Status', 'Gov\'t']],
+      head: [['Position', 'Company/Agency', 'Period', 'Salary', 'SG', 'Step', 'Status', 'Gov\'t']],
       body: workData,
       theme: 'striped',
       headStyles: { fillColor: [34, 165, 85], fontSize: 6.5 },
       styles: { fontSize: 6.5, cellPadding: 1.5 },
       columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 45 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 12 },
-        5: { cellWidth: 25 },
-        6: { cellWidth: 13 },
+        0: { cellWidth: 32 },
+        1: { cellWidth: 42 },
+        2: { cellWidth: 32 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 10 },
+        5: { cellWidth: 10 },
+        6: { cellWidth: 23 },
+        7: { cellWidth: 13 },
       },
     });
 

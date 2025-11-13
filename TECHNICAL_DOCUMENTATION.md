@@ -1,7 +1,7 @@
 # JobSync Technical Documentation
 
 **Version:** 1.0
-**Last Updated:** November 8, 2025
+**Last Updated:** November 13, 2025
 **Project:** JobSync - AI-Powered Job Application Management System
 **Client:** Asuncion Municipal Hall, Davao del Norte
 
@@ -50,7 +50,7 @@ JobSync is a cutting-edge web application designed for the Asuncion Municipal Ha
 - **Database**: PostgreSQL 17.6.1.025 via Supabase with 12 production tables
 - **Security**: 70+ Row-Level Security (RLS) policies
 - **Real-time**: WebSocket-based notifications and updates
-- **Compliance**: Complete audit trail with 12,333+ logged actions
+- **Compliance**: Complete audit trail with 14,000+ logged actions
 - **Scalability**: Built on serverless architecture with automatic scaling
 
 ### 1.3 Business Value
@@ -693,7 +693,7 @@ JobSync uses **PostgreSQL 17.6.1.025** via Supabase with **12 production tables*
 - Personal Data Sheet (PDS) records
 - Audit trail for compliance
 
-**Total Records**: 14,000+ rows across all tables
+**Total Records**: 15,700+ rows across all tables
 **RLS Policies**: 70+ security policies
 **Foreign Keys**: 17 relationships ensuring referential integrity
 
@@ -718,7 +718,7 @@ CREATE TABLE profiles (
 );
 ```
 
-**Row Count**: 76 users
+**Row Count**: 84 users
 **Indexes**:
 - Primary key on `id`
 - Unique index on `email`
@@ -1174,7 +1174,7 @@ CREATE TABLE audit_trail (
 );
 ```
 
-**Row Count**: 12,333 audit records
+**Row Count**: 14,044 audit records
 **Use Cases**:
 - Track all database changes
 - Identify who changed what and when
@@ -1210,7 +1210,7 @@ CREATE TABLE audit_trail (
 ```
                   ┌─────────────┐
                   │   profiles  │
-                  │ (76 users)  │
+                  │ (84 users)  │
                   └──────┬──────┘
                          │
         ┌────────────────┼────────────────┬──────────────────┬──────────────┐
@@ -1236,7 +1236,7 @@ CREATE TABLE audit_trail (
 │      System Tables (ADMIN only)           │
 │  ┌──────────────┐  ┌──────────────────┐  │
 │  │ activity_    │  │   audit_trail    │  │
-│  │   logs       │  │ (12,333 records) │  │
+│  │   logs       │  │ (14,000+ records)│  │
 │  │ (411 logs)   │  │                  │  │
 │  └──────────────┘  └──────────────────┘  │
 └───────────────────────────────────────────┘
@@ -4331,6 +4331,61 @@ NODE_ENV=development # or production
 - Gemini AI: https://ai.google.dev/docs
 - TypeScript: https://www.typescriptlang.org/docs
 - Tailwind CSS: https://tailwindcss.com/docs
+
+---
+
+## 19. Recent Updates (November 2025)
+
+### 19.1 System Enhancements
+
+**Database Growth**:
+- User base expanded from 76 to 84 users (+10.5%)
+- Audit trail records increased from 12,333 to 14,044 (+13.8%)
+- Total database records reached 15,700+ rows across all tables
+
+**Algorithm Verification**:
+- Confirmed scoring weights: Education (30%), Experience (20%), Skills (20%), Eligibility (30%)
+- Verified implementation in `scoringAlgorithms.ts` matches documentation
+- All ranking algorithms operating as designed with mathematically justified weights
+
+### 19.2 PDS Form Improvements
+
+**Questions Section (Part IV)**:
+- Fixed Questions 34-42c data binding and validation
+- Added proper Yes/No toggle handling with dependent fields
+- Improved conditional rendering for detailed responses
+- Enhanced form validation for required fields
+
+**Government ID Field**:
+- Corrected field binding for government-issued ID information
+- Updated validation rules to ensure proper data capture
+- Improved user experience with clear field labels
+
+### 19.3 Ranked Records Display
+
+**UI Enhancements**:
+- Fixed ranked applicant list display in HR dashboard
+- Improved score visualization with color-coded indicators
+- Enhanced sorting and filtering capabilities
+- Added detailed breakdown tooltips for ranking scores
+
+### 19.4 Notification System Updates
+
+**Admin Role Changes**:
+- Removed notification bell icon from System Admin role
+- Admin users now rely on Activity Logs & Audit Trail for system monitoring
+- Maintained real-time notifications for HR, PESO, and APPLICANT roles
+- Streamlined notification flow for role-specific requirements
+
+### 19.5 Documentation Updates
+
+**Technical Documentation**:
+- Updated all statistical data to reflect current system state
+- Verified database schema documentation accuracy
+- Refreshed ERD diagrams with current row counts
+- Added comprehensive Recent Updates section for client delivery
+
+**Last Verification Date**: November 13, 2025
 
 ---
 

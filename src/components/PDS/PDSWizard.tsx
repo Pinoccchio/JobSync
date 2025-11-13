@@ -476,6 +476,7 @@ const normalizePDSData = (data: any): Partial<PDSData> => ({
   otherInformation: {
     skills: [],
     references: [],
+    governmentIssuedId: {},
     declaration: {},
     ...(data.otherInformation || data.other_information || {}),
   },

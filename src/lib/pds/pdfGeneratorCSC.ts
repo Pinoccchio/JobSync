@@ -617,13 +617,14 @@ export async function generateCSCFormatPDF(
 
   // Work Experience table header
   const workColWidths = {
-    period: contentWidth * 0.15,
-    position: contentWidth * 0.25,
-    company: contentWidth * 0.25,
-    salary: contentWidth * 0.12,
-    grade: contentWidth * 0.08,
+    period: contentWidth * 0.14,
+    position: contentWidth * 0.23,
+    company: contentWidth * 0.23,
+    salary: contentWidth * 0.11,
+    grade: contentWidth * 0.07,
+    step: contentWidth * 0.06,
     status: contentWidth * 0.08,
-    govt: contentWidth * 0.07,
+    govt: contentWidth * 0.08,
   };
 
   drawBox(margin, yPosition, workColWidths.period, 12);
@@ -631,8 +632,9 @@ export async function generateCSCFormatPDF(
   drawBox(margin + workColWidths.period + workColWidths.position, yPosition, workColWidths.company, 12);
   drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company, yPosition, workColWidths.salary, 12);
   drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary, yPosition, workColWidths.grade, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade, yPosition, workColWidths.status, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status, yPosition, workColWidths.govt, 12);
+  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade, yPosition, workColWidths.step, 12);
+  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step, yPosition, workColWidths.status, 12);
+  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status, yPosition, workColWidths.govt, 12);
 
   doc.setFillColor(240, 240, 240);
   doc.rect(margin, yPosition, contentWidth, 12, 'F');
@@ -658,13 +660,15 @@ export async function generateCSCFormatPDF(
   doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + 7);
   doc.text('GRADE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + 10);
 
-  doc.text('43.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + 4);
-  doc.text('STATUS', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + 7);
-  doc.text('OF APPT.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + 10);
+  doc.text('STEP', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + 7);
 
-  doc.text('44.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status + 1, yPosition + 5);
-  doc.text('GOV\'T', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status + 1, yPosition + 8);
-  doc.text('SERVICE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status + 1, yPosition + 10.5);
+  doc.text('43.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + 4);
+  doc.text('STATUS', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + 7);
+  doc.text('OF APPT.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + 10);
+
+  doc.text('44.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + 5);
+  doc.text('GOV\'T', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + 8);
+  doc.text('SERVICE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + 10.5);
 
   yPosition += 12;
 
@@ -695,8 +699,9 @@ export async function generateCSCFormatPDF(
       drawBox(margin + workColWidths.period + workColWidths.position, yPosition, workColWidths.company, rowHeight);
       drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company, yPosition, workColWidths.salary, rowHeight);
       drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary, yPosition, workColWidths.grade, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade, yPosition, workColWidths.status, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status, yPosition, workColWidths.govt, rowHeight);
+      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade, yPosition, workColWidths.step, rowHeight);
+      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step, yPosition, workColWidths.status, rowHeight);
+      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status, yPosition, workColWidths.govt, rowHeight);
 
       doc.setFontSize(6);
       doc.setFont('helvetica', 'normal');
@@ -727,11 +732,14 @@ export async function generateCSCFormatPDF(
       // Grade - centered vertically for single line
       doc.text(work.salaryGrade || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + singleLineYOffset);
 
+      // Step - centered vertically for single line
+      doc.text(work.stepIncrement || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + singleLineYOffset);
+
       // Status - centered vertically for single line
-      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + singleLineYOffset);
+      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + singleLineYOffset);
 
       // Govt Service - centered vertically for single line
-      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.status + 1, yPosition + singleLineYOffset);
+      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + singleLineYOffset);
 
       yPosition += rowHeight;
     });
@@ -1123,13 +1131,18 @@ export async function generateCSCFormatPDF(
     yPosition += 5;
 
     const questions = [
-      { num: '34', q: 'Are you related by consanguinity or affinity to the appointing or recommending authority, or to the chief of bureau or office or to the person who has immediate supervision over you in the Office, Bureau or Department where you will be appointed?', answer: oi.question34?.answer || 'N/A', details: oi.question34?.details },
-      { num: '35', q: 'Have you ever been found guilty of any administrative offense?', answer: oi.question35a?.answer || 'N/A', details: oi.question35a?.details },
-      { num: '36', q: 'Have you been criminally charged before any court?', answer: oi.question35b?.answer || 'N/A', details: oi.question35b?.details },
-      { num: '37', q: 'Have you ever been convicted of any crime or violation of any law, decree, ordinance or regulation by any court or tribunal?', answer: oi.question36?.answer || 'N/A', details: oi.question36?.details },
-      { num: '38', q: 'Have you ever been separated from the service in any of the following modes: resignation, retirement, dropped from the rolls, dismissal, termination, end of term, finished contract or phased out (abolition) in the public or private sector?', answer: oi.question37?.answer || 'N/A', details: oi.question37?.details },
-      { num: '39', q: 'Have you ever been a candidate in a national or local election held within the last year (except Barangay election)?', answer: oi.question38a?.answer || 'N/A', details: oi.question38a?.details },
-      { num: '40', q: 'Have you resigned from the government service during the three (3)-month period before the last election to promote/actively campaign for a national or local candidate?', answer: oi.question38b?.answer || 'N/A', details: oi.question38b?.details },
+      { num: '34a', q: 'Are you related by consanguinity or affinity to the appointing or recommending authority, or to the chief of bureau or office or to the person who has immediate supervision over you in the Office, Bureau or Department where you will be appointed, within the third degree?', answer: oi.relatedThirdDegree ? 'YES' : 'NO', details: oi.relatedThirdDegreeDetails },
+      { num: '34b', q: 'within the fourth degree (for Local Government Unit - Career Employees)?', answer: oi.relatedFourthDegree ? 'YES' : 'NO', details: oi.relatedFourthDegreeDetails },
+      { num: '35', q: 'Have you ever been found guilty of any administrative offense?', answer: oi.guiltyAdministrativeOffense ? 'YES' : 'NO', details: oi.guiltyAdministrativeOffenseDetails },
+      { num: '36', q: 'Have you been criminally charged before any court?', answer: oi.criminallyCharged ? 'YES' : 'NO', details: oi.criminallyChargedDetails },
+      { num: '37', q: 'Have you ever been convicted of any crime or violation of any law, decree, ordinance or regulation by any court or tribunal?', answer: oi.convicted ? 'YES' : 'NO', details: oi.convictedDetails },
+      { num: '38', q: 'Have you ever been separated from the service in any of the following modes: resignation, retirement, dropped from the rolls, dismissal, termination, end of term, finished contract or phased out (abolition) in the public or private sector?', answer: oi.separatedFromService ? 'YES' : 'NO', details: oi.separatedFromServiceDetails },
+      { num: '39', q: 'Have you ever been a candidate in a national or local election held within the last year (except Barangay election)?', answer: oi.candidateNationalLocal ? 'YES' : 'NO', details: oi.candidateNationalLocalDetails },
+      { num: '40', q: 'Have you resigned from the government service during the three (3)-month period before the last election to promote/actively campaign for a national or local candidate?', answer: oi.resignedForCandidacy ? 'YES' : 'NO', details: oi.resignedForCandidacyDetails },
+      { num: '41', q: 'Have you acquired the status of an immigrant or permanent resident of another country?', answer: oi.immigrantOrPermanentResident ? 'YES' : 'NO', details: oi.immigrantOrPermanentResidentCountry },
+      { num: '42a', q: 'Are you a member of any indigenous group?', answer: oi.indigenousGroupMember ? 'YES' : 'NO', details: oi.indigenousGroupName },
+      { num: '42b', q: 'Are you a person with disability?', answer: oi.personWithDisability ? 'YES' : 'NO', details: oi.personWithDisabilityDetails },
+      { num: '42c', q: 'Are you a solo parent?', answer: oi.soloParent ? 'YES' : 'NO', details: oi.soloParentIdNumber ? `ID Number: ${oi.soloParentIdNumber}` : undefined },
     ];
 
     questions.forEach((q) => {

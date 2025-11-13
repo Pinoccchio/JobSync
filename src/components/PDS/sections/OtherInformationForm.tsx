@@ -40,6 +40,7 @@ export const OtherInformationForm: React.FC<OtherInformationFormProps> = ({
       recognitions: [],
       memberships: [],
       references: [],
+      governmentIssuedId: {},
       declaration: {
         agreed: false,
         dateAccomplished: '',
