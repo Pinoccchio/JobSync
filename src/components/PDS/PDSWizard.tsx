@@ -807,6 +807,7 @@ export const PDSWizard: React.FC = () => {
         return (
           <ReviewSubmit
             pdsData={pdsData}
+            pdsId={pdsData.id}
             onEdit={(sectionIndex) => setCurrentStep(sectionIndex)}
             onSubmit={handleSubmit}
           />

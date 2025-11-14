@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
 import { generateCSCFormatPDF } from '@/lib/pds/pdfGeneratorCSC';
 import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
+import fs from 'fs';
+import path from 'path';
 
 export async function GET(
   request: NextRequest,
@@ -63,12 +65,57 @@ export async function GET(
     const applicantName = applicantProfile?.full_name || 'Unknown Applicant';
 
     // Read format, includeSignature and useCurrentDate from query parameters
-    const format = request.nextUrl.searchParams.get('format') || 'modern'; // 'csc' | 'modern'
+    const format = request.nextUrl.searchParams.get('format') || 'modern'; // 'csc' | 'modern' | 'excel'
     const includeSignature = request.nextUrl.searchParams.get('includeSignature') === 'true';
     const useCurrentDate = request.nextUrl.searchParams.get('useCurrentDate') === 'true';
 
     // Transform database format (snake_case) to application format (camelCase)
     const transformedPDSData = transformPDSFromDatabase(pdsData);
+
+    // Handle Excel export - serve empty template for manual filling
+    if (format === 'excel') {
+      try {
+        // Read the empty PDS 2025 template file
+        const templatePath = path.join(process.cwd(), 'public', 'templates', 'PDS_2025_Template.xlsx');
+
+        // Verify template exists
+        if (!fs.existsSync(templatePath)) {
+          console.error('Template file not found at:', templatePath);
+          return NextResponse.json(
+            { success: false, error: 'Template file not found' },
+            { status: 404 }
+          );
+        }
+
+        // Read template file as buffer
+        console.log('📂 Serving empty PDS template from:', templatePath);
+        const templateBuffer = fs.readFileSync(templatePath);
+
+        // Generate filename using applicant info for personalization
+        const surname = transformedPDSData.personalInfo?.surname || 'TEMPLATE';
+        const firstName = transformedPDSData.personalInfo?.firstName || 'PDS';
+        const cleanSurname = surname.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+        const cleanFirstName = firstName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+        const fileName = `CS_Form_212_${cleanSurname}_${cleanFirstName}_2025.xlsx`;
+
+        console.log('✅ Serving template as:', fileName);
+
+        // Return template as downloadable file
+        return new NextResponse(templateBuffer, {
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Length': templateBuffer.length.toString(),
+          },
+        });
+      } catch (error) {
+        console.error('Error serving Excel template:', error);
+        return NextResponse.json(
+          { success: false, error: 'Failed to serve Excel template' },
+          { status: 500 }
+        );
+      }
+    }
 
     // Generate PDF using appropriate generator based on format
     const doc = format === 'csc'

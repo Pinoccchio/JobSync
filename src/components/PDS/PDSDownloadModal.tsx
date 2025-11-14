@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui';
-import { FileText, Download, CheckCircle2 } from 'lucide-react';
+import { FileText, Download, CheckCircle2, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 
 interface PDSDownloadModalProps {
@@ -13,7 +13,7 @@ interface PDSDownloadModalProps {
 
 export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalProps) {
   const { showToast } = useToast();
-  const [selectedFormat, setSelectedFormat] = useState<'csc' | 'modern'>('csc');
+  const [selectedFormat, setSelectedFormat] = useState<'csc' | 'modern' | 'excel'>('csc');
   const [includeSignature, setIncludeSignature] = useState(true);
   const [useCurrentDate, setUseCurrentDate] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -38,20 +38,39 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
         throw new Error('Failed to download PDS');
       }
 
-      // Get the PDF blob
+      // Get the file blob
       const blob = await response.blob();
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `PDS_${selectedFormat === 'csc' ? 'CSC' : 'Modern'}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // Set filename based on format
+      if (selectedFormat === 'excel') {
+        // Excel filename from backend Content-Disposition header
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'PDS_2025.xlsx'; // fallback
+
+        if (contentDisposition) {
+          // Use non-greedy regex to avoid capturing quotes
+          const match = contentDisposition.match(/filename="([^"]+)"/i);
+          if (match && match[1]) {
+            filename = match[1];
+          }
+        }
+        link.download = filename;
+      } else {
+        link.download = `PDS_${selectedFormat === 'csc' ? 'CSC' : 'Modern'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      }
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
       // Close modal after successful download
+      showToast(`PDS downloaded successfully as ${selectedFormat === 'excel' ? 'Excel' : 'PDF'}!`, 'success');
       onClose();
     } catch (error) {
       console.error('Error downloading PDS:', error);
@@ -73,7 +92,7 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
         {/* Format Selection */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Select Format:</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             {/* CSC Format Option */}
             <button
               onClick={() => setSelectedFormat('csc')}
@@ -126,12 +145,12 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Modern Format</h4>
+                  <h4 className="font-semibold text-gray-900">Modern PDF</h4>
                   <p className="text-xs text-gray-600 mt-1">
-                    JobSync Enhanced Layout
+                    JobSync Layout
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Clean table-based design for internal use
+                    Clean table design
                   </p>
                 </div>
                 {selectedFormat === 'modern' && (
@@ -141,45 +160,83 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
                 )}
               </div>
             </button>
+
+            {/* Excel Format Option */}
+            <button
+              onClick={() => setSelectedFormat('excel')}
+              className={`relative p-4 rounded-lg border-2 transition-all ${
+                selectedFormat === 'excel'
+                  ? 'border-teal-500 bg-teal-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  selectedFormat === 'excel' ? 'bg-teal-500' : 'bg-gray-200'
+                }`}>
+                  <FileSpreadsheet className={`w-6 h-6 ${
+                    selectedFormat === 'excel' ? 'text-white' : 'text-gray-600'
+                  }`} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Official Excel 2025</h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    CS Form 212 Excel
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Editable CSC format
+                  </p>
+                </div>
+                {selectedFormat === 'excel' && (
+                  <div className="absolute top-2 right-2">
+                    <CheckCircle2 className="w-5 h-5 text-teal-500" />
+                  </div>
+                )}
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Options */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Download Options:</h3>
-          <div className="space-y-2">
-            {/* Include Signature */}
-            <label className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeSignature}
-                onChange={(e) => setIncludeSignature(e.target.checked)}
-                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-              />
-              <span className="text-sm text-gray-700">Include Digital Signature</span>
-            </label>
+        {/* Options (only for PDF formats) */}
+        {selectedFormat !== 'excel' && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Download Options:</h3>
+            <div className="space-y-2">
+              {/* Include Signature */}
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeSignature}
+                  onChange={(e) => setIncludeSignature(e.target.checked)}
+                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                />
+                <span className="text-sm text-gray-700">Include Digital Signature</span>
+              </label>
 
-            {/* Use Current Date */}
-            <label className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={useCurrentDate}
-                onChange={(e) => setUseCurrentDate(e.target.checked)}
-                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-              />
-              <span className="text-sm text-gray-700">Use Current Date (instead of PDS date)</span>
-            </label>
+              {/* Use Current Date */}
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCurrentDate}
+                  onChange={(e) => setUseCurrentDate(e.target.checked)}
+                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                />
+                <span className="text-sm text-gray-700">Use Current Date (instead of PDS date)</span>
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Format Description */}
         <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
           <h4 className="text-sm font-semibold text-gray-900 mb-2">
-            {selectedFormat === 'csc' ? 'Official CSC Format' : 'Modern Format'}
+            {selectedFormat === 'csc' ? 'Official CSC PDF Format' : selectedFormat === 'excel' ? 'Official Excel 2025 Format' : 'Modern PDF Format'}
           </h4>
           <p className="text-xs text-gray-600">
             {selectedFormat === 'csc'
               ? 'This format replicates the official CS Form No. 212, Revised 2025 with box-based layout. Recommended for submission to government panels and HR offices requiring CSC compliance.'
+              : selectedFormat === 'excel'
+              ? 'Downloads the official CS Form No. 212, Revised 2025 as an EMPTY editable Excel template (.xlsx). Fill it out manually in Excel/LibreOffice with complete control over formatting. Guaranteed 100% CSC format compliance. Filename: CS_Form_212_LASTNAME_FIRSTNAME_2025.xlsx'
               : 'This format uses a modern, clean table-based design optimized for readability. Ideal for internal reviews, portfolio purposes, and digital archiving.'}
           </p>
         </div>
@@ -189,10 +246,12 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            className={`flex-1 flex items-center justify-center gap-2 text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium ${
+              selectedFormat === 'excel' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
             <Download className="w-4 h-4" />
-            {isDownloading ? 'Downloading...' : 'Download PDF'}
+            {isDownloading ? 'Downloading...' : `Download ${selectedFormat === 'excel' ? 'Excel' : 'PDF'}`}
           </button>
           <button
             onClick={onClose}
@@ -205,7 +264,7 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
 
         {/* Info Note */}
         <div className="text-xs text-gray-500 italic">
-          <p>Note: The PDF will be generated with the selected format and options. Large PDFs may take a few seconds to download.</p>
+          <p>Note: The {selectedFormat === 'excel' ? 'Excel file' : 'PDF'} will be generated with the selected format{selectedFormat !== 'excel' ? ' and options' : ''}. Large files may take a few seconds to download.</p>
         </div>
       </div>
     </Modal>

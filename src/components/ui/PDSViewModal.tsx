@@ -116,9 +116,9 @@ export function PDSViewModal({ isOpen, onClose, pdsData, applicantName }: PDSVie
               size="sm"
               icon={Download}
               onClick={handleDownloadClick}
-              title="Download PDS as PDF"
+              title="Download PDS"
             >
-              Download PDS as PDF
+              Download PDS
             </Button>
           </div>
         </div>

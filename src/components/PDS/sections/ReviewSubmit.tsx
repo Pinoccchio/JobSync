@@ -19,11 +19,12 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
   onSubmit,
 }) => {
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [includeSignature, setIncludeSignature] = useState(false);
 
   const isComplete = () => {
     return (
       pdsData.personalInfo?.surname &&
-      pdsData.familyBackground?.fatherSurname &&
+      pdsData.familyBackground?.father?.surname &&
       (pdsData.educationalBackground?.length || 0) > 0 &&
       pdsData.otherInformation?.declaration?.agreed
     );
@@ -436,7 +437,7 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             </p>
             <ul className="list-disc list-inside text-sm text-yellow-700 mt-2 space-y-1">
               {!pdsData.personalInfo?.surname && <li>Personal Information</li>}
-              {!pdsData.familyBackground?.father && <li>Family Background</li>}
+              {!pdsData.familyBackground?.father?.surname && <li>Family Background</li>}
               {(pdsData.educationalBackground?.length || 0) === 0 && <li>Educational Background</li>}
               {!pdsData.otherInformation?.declaration?.agreed && <li>Declaration & Signature</li>}
             </ul>
@@ -484,7 +485,7 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
             disabled={!pdsId || !pdsData.personalInfo?.surname}
             className="w-full"
           >
-            Download PDS as PDF
+            Download PDS
           </Button>
 
           <Button
